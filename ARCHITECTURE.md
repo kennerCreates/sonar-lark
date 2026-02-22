@@ -97,6 +97,9 @@ CourseData ──► spawn obstacles + drones
 | `GateIndex` | Component | race/gate | Gate sequence order |
 | `RaceProgress` | Resource | race/progress | Per-drone gate/finish tracking |
 | `CameraState` | Resource | camera/switching | Current mode + target drone |
+| `SpectatorSettings` | Resource | camera/spectator | Movement speed + mouse sensitivity |
+| `AvailableCourses` | Resource | menu/ui | Discovered course files (Menu state only) |
+| `SelectedCourse` | Resource | course/loader | User's course selection for racing |
 
 ## Assets
 

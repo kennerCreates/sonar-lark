@@ -1,11 +1,12 @@
-pub mod spectator;
-pub mod fpv;
 pub mod chase;
+pub mod fpv;
+pub mod spectator;
 pub mod switching;
 
 use bevy::prelude::*;
 
 use crate::states::AppState;
+use spectator::SpectatorSettings;
 use switching::CameraState;
 
 pub struct CameraPlugin;
@@ -13,12 +14,12 @@ pub struct CameraPlugin;
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraState>()
+            .init_resource::<SpectatorSettings>()
             .add_systems(Startup, spawn_camera)
             .add_systems(
                 Update,
-                spectator::spectator_movement.run_if(
-                    in_state(AppState::Editor).or(in_state(AppState::Race)),
-                ),
+                spectator::spectator_movement
+                    .run_if(in_state(AppState::Editor).or(in_state(AppState::Race))),
             );
     }
 }

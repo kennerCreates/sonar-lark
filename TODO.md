@@ -5,15 +5,9 @@
 - [x] **Phase 1**: States, common, main.rs wiring — state machine skeleton
 - [x] **Phase 2**: Obstacle and course data layer + RON serialization
 - [x] **Documentation**: CLAUDE.md updated, ARCHITECTURE.md created
+- [x] **Phase 3**: Menu UI + Spectator Camera enhancements
 
 ## Remaining
-
-### Phase 3: Menu + Spectator Camera
-- [ ] Menu UI with bevy_ui: buttons for Editor, Race, course selection
-- [ ] `SelectedCourse` resource populated from menu
-- [ ] `DespawnOnExit(AppState::Menu)` on all menu entities
-- [ ] Spectator camera: add mouse-look (right-click drag for rotation)
-- [ ] Spectator camera: scroll wheel for speed adjustment
 
 ### Phase 4: Editor — Obstacle Workshop
 - [ ] `WorkshopState` resource (selected scene name, preview entity, trigger config)
