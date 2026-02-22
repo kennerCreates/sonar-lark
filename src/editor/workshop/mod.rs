@@ -1,6 +1,7 @@
 pub mod ui;
 
 use bevy::{
+    gizmos::config::{DefaultGizmoConfigGroup, GizmoConfigStore},
     input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll},
     prelude::*,
 };
@@ -53,6 +54,9 @@ pub enum EditTarget {
 
 #[derive(Component)]
 pub struct PreviewObstacle;
+
+#[derive(Default, Reflect, GizmoConfigGroup)]
+struct TriggerGizmoGroup;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Axis {
@@ -124,7 +128,8 @@ pub struct WorkshopPlugin;
 
 impl Plugin for WorkshopPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.init_gizmo_group::<TriggerGizmoGroup>()
+        .add_systems(
             OnEnter(EditorMode::ObstacleWorkshop),
             (load_gltf_for_workshop, setup_workshop),
         )
@@ -183,17 +188,25 @@ fn load_gltf_for_workshop(
     }
 }
 
-fn setup_workshop(mut commands: Commands, library: Res<ObstacleLibrary>) {
+fn setup_workshop(
+    mut commands: Commands,
+    library: Res<ObstacleLibrary>,
+    mut config_store: ResMut<GizmoConfigStore>,
+) {
     let state = WorkshopState::default();
     ui::build_workshop_ui(&mut commands, &library);
     commands.insert_resource(state);
     commands.insert_resource(MoveWidgetState::default());
     commands.insert_resource(ResizeWidgetState::default());
+
+    let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
+    config.depth_bias = -1.0;
 }
 
 fn cleanup_workshop(
     mut commands: Commands,
     preview_query: Query<Entity, With<PreviewObstacle>>,
+    mut config_store: ResMut<GizmoConfigStore>,
 ) {
     commands.remove_resource::<WorkshopState>();
     commands.remove_resource::<MoveWidgetState>();
@@ -201,6 +214,9 @@ fn cleanup_workshop(
     for entity in &preview_query {
         commands.entity(entity).despawn();
     }
+
+    let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
+    config.depth_bias = 0.0;
 }
 
 fn populate_node_list(
@@ -343,7 +359,7 @@ fn spawn_placeholder_preview(
 }
 
 fn draw_trigger_gizmo(
-    mut gizmos: Gizmos,
+    mut gizmos: Gizmos<TriggerGizmoGroup>,
     state: Res<WorkshopState>,
     preview_query: Query<&Transform, With<PreviewObstacle>>,
 ) {
