@@ -37,7 +37,10 @@ pub(crate) struct CourseItem(usize);
 pub(crate) struct RaceButtonText;
 
 fn discover_courses() -> Vec<CourseEntry> {
-    let courses_dir = Path::new("assets/courses");
+    discover_courses_in(Path::new("assets/courses"))
+}
+
+fn discover_courses_in(courses_dir: &Path) -> Vec<CourseEntry> {
     let mut courses = Vec::new();
 
     if let Ok(entries) = fs::read_dir(courses_dir) {
@@ -351,4 +354,70 @@ pub fn handle_button_visuals(
 
 pub fn cleanup_menu(mut commands: Commands) {
     commands.remove_resource::<AvailableCourses>();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn discover_empty_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let courses = discover_courses_in(dir.path());
+        assert!(courses.is_empty());
+    }
+
+    #[test]
+    fn discover_nonexistent_directory() {
+        let courses = discover_courses_in(Path::new("this/does/not/exist"));
+        assert!(courses.is_empty());
+    }
+
+    #[test]
+    fn discover_filters_ron_only() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("track.course.ron"), "()").unwrap();
+        fs::write(dir.path().join("readme.txt"), "ignore me").unwrap();
+        fs::write(dir.path().join("notes.md"), "ignore me too").unwrap();
+
+        let courses = discover_courses_in(dir.path());
+        assert_eq!(courses.len(), 1);
+        assert_eq!(courses[0].name, "track");
+    }
+
+    #[test]
+    fn discover_strips_course_suffix() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("mountain.course.ron"), "()").unwrap();
+        fs::write(dir.path().join("simple.ron"), "()").unwrap();
+
+        let courses = discover_courses_in(dir.path());
+        assert_eq!(courses.len(), 2);
+        // Sorted alphabetically
+        assert_eq!(courses[0].name, "mountain");
+        assert_eq!(courses[1].name, "simple");
+    }
+
+    #[test]
+    fn discover_results_sorted_alphabetically() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("zebra.course.ron"), "()").unwrap();
+        fs::write(dir.path().join("alpha.course.ron"), "()").unwrap();
+        fs::write(dir.path().join("middle.course.ron"), "()").unwrap();
+
+        let courses = discover_courses_in(dir.path());
+        let names: Vec<&str> = courses.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["alpha", "middle", "zebra"]);
+    }
+
+    #[test]
+    fn discover_stores_full_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test.course.ron");
+        fs::write(&file_path, "()").unwrap();
+
+        let courses = discover_courses_in(dir.path());
+        assert_eq!(courses.len(), 1);
+        assert!(courses[0].path.contains("test.course.ron"));
+    }
 }

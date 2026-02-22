@@ -7,6 +7,8 @@
 - [x] **Documentation**: CLAUDE.md updated, ARCHITECTURE.md created
 - [x] **Phase 3**: Menu UI + Spectator Camera enhancements
 - [x] **Phase 4**: Editor — Obstacle Workshop (WorkshopState, scene browser, trigger gizmo, save/load/delete)
+- [x] **Testing**: Unit tests for obstacle library, course data, and menu discovery (22 tests)
+- [x] **Bugfix**: Workshop preview placeholder spawn race condition with deferred despawns
 
 ### Phase 5: Editor — Course Editor
 - [ ] `PlacementState` resource (selected obstacle, dragging entity, drag height)

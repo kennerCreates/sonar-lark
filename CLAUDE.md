@@ -55,3 +55,11 @@ After completing each implementation phase:
 
 1. **Update documentation**: Review and update `TODO.md`, `ARCHITECTURE.md`, and `CLAUDE.md` with any new types, patterns, or conventions introduced.
 2. **Review warnings**: Run `cargo build` and review all warnings. Fix any that indicate real issues (unused imports, unnecessary mut, etc.). Warnings for types/functions that are planned for upcoming phases in the current sprint are acceptable and should be left alone — do not suppress them with `#[allow(dead_code)]`.
+3. **Run tests**: Run `cargo test` and verify all tests pass. Add tests for new pure-logic functions.
+
+## Testing Conventions
+
+- Tests live in `#[cfg(test)] mod tests` at the bottom of each source file (idiomatic Rust).
+- Use `tempfile` crate (dev-dependency) for filesystem tests — never write to the real `assets/` directory.
+- Test pure logic and serialization (file I/O, data structures, discovery). ECS systems are tested manually.
+- When adding file I/O functions, provide a parameterized version that accepts a `&Path` so tests can use temp directories (e.g., `discover_courses_in(path)` vs `discover_courses()`).

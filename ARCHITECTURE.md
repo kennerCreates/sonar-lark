@@ -121,3 +121,18 @@ assets/
 - AI waypoint updates: O(12) per fixed tick
 - No system ordering constraints between unrelated plugins — maximum parallelism
 - `DespawnOnExit` for automatic entity cleanup on state transitions
+
+## Testing
+
+Unit tests cover the pure-logic data layers. Run with `cargo test`.
+
+| Module | Tests | What's covered |
+|--------|-------|----------------|
+| `obstacle::library` | 8 | Insert/get, overwrite, save/load roundtrip, error cases, existing RON format |
+| `course::loader` | 7 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format |
+| `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
+
+Functions used by tests:
+- `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
+- `load_course_from_file` / `save_course` — pure file I/O, no Bevy systems
+- `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability

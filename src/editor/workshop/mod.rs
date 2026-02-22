@@ -127,14 +127,14 @@ fn populate_node_list(
         return;
     };
 
+    let Ok(container) = container_query.single() else {
+        return;
+    };
+
     let mut nodes: Vec<String> = gltf.named_nodes.keys().map(|k| k.to_string()).collect();
     nodes.sort();
     state.available_nodes = nodes.clone();
     state.nodes_loaded = true;
-
-    let Ok(container) = container_query.single() else {
-        return;
-    };
 
     commands.entity(container).despawn_related::<Children>();
     commands.entity(container).with_children(|parent| {
@@ -205,7 +205,6 @@ fn spawn_placeholder_preview(
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
-    preview_query: Query<Entity, With<PreviewObstacle>>,
 ) {
     if state.node_name.is_empty() || state.preview_entity.is_some() {
         return;
@@ -227,20 +226,18 @@ fn spawn_placeholder_preview(
     }
 
     // No matching glTF node — spawn a placeholder cube
-    if preview_query.is_empty() {
-        let entity = commands
-            .spawn((
-                Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::srgb(0.5, 0.5, 0.6),
-                    ..default()
-                })),
-                Transform::default(),
-                PreviewObstacle,
-            ))
-            .id();
-        state.preview_entity = Some(entity);
-    }
+    let entity = commands
+        .spawn((
+            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgb(0.5, 0.5, 0.6),
+                ..default()
+            })),
+            Transform::default(),
+            PreviewObstacle,
+        ))
+        .id();
+    state.preview_entity = Some(entity);
 }
 
 fn draw_trigger_gizmo(mut gizmos: Gizmos, state: Res<WorkshopState>) {

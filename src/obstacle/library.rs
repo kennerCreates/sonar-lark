@@ -72,3 +72,139 @@ pub fn save_obstacle_library(library: &ObstacleLibrary) {
         Err(e) => error!("Failed to save obstacle library: {e}"),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::obstacle::definition::TriggerVolumeConfig;
+    use bevy::math::Vec3;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    fn sample_def(id: &str, node: &str, gate: bool) -> ObstacleDef {
+        ObstacleDef {
+            id: ObstacleId(id.to_string()),
+            glb_node_name: node.to_string(),
+            trigger_volume: if gate {
+                Some(TriggerVolumeConfig {
+                    offset: Vec3::new(0.0, 1.0, 0.0),
+                    half_extents: Vec3::new(2.0, 2.0, 0.5),
+                })
+            } else {
+                None
+            },
+            is_gate: gate,
+        }
+    }
+
+    #[test]
+    fn insert_and_get() {
+        let mut lib = ObstacleLibrary::default();
+        lib.insert(sample_def("gate_air", "gate_air", true));
+
+        let id = ObstacleId("gate_air".to_string());
+        let fetched = lib.get(&id).unwrap();
+        assert_eq!(fetched.id, id);
+        assert_eq!(fetched.glb_node_name, "gate_air");
+        assert!(fetched.is_gate);
+        assert!(fetched.trigger_volume.is_some());
+    }
+
+    #[test]
+    fn get_missing_returns_none() {
+        let lib = ObstacleLibrary::default();
+        assert!(lib.get(&ObstacleId("nonexistent".to_string())).is_none());
+    }
+
+    #[test]
+    fn insert_overwrites_same_id() {
+        let mut lib = ObstacleLibrary::default();
+        lib.insert(sample_def("wall", "wall_mesh", false));
+        lib.insert(sample_def("wall", "wall_mesh_v2", false));
+
+        let id = ObstacleId("wall".to_string());
+        assert_eq!(lib.get(&id).unwrap().glb_node_name, "wall_mesh_v2");
+        assert_eq!(lib.definitions.len(), 1);
+    }
+
+    #[test]
+    fn save_load_roundtrip() {
+        let mut lib = ObstacleLibrary::default();
+        lib.insert(sample_def("gate_air", "gate_air", true));
+        lib.insert(sample_def("wall_short", "wall_short", false));
+
+        let tmp = NamedTempFile::new().unwrap();
+        lib.save_to_file(tmp.path()).unwrap();
+        let loaded = ObstacleLibrary::load_from_file(tmp.path()).unwrap();
+
+        assert_eq!(loaded.definitions.len(), 2);
+
+        let gate = loaded.get(&ObstacleId("gate_air".to_string())).unwrap();
+        assert!(gate.is_gate);
+        let tv = gate.trigger_volume.as_ref().unwrap();
+        assert_eq!(tv.offset, Vec3::new(0.0, 1.0, 0.0));
+        assert_eq!(tv.half_extents, Vec3::new(2.0, 2.0, 0.5));
+
+        let wall = loaded.get(&ObstacleId("wall_short".to_string())).unwrap();
+        assert!(!wall.is_gate);
+        assert!(wall.trigger_volume.is_none());
+    }
+
+    #[test]
+    fn save_creates_parent_directories() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nested").join("dir").join("lib.ron");
+
+        let mut lib = ObstacleLibrary::default();
+        lib.insert(sample_def("test", "test_mesh", false));
+        lib.save_to_file(&path).unwrap();
+
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn load_missing_file_returns_error() {
+        let result = ObstacleLibrary::load_from_file(Path::new("nonexistent_path.ron"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_invalid_ron_returns_error() {
+        let mut tmp = NamedTempFile::new().unwrap();
+        write!(tmp, "this is not valid RON").unwrap();
+        assert!(ObstacleLibrary::load_from_file(tmp.path()).is_err());
+    }
+
+    #[test]
+    fn empty_library_roundtrip() {
+        let lib = ObstacleLibrary::default();
+        let tmp = NamedTempFile::new().unwrap();
+
+        lib.save_to_file(tmp.path()).unwrap();
+        let loaded = ObstacleLibrary::load_from_file(tmp.path()).unwrap();
+        assert!(loaded.definitions.is_empty());
+    }
+
+    #[test]
+    fn load_existing_ron_format() {
+        let ron_content = r#"[
+    (
+        id: ("gate_air"),
+        glb_node_name: "gate_air",
+        trigger_volume: Some((
+            offset: (0.0, 1.0, 0.0),
+            half_extents: (2.0, 2.0, 0.5),
+        )),
+        is_gate: true,
+    ),
+]"#;
+        let mut tmp = NamedTempFile::new().unwrap();
+        write!(tmp, "{ron_content}").unwrap();
+
+        let loaded = ObstacleLibrary::load_from_file(tmp.path()).unwrap();
+        assert_eq!(loaded.definitions.len(), 1);
+        let gate = loaded.get(&ObstacleId("gate_air".to_string())).unwrap();
+        assert_eq!(gate.glb_node_name, "gate_air");
+        assert!(gate.is_gate);
+    }
+}
