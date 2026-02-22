@@ -16,4 +16,6 @@ pub struct ObstacleDef {
     pub glb_node_name: String,
     pub trigger_volume: Option<TriggerVolumeConfig>,
     pub is_gate: bool,
+    #[serde(default)]
+    pub model_offset: Vec3,
 }

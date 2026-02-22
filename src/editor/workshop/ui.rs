@@ -680,6 +680,7 @@ pub fn handle_library_selection(
             state.trigger_offset = trigger.offset;
             state.trigger_half_extents = trigger.half_extents;
         }
+        state.model_offset = def.model_offset;
 
         for entity in &preview_query {
             commands.entity(entity).despawn();
@@ -775,6 +776,7 @@ pub fn handle_save_button(
             glb_node_name: state.node_name.clone(),
             trigger_volume,
             is_gate: state.is_gate,
+            model_offset: state.model_offset,
         };
 
         library.insert(def);

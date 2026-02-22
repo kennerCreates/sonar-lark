@@ -94,6 +94,7 @@ mod tests {
                 None
             },
             is_gate: gate,
+            model_offset: Vec3::ZERO,
         }
     }
 

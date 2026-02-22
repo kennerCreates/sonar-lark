@@ -5,7 +5,7 @@ pub mod switching;
 
 use bevy::prelude::*;
 
-use crate::states::AppState;
+use crate::states::{AppState, EditorMode};
 use spectator::SpectatorSettings;
 use switching::CameraState;
 
@@ -19,7 +19,7 @@ impl Plugin for CameraPlugin {
             .add_systems(
                 Update,
                 spectator::spectator_movement
-                    .run_if(in_state(AppState::Editor).or(in_state(AppState::Race))),
+                    .run_if(in_state(AppState::Race).or(in_state(EditorMode::CourseEditor))),
             );
     }
 }
