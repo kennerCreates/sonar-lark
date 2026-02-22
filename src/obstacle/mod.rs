@@ -8,6 +8,7 @@ pub struct ObstaclePlugin;
 
 impl Plugin for ObstaclePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<library::ObstacleLibrary>();
+        app.init_resource::<library::ObstacleLibrary>()
+            .add_systems(Startup, library::load_obstacle_library);
     }
 }

@@ -2,7 +2,13 @@
 
 ## Project Context
 
-This is a 3D video game built in **Rust** using the **Bevy 0.18.0** game framework.
+This is a **drone racing simulator with a built-in map editor**, built in **Rust** using **Bevy 0.18.0**. See `ARCHITECTURE.md` for the full module structure, data flow, and design decisions.
+
+Key facts:
+- **State machine**: `AppState` (Menu → Editor → Race → Results) with `EditorMode` SubStates (ObstacleWorkshop, CourseEditor)
+- **Physics**: PID-lite quadrotor in `FixedUpdate`, 12 AI drones with per-drone variation
+- **Data**: Obstacle definitions and courses serialized as RON. Single `.glb` file for all 3D models.
+- **Gate validation**: Trigger volumes (AABB), gates must be passed in order. Hit/miss = crash.
 
 ## MCP Tools
 
@@ -31,3 +37,12 @@ The performance target is a stable **60fps**. Performance is paramount.
 - If existing code is encountered that poses a performance risk, flag it proactively even if it wasn't the subject of the current task.
 - Prefer solutions with predictable, bounded performance over those with better average-case but worse worst-case behavior.
 - Be mindful of Bevy-specific pitfalls: over-querying, large archetypes, and unnecessary system ordering constraints that block parallelism.
+
+## Project Conventions
+
+- **Plugins**: each module exposes a single plugin (struct or fn). Plugins register their own systems with appropriate state guards via `run_if(in_state(...))`.
+- **State scoping**: use `DespawnOnExit` on entities that should be cleaned up when leaving a state. Do not manually despawn in `OnExit` unless there's a reason.
+- **Serialization**: all persistent data uses RON via serde. Obstacle library lives at `assets/library/default.obstacles.ron`, courses at `assets/courses/*.course.ron`.
+- **Asset loading**: all obstacle models come from a single `assets/models/obstacles.glb`. Individual objects are accessed via `Gltf::named_scenes` using the Blender object name.
+- **Physics**: all physics systems run in `FixedUpdate` with `.chain()` for ordering. No physics in `Update`.
+- **Bevy 0.18 specifics**: `set_parent_in_place()` (not `set_parent()`), `SceneRoot` (not `SceneBundle`), `Mesh3d`/`MeshMaterial3d` components.
