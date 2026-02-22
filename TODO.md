@@ -6,17 +6,7 @@
 - [x] **Phase 2**: Obstacle and course data layer + RON serialization
 - [x] **Documentation**: CLAUDE.md updated, ARCHITECTURE.md created
 - [x] **Phase 3**: Menu UI + Spectator Camera enhancements
-
-## Remaining
-
-### Phase 4: Editor — Obstacle Workshop
-- [ ] `WorkshopState` resource (selected scene name, preview entity, trigger config)
-- [ ] UI to enter/select glTF scene name from `obstacles.glb`
-- [ ] Spawn preview of selected obstacle model
-- [ ] Gizmo overlay for trigger volume (wireframe box)
-- [ ] UI controls to adjust trigger volume offset and half_extents
-- [ ] Save to `ObstacleLibrary` and serialize to `default.obstacles.ron`
-- [ ] Toggle `is_gate` flag per obstacle
+- [x] **Phase 4**: Editor — Obstacle Workshop (WorkshopState, scene browser, trigger gizmo, save/load/delete)
 
 ### Phase 5: Editor — Course Editor
 - [ ] `PlacementState` resource (selected obstacle, dragging entity, drag height)

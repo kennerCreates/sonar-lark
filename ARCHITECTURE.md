@@ -33,6 +33,8 @@ src/
 │   └── loader.rs        Load/save/spawn courses from RON
 ├── editor/              Map editor
 │   ├── workshop/        Define new obstacle types from glb scenes
+│   │   ├── mod.rs       WorkshopPlugin, WorkshopState, preview spawning, gizmo
+│   │   └── ui.rs        Workshop UI layout, interaction handlers, text input
 │   └── course_editor/   Place obstacles, set gate order
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, PidController, DroneDynamics, DroneConfig, AIController
@@ -100,6 +102,8 @@ CourseData ──► spawn obstacles + drones
 | `SpectatorSettings` | Resource | camera/spectator | Movement speed + mouse sensitivity |
 | `AvailableCourses` | Resource | menu/ui | Discovered course files (Menu state only) |
 | `SelectedCourse` | Resource | course/loader | User's course selection for racing |
+| `WorkshopState` | Resource | editor/workshop | Current obstacle being edited (scene, trigger config, preview) |
+| `PreviewObstacle` | Component | editor/workshop | Marker on the 3D preview entity in the workshop |
 
 ## Assets
 

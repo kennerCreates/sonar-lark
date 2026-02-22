@@ -45,8 +45,9 @@ The performance target is a stable **60fps**. Performance is paramount.
 - **Serialization**: all persistent data uses RON via serde. Obstacle library lives at `assets/library/default.obstacles.ron`, courses at `assets/courses/*.course.ron`.
 - **Asset loading**: all obstacle models come from a single `assets/models/obstacles.glb`. Individual objects are accessed via `Gltf::named_scenes` using the Blender object name.
 - **Physics**: all physics systems run in `FixedUpdate` with `.chain()` for ordering. No physics in `Update`.
-- **Bevy 0.18 specifics**: `set_parent_in_place()` (not `set_parent()`), `SceneRoot` (not `SceneBundle`), `Mesh3d`/`MeshMaterial3d` components, `ChildSpawnerCommands` (not `ChildBuilder`) for `with_children` closures in commands context, `AccumulatedMouseMotion`/`AccumulatedMouseScroll` from `bevy::input::mouse` (not in prelude).
+- **Bevy 0.18 specifics**: `set_parent_in_place()` (not `set_parent()`), `SceneRoot` (not `SceneBundle`), `Mesh3d`/`MeshMaterial3d` components, `ChildSpawnerCommands` (not `ChildBuilder`) for `with_children` closures in commands context, `AccumulatedMouseMotion`/`AccumulatedMouseScroll` from `bevy::input::mouse` (not in prelude). `MessageReader<T>` (not `EventReader<T>`) for reading events. `KeyboardInput` from `bevy::input::keyboard`. System tuples max ~12 elements for `run_if`; split larger groups into multiple `add_systems` calls. `Gltf::named_scenes` uses `Box<str>` keys (not `String`).
 - **Menu pattern**: `AvailableCourses` resource is created on `OnEnter(Menu)` and removed on `OnExit(Menu)`. `SelectedCourse` resource persists across states to carry the user's course selection into Race.
+- **Workshop pattern**: `WorkshopState` resource is created on `OnEnter(ObstacleWorkshop)` and removed on `OnExit`. Preview entities use `PreviewObstacle` component and are manually despawned on exit (not part of UI hierarchy). glTF scene list populates asynchronously once the asset is loaded.
 
 ## Post-Phase Checklist
 
