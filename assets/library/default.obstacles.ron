@@ -1,12 +1,32 @@
 [
     (
+        id: ("gate_best"),
+        glb_node_name: "gate_air",
+        trigger_volume: Some((
+            offset: (-0.79640806, 14.091407, 0.0),
+            half_extents: (4.1758404, 4.7085934, 0.5),
+        )),
+        is_gate: true,
+        model_offset: (0.0, 0.0, 0.0),
+    ),
+    (
         id: ("gate_ground"),
         glb_node_name: "gate_ground",
         trigger_volume: Some((
-            offset: (0.0, 1.0, 0.0),
-            half_extents: (2.0, 2.0, 0.5),
+            offset: (-10.485883, 5.7935867, 0.0),
+            half_extents: (8.56579, 5.8794546, 0.5),
         )),
         is_gate: true,
         model_offset: (11.731935, 0.0, 0.0),
+    ),
+    (
+        id: ("gate_loop"),
+        glb_node_name: "gate_loop",
+        trigger_volume: Some((
+            offset: (0.4772761, 11.862752, -0.7912843),
+            half_extents: (6.2807226, 3.6850808, 1.3150666),
+        )),
+        is_gate: true,
+        model_offset: (-0.071406126, 0.0, 0.02642262),
     ),
 ]
