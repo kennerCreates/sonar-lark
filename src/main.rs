@@ -1,35 +1,31 @@
+mod camera;
+mod common;
+mod course;
+mod drone;
+mod editor;
+mod menu;
+mod obstacle;
+mod race;
+mod results;
+mod states;
+
 use bevy::prelude::*;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_systems(Startup, setup)
+        .init_state::<states::AppState>()
+        .add_sub_state::<states::EditorMode>()
+        .add_plugins((
+            common::CommonPlugin,
+            menu::MenuPlugin,
+            obstacle::ObstaclePlugin,
+            course::CoursePlugin,
+            editor::EditorPlugin,
+            drone::DronePlugin,
+            race::RacePlugin,
+            camera::CameraPlugin,
+            results::ResultsPlugin,
+        ))
         .run();
-}
-
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // Camera
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(0.0, 5.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-
-    // Light
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 10_000.0,
-            ..default()
-        },
-        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.5, -0.5, 0.0)),
-    ));
-
-    // Ground plane
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(20.0, 20.0))),
-        MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
-    ));
 }
