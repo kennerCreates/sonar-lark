@@ -163,6 +163,7 @@ pub fn spawn_preview(
     gltf_assets: &Assets<bevy::gltf::Gltf>,
     node_assets: &Assets<bevy::gltf::GltfNode>,
     mesh_assets: &Assets<bevy::gltf::GltfMesh>,
+    materials: &mut Assets<StandardMaterial>,
     gltf_handle: &ObstaclesGltfHandle,
     node_name: &str,
 ) -> Option<Entity> {
@@ -181,16 +182,18 @@ pub fn spawn_preview(
         .id();
 
     for primitive in &gltf_mesh.primitives {
-        let mut prim_commands = commands.spawn((
-            Mesh3d(primitive.mesh.clone()),
-            Transform::default(),
-        ));
+        let material = match primitive.material {
+            Some(ref mat) => MeshMaterial3d(mat.clone()),
+            None => MeshMaterial3d(materials.add(StandardMaterial::default())),
+        };
 
-        if let Some(ref material) = primitive.material {
-            prim_commands.insert(MeshMaterial3d(material.clone()));
-        }
-
-        prim_commands.set_parent_in_place(parent);
+        commands
+            .spawn((
+                Mesh3d(primitive.mesh.clone()),
+                material,
+                Transform::default(),
+            ))
+            .set_parent_in_place(parent);
     }
 
     Some(parent)
@@ -217,6 +220,7 @@ fn spawn_placeholder_preview(
             &gltf_assets,
             &node_assets,
             &mesh_assets,
+            &mut materials,
             handle,
             &state.node_name,
         ) {

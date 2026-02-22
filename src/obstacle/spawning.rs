@@ -30,6 +30,7 @@ pub fn spawn_obstacle(
     gltf_assets: &Assets<bevy::gltf::Gltf>,
     node_assets: &Assets<bevy::gltf::GltfNode>,
     mesh_assets: &Assets<bevy::gltf::GltfMesh>,
+    materials: &mut Assets<StandardMaterial>,
     gltf_handle: &ObstaclesGltfHandle,
     obstacle_id: &ObstacleId,
     node_name: &str,
@@ -59,16 +60,18 @@ pub fn spawn_obstacle(
 
     // Spawn each primitive as a child with its mesh and material
     for primitive in &gltf_mesh.primitives {
-        let mut prim_commands = commands.spawn((
-            Mesh3d(primitive.mesh.clone()),
-            node.transform,
-        ));
+        let material = match primitive.material {
+            Some(ref mat) => MeshMaterial3d(mat.clone()),
+            None => MeshMaterial3d(materials.add(StandardMaterial::default())),
+        };
 
-        if let Some(ref material) = primitive.material {
-            prim_commands.insert(MeshMaterial3d(material.clone()));
-        }
-
-        prim_commands.set_parent_in_place(entity);
+        commands
+            .spawn((
+                Mesh3d(primitive.mesh.clone()),
+                material,
+                node.transform,
+            ))
+            .set_parent_in_place(entity);
     }
 
     if let Some(trigger) = trigger_config {

@@ -41,6 +41,7 @@ pub fn spawn_course(
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let Some(course) = course else { return };
     let Some(gltf_handle) = gltf_handle else {
@@ -65,6 +66,7 @@ pub fn spawn_course(
             &gltf_assets,
             &node_assets,
             &mesh_assets,
+            &mut materials,
             &gltf_handle,
             &def.id,
             &def.glb_node_name,
