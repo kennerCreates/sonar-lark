@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-fetch"
+      ],
+      "env": {}
+    }
+  }
+}

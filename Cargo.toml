@@ -1,0 +1,20 @@
+[package]
+name = "sonar-lark"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.18.0", features = ["dynamic_linking"] }
+
+# Optimize dependencies in dev builds for better runtime performance
+# while keeping sonar-lark itself unoptimized for fast incremental compiles.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# Lean release build
+[profile.release]
+lto = "thin"
+codegen-units = 1
