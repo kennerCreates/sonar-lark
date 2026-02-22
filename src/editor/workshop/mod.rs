@@ -9,32 +9,32 @@ use crate::states::EditorMode;
 #[derive(Resource)]
 pub struct WorkshopState {
     pub obstacle_id: String,
-    pub scene_name: String,
+    pub node_name: String,
     pub is_gate: bool,
     pub has_trigger: bool,
     pub trigger_offset: Vec3,
     pub trigger_half_extents: Vec3,
     pub preview_entity: Option<Entity>,
-    pub available_scenes: Vec<String>,
-    pub scenes_loaded: bool,
+    pub available_nodes: Vec<String>,
+    pub nodes_loaded: bool,
     pub editing_id: bool,
-    pub editing_scene: bool,
+    pub editing_node: bool,
 }
 
 impl Default for WorkshopState {
     fn default() -> Self {
         Self {
             obstacle_id: String::new(),
-            scene_name: String::new(),
+            node_name: String::new(),
             is_gate: true,
             has_trigger: true,
             trigger_offset: Vec3::new(0.0, 1.0, 0.0),
             trigger_half_extents: Vec3::new(2.0, 2.0, 0.5),
             preview_entity: None,
-            available_scenes: Vec::new(),
-            scenes_loaded: false,
+            available_nodes: Vec::new(),
+            nodes_loaded: false,
             editing_id: false,
-            editing_scene: false,
+            editing_node: false,
         }
     }
 }
@@ -53,8 +53,8 @@ impl Plugin for WorkshopPlugin {
         .add_systems(
             Update,
             (
-                populate_scene_list,
-                ui::handle_scene_selection,
+                populate_node_list,
+                ui::handle_node_selection,
                 ui::handle_library_selection,
                 ui::handle_adjust_buttons,
                 ui::handle_is_gate_toggle,
@@ -72,8 +72,8 @@ impl Plugin for WorkshopPlugin {
             (
                 ui::handle_id_text_input,
                 ui::handle_id_field_focus,
-                ui::handle_scene_text_input,
-                ui::handle_scene_field_focus,
+                ui::handle_node_text_input,
+                ui::handle_node_field_focus,
                 ui::update_display_values,
                 ui::handle_button_hover,
                 spawn_placeholder_preview,
@@ -112,14 +112,14 @@ fn cleanup_workshop(
     }
 }
 
-fn populate_scene_list(
+fn populate_node_list(
     mut commands: Commands,
     mut state: ResMut<WorkshopState>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
-    container_query: Query<Entity, With<ui::SceneListContainer>>,
+    container_query: Query<Entity, With<ui::NodeListContainer>>,
 ) {
-    if state.scenes_loaded {
+    if state.nodes_loaded {
         return;
     }
     let Some(handle) = gltf_handle else { return };
@@ -127,10 +127,10 @@ fn populate_scene_list(
         return;
     };
 
-    let mut scenes: Vec<String> = gltf.named_scenes.keys().map(|k| k.to_string()).collect();
-    scenes.sort();
-    state.available_scenes = scenes.clone();
-    state.scenes_loaded = true;
+    let mut nodes: Vec<String> = gltf.named_nodes.keys().map(|k| k.to_string()).collect();
+    nodes.sort();
+    state.available_nodes = nodes.clone();
+    state.nodes_loaded = true;
 
     let Ok(container) = container_query.single() else {
         return;
@@ -138,9 +138,9 @@ fn populate_scene_list(
 
     commands.entity(container).despawn_related::<Children>();
     commands.entity(container).with_children(|parent| {
-        if scenes.is_empty() {
+        if nodes.is_empty() {
             parent.spawn((
-                Text::new("No scenes found in glb"),
+                Text::new("No objects found in glb"),
                 TextFont {
                     font_size: 14.0,
                     ..default()
@@ -148,33 +148,52 @@ fn populate_scene_list(
                 TextColor(Color::srgb(0.5, 0.5, 0.5)),
             ));
         } else {
-            for scene in &scenes {
-                ui::spawn_scene_button(parent, scene);
+            for node in &nodes {
+                ui::spawn_node_button(parent, node);
             }
         }
     });
 
-    info!("Found {} named scenes in obstacles.glb", scenes.len());
+    info!("Found {} named nodes in obstacles.glb", nodes.len());
 }
 
+/// Spawn a preview from a named node in the glTF.
 pub fn spawn_preview(
     commands: &mut Commands,
     gltf_assets: &Assets<bevy::gltf::Gltf>,
+    node_assets: &Assets<bevy::gltf::GltfNode>,
+    mesh_assets: &Assets<bevy::gltf::GltfMesh>,
     gltf_handle: &ObstaclesGltfHandle,
-    scene_name: &str,
+    node_name: &str,
 ) -> Option<Entity> {
     let gltf = gltf_assets.get(&gltf_handle.0)?;
-    let scene_handle = gltf.named_scenes.get(scene_name)?;
+    let node_handle = gltf.named_nodes.get(node_name)?;
+    let node = node_assets.get(node_handle)?;
+    let gltf_mesh_handle = node.mesh.as_ref()?;
+    let gltf_mesh = mesh_assets.get(gltf_mesh_handle)?;
 
-    let entity = commands
+    let parent = commands
         .spawn((
-            SceneRoot(scene_handle.clone()),
-            Transform::default(),
+            node.transform,
+            Visibility::default(),
             PreviewObstacle,
         ))
         .id();
 
-    Some(entity)
+    for primitive in &gltf_mesh.primitives {
+        let mut prim_commands = commands.spawn((
+            Mesh3d(primitive.mesh.clone()),
+            Transform::default(),
+        ));
+
+        if let Some(ref material) = primitive.material {
+            prim_commands.insert(MeshMaterial3d(material.clone()));
+        }
+
+        prim_commands.set_parent_in_place(parent);
+    }
+
+    Some(parent)
 }
 
 fn spawn_placeholder_preview(
@@ -184,22 +203,30 @@ fn spawn_placeholder_preview(
     mut materials: ResMut<Assets<StandardMaterial>>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
+    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
+    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
     preview_query: Query<Entity, With<PreviewObstacle>>,
 ) {
-    if state.scene_name.is_empty() || state.preview_entity.is_some() {
+    if state.node_name.is_empty() || state.preview_entity.is_some() {
         return;
     }
 
     // Try to spawn from glTF first
     if let Some(handle) = &gltf_handle {
-        if let Some(entity) = spawn_preview(&mut commands, &gltf_assets, handle, &state.scene_name)
-        {
+        if let Some(entity) = spawn_preview(
+            &mut commands,
+            &gltf_assets,
+            &node_assets,
+            &mesh_assets,
+            handle,
+            &state.node_name,
+        ) {
             state.preview_entity = Some(entity);
             return;
         }
     }
 
-    // No matching glTF scene — spawn a placeholder cube
+    // No matching glTF node — spawn a placeholder cube
     if preview_query.is_empty() {
         let entity = commands
             .spawn((
@@ -217,7 +244,7 @@ fn spawn_placeholder_preview(
 }
 
 fn draw_trigger_gizmo(mut gizmos: Gizmos, state: Res<WorkshopState>) {
-    if !state.has_trigger || state.scene_name.is_empty() {
+    if !state.has_trigger || state.node_name.is_empty() {
         return;
     }
 

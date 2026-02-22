@@ -42,6 +42,8 @@ pub fn spawn_course(
     library: Res<ObstacleLibrary>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
+    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
+    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
 ) {
     let Some(course) = course else { return };
     let Some(gltf_handle) = gltf_handle else {
@@ -64,9 +66,11 @@ pub fn spawn_course(
         let spawned = spawn_obstacle(
             &mut commands,
             &gltf_assets,
+            &node_assets,
+            &mesh_assets,
             &gltf_handle,
             &def.id,
-            &def.glb_scene_name,
+            &def.glb_node_name,
             transform,
             def.trigger_volume.as_ref(),
             instance.gate_order,
@@ -74,8 +78,8 @@ pub fn spawn_course(
 
         if spawned.is_none() {
             warn!(
-                "Failed to spawn obstacle '{}' (scene '{}')",
-                instance.obstacle_id.0, def.glb_scene_name
+                "Failed to spawn obstacle '{}' (node '{}')",
+                instance.obstacle_id.0, def.glb_node_name
             );
         }
     }

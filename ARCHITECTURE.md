@@ -27,7 +27,7 @@ src/
 ├── obstacle/            Obstacle data layer
 │   ├── definition.rs    ObstacleId, ObstacleDef, TriggerVolumeConfig
 │   ├── library.rs       ObstacleLibrary resource, RON load/save
-│   └── spawning.rs      Spawn obstacles from glTF, TriggerVolume component
+│   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume component
 ├── course/              Course data layer
 │   ├── data.rs          CourseData, ObstacleInstance
 │   └── loader.rs        Load/save/spawn courses from RON
@@ -63,7 +63,7 @@ Blender ──► obstacles.glb ──► Obstacle Workshop ──► default.ob
                                                     ObstacleLibrary (Resource)
 ```
 
-Each obstacle definition maps a human-readable ID to a named scene inside the glb, plus an optional trigger volume configuration.
+Each obstacle definition maps a human-readable ID to a named node (Blender object) inside the glb, plus an optional trigger volume configuration.
 
 ### Course Pipeline
 ```

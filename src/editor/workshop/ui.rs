@@ -16,13 +16,13 @@ const TOGGLE_OFF: Color = Color::srgb(0.4, 0.15, 0.15);
 
 // Marker components
 #[derive(Component)]
-pub struct SceneListContainer;
+pub struct NodeListContainer;
 
 #[derive(Component)]
 pub struct LibraryListContainer;
 
 #[derive(Component)]
-pub struct SceneButton(pub String);
+pub struct NodeButton(pub String);
 
 #[derive(Component)]
 pub struct LibraryButton(pub String);
@@ -71,10 +71,10 @@ pub struct IdFieldButton;
 pub struct IdDisplayText;
 
 #[derive(Component)]
-pub struct SceneFieldButton;
+pub struct NodeFieldButton;
 
 #[derive(Component)]
-pub struct SceneDisplayText;
+pub struct NodeDisplayText;
 
 #[derive(Component)]
 pub struct ValueDisplay(pub AdjustField);
@@ -86,7 +86,6 @@ pub struct IsGateText;
 pub struct HasTriggerText;
 
 pub fn build_workshop_ui(commands: &mut Commands, library: &ObstacleLibrary) {
-    // Root container - full screen overlay with left and right panels
     commands
         .spawn((
             Node {
@@ -96,7 +95,6 @@ pub fn build_workshop_ui(commands: &mut Commands, library: &ObstacleLibrary) {
                 justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
-            // Transparent so 3D viewport shows through
             DespawnOnExit(EditorMode::ObstacleWorkshop),
         ))
         .with_children(|root| {
@@ -120,7 +118,6 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
             BackgroundColor(PANEL_BG),
         ))
         .with_children(|panel| {
-            // Title
             panel.spawn((
                 Text::new("Obstacle Workshop"),
                 TextFont {
@@ -130,9 +127,8 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 TextColor(Color::srgb(0.9, 0.9, 0.9)),
             ));
 
-            // Scene list header
             panel.spawn((
-                Text::new("glTF Scenes"),
+                Text::new("glTF Objects"),
                 TextFont {
                     font_size: 16.0,
                     ..default()
@@ -144,10 +140,10 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 },
             ));
 
-            // Scene list container (populated async when glTF loads)
+            // Node list container (populated async when glTF loads)
             panel
                 .spawn((
-                    SceneListContainer,
+                    NodeListContainer,
                     Node {
                         flex_direction: FlexDirection::Column,
                         row_gap: Val::Px(4.0),
@@ -176,7 +172,6 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 BackgroundColor(Color::srgb(0.3, 0.3, 0.3)),
             ));
 
-            // Library header
             panel.spawn((
                 Text::new("Library"),
                 TextFont {
@@ -186,7 +181,6 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 TextColor(Color::srgb(0.7, 0.7, 0.7)),
             ));
 
-            // Library list container
             panel
                 .spawn((
                     LibraryListContainer,
@@ -215,13 +209,11 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     }
                 });
 
-            // Spacer
             panel.spawn(Node {
                 flex_grow: 1.0,
                 ..default()
             });
 
-            // Navigation buttons
             spawn_small_button(panel, "Back to Menu", BackButton);
             spawn_small_button(panel, "Course Editor", SwitchToCourseEditorButton);
         });
@@ -242,7 +234,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             BackgroundColor(PANEL_BG),
         ))
         .with_children(|panel| {
-            // Obstacle ID section
+            // Obstacle ID
             panel.spawn((
                 Text::new("Obstacle ID"),
                 TextFont {
@@ -252,7 +244,6 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                 TextColor(Color::srgb(0.6, 0.6, 0.6)),
             ));
 
-            // Clickable ID field
             panel
                 .spawn((
                     Button,
@@ -270,7 +261,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                 ))
                 .with_children(|field| {
                     field.spawn((
-                        Text::new("(select a scene)"),
+                        Text::new("(type an ID)"),
                         TextFont {
                             font_size: 14.0,
                             ..default()
@@ -280,9 +271,9 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                     ));
                 });
 
-            // Scene name label
+            // Object name
             panel.spawn((
-                Text::new("glTF Scene Name"),
+                Text::new("Object Name (in glb)"),
                 TextFont {
                     font_size: 14.0,
                     ..default()
@@ -294,11 +285,10 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                 },
             ));
 
-            // Clickable scene name field
             panel
                 .spawn((
                     Button,
-                    SceneFieldButton,
+                    NodeFieldButton,
                     Node {
                         width: Val::Percent(100.0),
                         height: Val::Px(32.0),
@@ -318,14 +308,13 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                             ..default()
                         },
                         TextColor(Color::srgb(0.5, 0.5, 0.5)),
-                        SceneDisplayText,
+                        NodeDisplayText,
                     ));
                 });
 
-            // Divider
             spawn_divider(panel);
 
-            // Is Gate toggle
+            // Properties
             panel.spawn((
                 Text::new("Properties"),
                 TextFont {
@@ -338,7 +327,6 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             spawn_toggle_row(panel, "Is Gate", IsGateToggle, IsGateText, true);
             spawn_toggle_row(panel, "Trigger Volume", HasTriggerToggle, HasTriggerText, true);
 
-            // Divider
             spawn_divider(panel);
 
             // Trigger volume controls
@@ -372,13 +360,11 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             spawn_adjust_row(panel, "Y", AdjustField::ExtentY, 2.0);
             spawn_adjust_row(panel, "Z", AdjustField::ExtentZ, 0.5);
 
-            // Spacer
             panel.spawn(Node {
                 flex_grow: 1.0,
                 ..default()
             });
 
-            // Action buttons
             spawn_divider(panel);
             spawn_action_button(panel, "Save Obstacle", SaveButton, Color::srgb(0.15, 0.4, 0.15));
             spawn_action_button(panel, "New / Clear", NewButton, BUTTON_NORMAL);
@@ -386,11 +372,11 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
         });
 }
 
-pub fn spawn_scene_button(parent: &mut ChildSpawnerCommands, name: &str) {
+pub fn spawn_node_button(parent: &mut ChildSpawnerCommands, name: &str) {
     parent
         .spawn((
             Button,
-            SceneButton(name.to_string()),
+            NodeButton(name.to_string()),
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Px(28.0),
@@ -536,7 +522,6 @@ fn spawn_adjust_row(
             ..default()
         })
         .with_children(|row| {
-            // Axis label
             row.spawn((
                 Text::new(format!("{axis}:")),
                 TextFont {
@@ -550,10 +535,8 @@ fn spawn_adjust_row(
                 },
             ));
 
-            // Minus button
             spawn_adjust_btn(row, "-", field, -0.1);
 
-            // Value display
             row.spawn((
                 Text::new(format!("{initial:.1}")),
                 TextFont {
@@ -569,7 +552,6 @@ fn spawn_adjust_row(
                 },
             ));
 
-            // Plus button
             spawn_adjust_btn(row, "+", field, 0.1);
         });
 }
@@ -650,23 +632,22 @@ fn spawn_divider(parent: &mut ChildSpawnerCommands) {
 
 // --- Interaction Systems ---
 
-pub fn handle_scene_selection(
+pub fn handle_node_selection(
     mut commands: Commands,
     mut state: ResMut<WorkshopState>,
-    query: Query<(&Interaction, &SceneButton), Changed<Interaction>>,
+    query: Query<(&Interaction, &NodeButton), Changed<Interaction>>,
     preview_query: Query<Entity, With<PreviewObstacle>>,
 ) {
-    for (interaction, scene_btn) in &query {
+    for (interaction, node_btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
 
-        state.scene_name = scene_btn.0.clone();
+        state.node_name = node_btn.0.clone();
         if state.obstacle_id.is_empty() {
-            state.obstacle_id = scene_btn.0.to_lowercase().replace(' ', "_");
+            state.obstacle_id = node_btn.0.to_lowercase().replace(' ', "_");
         }
 
-        // Despawn old preview — spawn_placeholder_preview will create the new one
         for entity in &preview_query {
             commands.entity(entity).despawn();
         }
@@ -692,7 +673,7 @@ pub fn handle_library_selection(
         };
 
         state.obstacle_id = def.id.0.clone();
-        state.scene_name = def.glb_scene_name.clone();
+        state.node_name = def.glb_node_name.clone();
         state.is_gate = def.is_gate;
         state.has_trigger = def.trigger_volume.is_some();
         if let Some(trigger) = &def.trigger_volume {
@@ -700,7 +681,6 @@ pub fn handle_library_selection(
             state.trigger_half_extents = trigger.half_extents;
         }
 
-        // Despawn old preview — spawn_placeholder_preview will create the new one
         for entity in &preview_query {
             commands.entity(entity).despawn();
         }
@@ -776,8 +756,8 @@ pub fn handle_save_button(
             continue;
         }
 
-        if state.obstacle_id.is_empty() || state.scene_name.is_empty() {
-            warn!("Cannot save: obstacle ID and scene name are required");
+        if state.obstacle_id.is_empty() || state.node_name.is_empty() {
+            warn!("Cannot save: obstacle ID and object name are required");
             return;
         }
 
@@ -792,7 +772,7 @@ pub fn handle_save_button(
 
         let def = ObstacleDef {
             id: ObstacleId(state.obstacle_id.clone()),
-            glb_scene_name: state.scene_name.clone(),
+            glb_node_name: state.node_name.clone(),
             trigger_volume,
             is_gate: state.is_gate,
         };
@@ -801,7 +781,6 @@ pub fn handle_save_button(
         save_obstacle_library(&library);
         info!("Saved obstacle '{}'", state.obstacle_id);
 
-        // Rebuild library list
         rebuild_library_list(&mut commands, &library, &library_container);
     }
 }
@@ -817,17 +796,15 @@ pub fn handle_new_button(
             continue;
         }
 
-        // Despawn preview
         for entity in &preview_query {
             commands.entity(entity).despawn();
         }
 
-        // Reset state but keep scene list
-        let scenes = std::mem::take(&mut state.available_scenes);
-        let scenes_loaded = state.scenes_loaded;
+        let nodes = std::mem::take(&mut state.available_nodes);
+        let nodes_loaded = state.nodes_loaded;
         *state = WorkshopState {
-            available_scenes: scenes,
-            scenes_loaded,
+            available_nodes: nodes,
+            nodes_loaded,
             ..default()
         };
     }
@@ -855,21 +832,18 @@ pub fn handle_delete_button(
             save_obstacle_library(&library);
             info!("Deleted obstacle '{}'", state.obstacle_id);
 
-            // Despawn preview
             for entity in &preview_query {
                 commands.entity(entity).despawn();
             }
 
-            // Reset state
-            let scenes = std::mem::take(&mut state.available_scenes);
-            let scenes_loaded = state.scenes_loaded;
+            let nodes = std::mem::take(&mut state.available_nodes);
+            let nodes_loaded = state.nodes_loaded;
             *state = WorkshopState {
-                available_scenes: scenes,
-                scenes_loaded,
+                available_nodes: nodes,
+                nodes_loaded,
                 ..default()
             };
 
-            // Rebuild library list
             rebuild_library_list(&mut commands, &library, &library_container);
         }
     }
@@ -940,7 +914,6 @@ pub fn handle_id_text_input(
                 state.obstacle_id.push('_');
             }
             Key::Character(c) => {
-                // Only allow alphanumeric and underscore
                 for ch in c.chars() {
                     if ch.is_alphanumeric() || ch == '_' || ch == '-' {
                         state.obstacle_id.push(ch.to_ascii_lowercase());
@@ -952,14 +925,14 @@ pub fn handle_id_text_input(
     }
 }
 
-pub fn handle_scene_field_focus(
+pub fn handle_node_field_focus(
     mut state: ResMut<WorkshopState>,
-    query: Query<&Interaction, (Changed<Interaction>, With<SceneFieldButton>)>,
-    mut border: Query<&mut BorderColor, With<SceneFieldButton>>,
+    query: Query<&Interaction, (Changed<Interaction>, With<NodeFieldButton>)>,
+    mut border: Query<&mut BorderColor, With<NodeFieldButton>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            state.editing_scene = true;
+            state.editing_node = true;
             if let Ok(mut b) = border.single_mut() {
                 *b = BorderColor::all(Color::srgb(0.4, 0.7, 1.0));
             }
@@ -967,18 +940,18 @@ pub fn handle_scene_field_focus(
     }
 }
 
-pub fn handle_scene_text_input(
+pub fn handle_node_text_input(
     mut commands: Commands,
     mut state: ResMut<WorkshopState>,
     mut events: MessageReader<KeyboardInput>,
-    mut border: Query<&mut BorderColor, With<SceneFieldButton>>,
+    mut border: Query<&mut BorderColor, With<NodeFieldButton>>,
     preview_query: Query<Entity, With<PreviewObstacle>>,
 ) {
-    if !state.editing_scene {
+    if !state.editing_node {
         return;
     }
 
-    let mut scene_changed = false;
+    let mut name_changed = false;
     for event in events.read() {
         if !event.state.is_pressed() {
             continue;
@@ -986,21 +959,21 @@ pub fn handle_scene_text_input(
 
         match &event.logical_key {
             Key::Enter | Key::Escape => {
-                state.editing_scene = false;
+                state.editing_node = false;
                 if let Ok(mut b) = border.single_mut() {
                     *b = BorderColor::all(Color::srgb(0.3, 0.3, 0.3));
                 }
-                scene_changed = true;
+                name_changed = true;
             }
             Key::Backspace => {
-                if state.scene_name.pop().is_some() {
-                    scene_changed = true;
+                if state.node_name.pop().is_some() {
+                    name_changed = true;
                 }
             }
             Key::Character(c) => {
                 for ch in c.chars() {
                     if ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '.' || ch == ' ' {
-                        state.scene_name.push(ch);
+                        state.node_name.push(ch);
                     }
                 }
             }
@@ -1008,31 +981,28 @@ pub fn handle_scene_text_input(
         }
     }
 
-    // When scene name changes and we finish editing, despawn old preview so
-    // spawn_placeholder_preview can create the right one next frame
-    if scene_changed && !state.editing_scene {
+    if name_changed && !state.editing_node {
         for entity in &preview_query {
             commands.entity(entity).despawn();
         }
         state.preview_entity = None;
 
-        // Auto-fill ID from scene name if ID is empty
-        if state.obstacle_id.is_empty() && !state.scene_name.is_empty() {
-            state.obstacle_id = state.scene_name.to_lowercase().replace(' ', "_");
+        if state.obstacle_id.is_empty() && !state.node_name.is_empty() {
+            state.obstacle_id = state.node_name.to_lowercase().replace(' ', "_");
         }
     }
 }
 
 pub fn update_display_values(
     state: Res<WorkshopState>,
-    mut id_text: Query<&mut Text, (With<IdDisplayText>, Without<SceneDisplayText>)>,
-    mut scene_text: Query<&mut Text, (With<SceneDisplayText>, Without<IdDisplayText>)>,
+    mut id_text: Query<&mut Text, (With<IdDisplayText>, Without<NodeDisplayText>)>,
+    mut node_text: Query<&mut Text, (With<NodeDisplayText>, Without<IdDisplayText>)>,
     mut value_displays: Query<
         (&mut Text, &ValueDisplay),
-        (Without<IdDisplayText>, Without<SceneDisplayText>, Without<IsGateText>, Without<HasTriggerText>),
+        (Without<IdDisplayText>, Without<NodeDisplayText>, Without<IsGateText>, Without<HasTriggerText>),
     >,
-    mut gate_text: Query<&mut Text, (With<IsGateText>, Without<HasTriggerText>, Without<IdDisplayText>, Without<SceneDisplayText>, Without<ValueDisplay>)>,
-    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<IsGateText>, Without<IdDisplayText>, Without<SceneDisplayText>, Without<ValueDisplay>)>,
+    mut gate_text: Query<&mut Text, (With<IsGateText>, Without<HasTriggerText>, Without<IdDisplayText>, Without<NodeDisplayText>, Without<ValueDisplay>)>,
+    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<IsGateText>, Without<IdDisplayText>, Without<NodeDisplayText>, Without<ValueDisplay>)>,
     mut gate_bg: Query<&mut BackgroundColor, (With<IsGateToggle>, Without<HasTriggerToggle>)>,
     mut trigger_bg: Query<&mut BackgroundColor, (With<HasTriggerToggle>, Without<IsGateToggle>)>,
 ) {
@@ -1040,7 +1010,6 @@ pub fn update_display_values(
         return;
     }
 
-    // Update ID display
     if let Ok(mut text) = id_text.single_mut() {
         let display = if state.obstacle_id.is_empty() {
             if state.editing_id {
@@ -1056,23 +1025,21 @@ pub fn update_display_values(
         **text = display;
     }
 
-    // Update scene name display
-    if let Ok(mut text) = scene_text.single_mut() {
-        let display = if state.scene_name.is_empty() {
-            if state.editing_scene {
+    if let Ok(mut text) = node_text.single_mut() {
+        let display = if state.node_name.is_empty() {
+            if state.editing_node {
                 "|".to_string()
             } else {
                 "(type or select from list)".to_string()
             }
-        } else if state.editing_scene {
-            format!("{}|", state.scene_name)
+        } else if state.editing_node {
+            format!("{}|", state.node_name)
         } else {
-            state.scene_name.clone()
+            state.node_name.clone()
         };
         **text = display;
     }
 
-    // Update value displays
     for (mut text, display) in &mut value_displays {
         let val = match display.0 {
             AdjustField::OffsetX => state.trigger_offset.x,
@@ -1085,7 +1052,6 @@ pub fn update_display_values(
         **text = format!("{val:.1}");
     }
 
-    // Update toggle visuals
     if let Ok(mut text) = gate_text.single_mut() {
         **text = if state.is_gate { "ON" } else { "OFF" }.to_string();
     }
@@ -1107,7 +1073,7 @@ pub fn handle_button_hover(
         (
             Changed<Interaction>,
             Or<(
-                With<SceneButton>,
+                With<NodeButton>,
                 With<LibraryButton>,
                 With<BackButton>,
                 With<SwitchToCourseEditorButton>,

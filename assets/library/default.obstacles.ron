@@ -1,1 +1,11 @@
-[]
+[
+    (
+        id: ("gate_air"),
+        glb_node_name: "gate_air",
+        trigger_volume: Some((
+            offset: (0.0, 1.0, 0.0),
+            half_extents: (2.0, 2.0, 0.5),
+        )),
+        is_gate: true,
+    ),
+]

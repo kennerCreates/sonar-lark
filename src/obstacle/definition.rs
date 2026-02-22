@@ -13,7 +13,7 @@ pub struct TriggerVolumeConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ObstacleDef {
     pub id: ObstacleId,
-    pub glb_scene_name: String,
+    pub glb_node_name: String,
     pub trigger_volume: Option<TriggerVolumeConfig>,
     pub is_gate: bool,
 }
