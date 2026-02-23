@@ -17,17 +17,17 @@
         ),
         (
             obstacle_id: ("gate_loop"),
-            translation: (-57.51622, 0.0, 0.0),
+            translation: (-60.219334, 0.39609563, -33.607376),
             rotation: (0.0, 0.21397556, 0.0, 0.976839),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(10),
         ),
         (
-            obstacle_id: ("gate_best"),
-            translation: (-37.869286, -7.3035374, -35.628498),
-            rotation: (0.0, -0.3618421, 0.0, 0.9322394),
+            obstacle_id: ("gate_loop"),
+            translation: (59.705387, 0.0, 55.58597),
+            rotation: (0.0, 0.0, 0.0, 1.0),
             scale: (1.0, 1.0, 1.0),
-            gate_order: Some(9),
+            gate_order: Some(2),
         ),
         (
             obstacle_id: ("gate_ground"),
@@ -63,13 +63,6 @@
             rotation: (0.0, 0.5635395, 0.0, -0.82608914),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(3),
-        ),
-        (
-            obstacle_id: ("gate_loop"),
-            translation: (59.705387, 0.0, 55.58597),
-            rotation: (0.0, 0.0, 0.0, 1.0),
-            scale: (1.0, 1.0, 1.0),
-            gate_order: Some(2),
         ),
     ],
 )

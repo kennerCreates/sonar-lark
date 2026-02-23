@@ -44,12 +44,8 @@ pub fn setup_drone_assets(
         return;
     };
 
-    let node_name = "Drone";
-    let Some(node_handle) = gltf.named_nodes.get(node_name) else {
-        warn!(
-            "Drone node '{}' not found in glb, using placeholder",
-            node_name
-        );
+    // TODO: restore glTF drone model once visibility issue is resolved
+    {
         let mesh = meshes.add(Cuboid::new(0.3, 0.1, 0.3));
         let mat = materials.add(StandardMaterial {
             base_color: Color::srgb(0.8, 0.2, 0.2),
@@ -59,6 +55,12 @@ pub fn setup_drone_assets(
             mesh_primitives: vec![(mesh, mat)],
             mesh_transform: Transform::IDENTITY,
         });
+        return;
+    }
+
+    #[allow(unreachable_code)]
+    let node_name = "Drone";
+    let Some(node_handle) = gltf.named_nodes.get(node_name) else {
         return;
     };
 
