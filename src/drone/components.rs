@@ -61,12 +61,9 @@ pub struct DroneConfig {
     pub hover_phase: Vec3,
     /// Per-axis primary oscillation frequencies (Hz) for idle hover.
     pub hover_freq: Vec3,
-    /// Per-axis amplitude of idle hover movement (units).
+    /// Per-axis amplitude of idle hover movement (units). X/Z may be negative
+    /// to vary drift direction across drones; Y is always positive (drift up).
     pub hover_amp: Vec3,
-    /// Frequency of sharp "jerk" impulses during hover.
-    pub hover_jerk_freq: f32,
-    /// Amplitude of jerk impulses.
-    pub hover_jerk_amp: f32,
 }
 
 #[derive(Component)]

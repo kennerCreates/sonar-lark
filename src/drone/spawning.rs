@@ -7,10 +7,10 @@ use crate::states::AppState;
 use super::components::*;
 
 const DRONE_COUNT: u8 = 12;
-const START_DISTANCE_BEHIND_GATE: f32 = 15.0;
-const LATERAL_SPACING: f32 = 2.5;
-const ROWS: usize = 1;
+const START_DISTANCE_BEHIND_GATE: f32 = 5.0;
 const HOVER_HEIGHT: f32 = 1.5;
+/// Fraction of gate width used for the start line (leaves margin at edges).
+const GATE_WIDTH_USAGE: f32 = 0.8;
 
 #[derive(Resource)]
 pub struct DroneGltfHandle(pub Handle<bevy::gltf::Gltf>);
@@ -111,7 +111,34 @@ pub fn spawn_drones(
         return;
     }
 
-    let start_positions = compute_start_positions(&waypoints, DRONE_COUNT);
+    let first_gate_inst = course
+        .instances
+        .iter()
+        .filter_map(|inst| inst.gate_order.map(|order| (order, inst)))
+        .min_by_key(|(order, _)| *order)
+        .map(|(_, inst)| inst);
+    let Some(first_gate) = first_gate_inst else {
+        warn!("No gate instances found in course");
+        return;
+    };
+    let gate_half_width = library
+        .get(&first_gate.obstacle_id)
+        .and_then(|def| def.trigger_volume.as_ref())
+        .map(|tv| tv.half_extents.x)
+        .unwrap_or(5.0);
+    let next_waypoint = if waypoints.len() > 1 {
+        Some(waypoints[1])
+    } else {
+        None
+    };
+
+    let start_positions = compute_start_positions(
+        first_gate.translation,
+        first_gate.rotation,
+        gate_half_width,
+        next_waypoint,
+        DRONE_COUNT,
+    );
     let mut rng = rand::thread_rng();
 
     for i in 0..DRONE_COUNT {
@@ -201,37 +228,52 @@ pub fn generate_waypoints(course: &CourseData, library: &ObstacleLibrary) -> Vec
     waypoints
 }
 
-pub fn compute_start_positions(waypoints: &[Vec3], count: u8) -> Vec<Vec3> {
-    let first_gate = waypoints[0];
+pub fn compute_start_positions(
+    gate_translation: Vec3,
+    gate_rotation: Quat,
+    gate_half_width: f32,
+    next_waypoint: Option<Vec3>,
+    count: u8,
+) -> Vec<Vec3> {
+    // Gate's local Z axis = fly-through axis
+    let gate_z = gate_rotation * Vec3::Z;
+    let gate_z_flat = Vec3::new(gate_z.x, 0.0, gate_z.z).normalize_or(Vec3::Z);
 
-    // Direction from first gate toward second (or default -Z)
-    let forward = if waypoints.len() > 1 {
-        let dir = waypoints[1] - waypoints[0];
-        Vec3::new(dir.x, 0.0, dir.z).normalize_or(Vec3::NEG_Z)
+    // Determine which direction along the gate's Z axis leads toward the next gate.
+    // Drones start on the opposite side and fly through.
+    let through_dir = if let Some(next) = next_waypoint {
+        let to_next = next - gate_translation;
+        let to_next_flat = Vec3::new(to_next.x, 0.0, to_next.z).normalize_or(gate_z_flat);
+        if gate_z_flat.dot(to_next_flat) > 0.0 {
+            gate_z_flat
+        } else {
+            -gate_z_flat
+        }
     } else {
-        Vec3::NEG_Z
+        gate_z_flat
     };
 
-    // Start line is behind the first gate
-    let start_center = first_gate - forward * START_DISTANCE_BEHIND_GATE;
+    // Start line center: behind the gate at ground level
+    let start_center = Vec3::new(gate_translation.x, 0.0, gate_translation.z)
+        - through_dir * START_DISTANCE_BEHIND_GATE;
 
-    // Lateral direction (perpendicular to forward on XZ plane)
-    let lateral = Vec3::Y.cross(forward).normalize_or(Vec3::X);
+    // Gate's local X axis projected to XZ = lateral spread direction
+    let gate_x = gate_rotation * Vec3::X;
+    let lateral = Vec3::new(gate_x.x, 0.0, gate_x.z).normalize_or(Vec3::X);
 
-    let cols = (count as usize + ROWS - 1) / ROWS;
+    // Fit drones within a fraction of the gate width
+    let usable_width = gate_half_width * 2.0 * GATE_WIDTH_USAGE;
+    let spacing = if count > 1 {
+        usable_width / (count as f32 - 1.0)
+    } else {
+        0.0
+    };
+
+    let center_offset = (count as f32 - 1.0) / 2.0;
     let mut positions = Vec::with_capacity(count as usize);
-
     for i in 0..count as usize {
-        let row = i / cols;
-        let col = i % cols;
-
-        let row_offset = -(row as f32) * LATERAL_SPACING * 1.5;
-        let col_center = (cols as f32 - 1.0) / 2.0;
-        let col_offset = (col as f32 - col_center) * LATERAL_SPACING;
-
-        let pos =
-            start_center + forward * row_offset + lateral * col_offset + Vec3::Y * HOVER_HEIGHT;
-
+        let col_offset = (i as f32 - center_offset) * spacing;
+        let pos = start_center + lateral * col_offset + Vec3::Y * HOVER_HEIGHT;
         positions.push(pos);
     }
     positions
@@ -253,17 +295,15 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
             rng.gen_range(0.0..std::f32::consts::TAU),
         ),
         hover_freq: Vec3::new(
-            rng.gen_range(0.8..=2.5),
-            rng.gen_range(1.0..=3.0),
-            rng.gen_range(0.6..=2.0),
+            rng.gen_range(0.72..=2.25),
+            rng.gen_range(0.9..=2.7),
+            rng.gen_range(0.54..=1.8),
         ),
         hover_amp: Vec3::new(
-            rng.gen_range(0.3..=0.8),
-            rng.gen_range(0.2..=0.5),
-            rng.gen_range(0.2..=0.6),
+            if rng.gen_bool(0.5) { 1.0 } else { -1.0 } * rng.gen_range(0.9..=4.8),
+            rng.gen_range(0.45..=2.4),
+            if rng.gen_bool(0.5) { 1.0 } else { -1.0 } * rng.gen_range(0.6..=3.6),
         ),
-        hover_jerk_freq: rng.gen_range(3.0..=6.0),
-        hover_jerk_amp: rng.gen_range(0.1..=0.3),
     }
 }
 
@@ -391,37 +431,126 @@ mod tests {
 
     #[test]
     fn compute_start_positions_correct_count() {
-        let waypoints = vec![Vec3::ZERO, Vec3::new(0.0, 0.0, -20.0)];
-        let positions = compute_start_positions(&waypoints, 12);
+        let positions = compute_start_positions(
+            Vec3::ZERO,
+            Quat::IDENTITY,
+            5.0,
+            Some(Vec3::new(0.0, 0.0, -20.0)),
+            12,
+        );
         assert_eq!(positions.len(), 12);
     }
 
     #[test]
     fn compute_start_positions_behind_first_gate() {
-        let waypoints = vec![Vec3::new(0.0, 2.0, 0.0), Vec3::new(0.0, 2.0, -20.0)];
-        let positions = compute_start_positions(&waypoints, 12);
+        // Gate at origin, identity rotation, next gate at -Z.
+        // Through direction is -Z, so drones should be at +Z (behind).
+        let gate_pos = Vec3::ZERO;
+        let positions = compute_start_positions(
+            gate_pos,
+            Quat::IDENTITY,
+            5.0,
+            Some(Vec3::new(0.0, 2.0, -20.0)),
+            12,
+        );
 
         for pos in &positions {
             assert!(
-                pos.z > waypoints[0].z,
+                pos.z > gate_pos.z,
                 "drone at z={} should be behind gate at z={}",
                 pos.z,
-                waypoints[0].z
+                gate_pos.z
+            );
+        }
+    }
+
+    #[test]
+    fn compute_start_positions_at_hover_height() {
+        let positions = compute_start_positions(
+            Vec3::new(0.0, 10.0, 0.0), // elevated gate
+            Quat::IDENTITY,
+            5.0,
+            Some(Vec3::new(0.0, 0.0, -20.0)),
+            4,
+        );
+
+        for pos in &positions {
+            assert!(
+                (pos.y - HOVER_HEIGHT).abs() < 0.01,
+                "drone at y={} should be at HOVER_HEIGHT={}, not gate elevation",
+                pos.y,
+                HOVER_HEIGHT,
+            );
+        }
+    }
+
+    #[test]
+    fn compute_start_positions_fits_within_gate_width() {
+        let half_width = 5.0;
+        let positions = compute_start_positions(
+            Vec3::ZERO,
+            Quat::IDENTITY,
+            half_width,
+            Some(Vec3::new(0.0, 0.0, -20.0)),
+            12,
+        );
+
+        // With identity rotation, lateral axis is X
+        let usable = half_width * 2.0 * GATE_WIDTH_USAGE;
+        for pos in &positions {
+            assert!(
+                pos.x.abs() <= usable / 2.0 + 0.01,
+                "drone at x={} exceeds usable width {}",
+                pos.x,
+                usable,
             );
         }
     }
 
     #[test]
     fn compute_start_positions_no_overlap() {
-        let waypoints = vec![Vec3::ZERO, Vec3::new(0.0, 0.0, -20.0)];
-        let positions = compute_start_positions(&waypoints, 12);
+        let positions = compute_start_positions(
+            Vec3::ZERO,
+            Quat::IDENTITY,
+            8.0,
+            Some(Vec3::new(0.0, 0.0, -20.0)),
+            12,
+        );
 
         for i in 0..positions.len() {
             for j in (i + 1)..positions.len() {
                 let dist = (positions[i] - positions[j]).length();
-                assert!(dist > 1.0, "drones {} and {} too close: {:.2}", i, j, dist);
+                assert!(dist > 0.5, "drones {} and {} too close: {:.2}", i, j, dist);
             }
         }
+    }
+
+    #[test]
+    fn compute_start_positions_respects_gate_rotation() {
+        // Gate rotated 90 degrees around Y — lateral axis becomes world Z
+        let rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let positions = compute_start_positions(
+            Vec3::ZERO,
+            rotation,
+            5.0,
+            Some(Vec3::new(-20.0, 0.0, 0.0)),
+            3,
+        );
+
+        // All drones should share the same X (spread along Z, not X)
+        let first_x = positions[0].x;
+        for pos in &positions {
+            assert!(
+                (pos.x - first_x).abs() < 0.01,
+                "expected drones aligned on X, got x={}",
+                pos.x,
+            );
+        }
+        // But Z should differ
+        assert!(
+            (positions[0].z - positions[2].z).abs() > 1.0,
+            "drones should be spread along Z"
+        );
     }
 
     #[test]
@@ -439,14 +568,12 @@ mod tests {
             assert!(config.hover_phase.x >= 0.0 && config.hover_phase.x < std::f32::consts::TAU);
             assert!(config.hover_phase.y >= 0.0 && config.hover_phase.y < std::f32::consts::TAU);
             assert!(config.hover_phase.z >= 0.0 && config.hover_phase.z < std::f32::consts::TAU);
-            assert!((0.8..=2.5).contains(&config.hover_freq.x));
-            assert!((1.0..=3.0).contains(&config.hover_freq.y));
-            assert!((0.6..=2.0).contains(&config.hover_freq.z));
-            assert!((0.3..=0.8).contains(&config.hover_amp.x));
-            assert!((0.2..=0.5).contains(&config.hover_amp.y));
-            assert!((0.2..=0.6).contains(&config.hover_amp.z));
-            assert!((3.0..=6.0).contains(&config.hover_jerk_freq));
-            assert!((0.1..=0.3).contains(&config.hover_jerk_amp));
+            assert!((0.72..=2.25).contains(&config.hover_freq.x));
+            assert!((0.9..=2.7).contains(&config.hover_freq.y));
+            assert!((0.54..=1.8).contains(&config.hover_freq.z));
+            assert!((0.9..=4.8).contains(&config.hover_amp.x.abs()));
+            assert!((0.45..=2.4).contains(&config.hover_amp.y));
+            assert!((0.6..=3.6).contains(&config.hover_amp.z.abs()));
         }
     }
 
@@ -460,8 +587,6 @@ mod tests {
             hover_phase: Vec3::ZERO,
             hover_freq: Vec3::ONE,
             hover_amp: Vec3::splat(0.3),
-            hover_jerk_freq: 4.0,
-            hover_jerk_amp: 0.2,
         };
         let pid = create_pid_with_variation(&config);
         let base = PidController::default();
