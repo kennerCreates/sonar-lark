@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 
+use crate::course::loader::SelectedCourse;
 use crate::drone::components::*;
 use crate::drone::spawning::NoGatesCourse;
+use crate::editor::course_editor::PendingEditorCourse;
 use crate::states::AppState;
 use super::lifecycle::RacePhase;
 
@@ -266,11 +268,18 @@ pub fn show_no_gates_banner(
 }
 
 pub fn handle_open_editor_button(
+    mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<OpenEditorButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
+    selected: Option<Res<SelectedCourse>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            if let Some(ref sel) = selected {
+                commands.insert_resource(PendingEditorCourse {
+                    path: sel.path.clone(),
+                });
+            }
             next_state.set(AppState::Editor);
         }
     }

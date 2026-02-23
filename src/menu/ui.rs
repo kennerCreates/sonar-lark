@@ -4,6 +4,7 @@ use std::path::Path;
 use bevy::prelude::*;
 
 use crate::course::loader::SelectedCourse;
+use crate::editor::course_editor::{LastEditedCourse, PendingEditorCourse};
 use crate::states::AppState;
 
 const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
@@ -298,11 +299,18 @@ pub fn update_course_highlights(
 }
 
 pub fn handle_editor_button(
+    mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<EditorButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
+    last_edited: Option<Res<LastEditedCourse>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            if let Some(ref last) = last_edited {
+                commands.insert_resource(PendingEditorCourse {
+                    path: last.path.clone(),
+                });
+            }
             next_state.set(AppState::Editor);
         }
     }

@@ -10,7 +10,7 @@ use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::states::{AppState, EditorMode};
 
-use super::{PlacedObstacle, PlacementState, TransformMode};
+use super::{LastEditedCourse, PendingEditorCourse, PlacedObstacle, PlacementState, TransformMode};
 
 const PANEL_BG: Color = Color::srgba(0.08, 0.08, 0.08, 0.9);
 const BUTTON_NORMAL: Color = Color::srgb(0.15, 0.15, 0.15);
@@ -684,12 +684,17 @@ pub fn handle_save_button(
         let path_str = format!("assets/courses/{}.course.ron", state.course_name);
         let path = std::path::Path::new(&path_str);
         match save_course(&course, path) {
-            Ok(()) => info!(
-                "Saved course '{}' ({} obstacles) to {}",
-                state.course_name,
-                course.instances.len(),
-                path_str
-            ),
+            Ok(()) => {
+                info!(
+                    "Saved course '{}' ({} obstacles) to {}",
+                    state.course_name,
+                    course.instances.len(),
+                    path_str
+                );
+                commands.insert_resource(LastEditedCourse {
+                    path: path_str.clone(),
+                });
+            }
             Err(e) => {
                 error!("Failed to save course: {e}");
                 continue;
@@ -720,6 +725,85 @@ pub fn handle_save_button(
     }
 }
 
+/// Shared logic: despawn existing obstacles, load course data, spawn obstacles.
+#[allow(clippy::too_many_arguments)]
+fn load_course_into_editor(
+    commands: &mut Commands,
+    state: &mut PlacementState,
+    placed_query: &Query<Entity, With<PlacedObstacle>>,
+    library: &ObstacleLibrary,
+    gltf_handle: &ObstaclesGltfHandle,
+    gltf_assets: &Assets<bevy::gltf::Gltf>,
+    node_assets: &Assets<bevy::gltf::GltfNode>,
+    mesh_assets: &Assets<bevy::gltf::GltfMesh>,
+    materials: &mut Assets<StandardMaterial>,
+    course: &CourseData,
+) {
+    for entity in placed_query {
+        commands.entity(entity).despawn();
+    }
+
+    state.selected_entity = None;
+    state.selected_palette_id = None;
+    state.course_name = course.name.clone();
+    state.next_gate_order = course
+        .instances
+        .iter()
+        .filter_map(|i| i.gate_order)
+        .max()
+        .map(|m| m + 1)
+        .unwrap_or(0);
+
+    for instance in &course.instances {
+        let Some(def) = library.get(&instance.obstacle_id) else {
+            warn!(
+                "Unknown obstacle '{}' in course file, skipping",
+                instance.obstacle_id.0
+            );
+            continue;
+        };
+
+        let transform = Transform {
+            translation: instance.translation,
+            rotation: instance.rotation,
+            scale: instance.scale,
+        };
+
+        let spawned = crate::obstacle::spawning::spawn_obstacle(
+            commands,
+            gltf_assets,
+            node_assets,
+            mesh_assets,
+            materials,
+            gltf_handle,
+            &def.id,
+            &def.glb_node_name,
+            transform,
+            def.model_offset,
+            def.trigger_volume.as_ref(),
+            None,
+        );
+
+        if let Some(entity) = spawned {
+            commands.entity(entity).insert(PlacedObstacle {
+                obstacle_id: instance.obstacle_id.clone(),
+                gate_order: instance.gate_order,
+            });
+        } else {
+            warn!(
+                "Failed to spawn '{}' (node '{}') from loaded course",
+                instance.obstacle_id.0, def.glb_node_name
+            );
+        }
+    }
+
+    info!(
+        "Loaded course '{}' for editing ({} obstacles)",
+        course.name,
+        course.instances.len()
+    );
+}
+
 pub fn handle_load_button(
     mut commands: Commands,
     query: Query<(&Interaction, &ExistingCourseButton), Changed<Interaction>>,
@@ -746,76 +830,77 @@ pub fn handle_load_button(
             }
         };
 
-        // Despawn all existing placed entities
-        for entity in &placed_query {
-            commands.entity(entity).despawn();
-        }
-
-        state.selected_entity = None;
-        state.selected_palette_id = None;
-        state.course_name = course.name.clone();
-        state.next_gate_order = course
-            .instances
-            .iter()
-            .filter_map(|i| i.gate_order)
-            .max()
-            .map(|m| m + 1)
-            .unwrap_or(0);
-
         let Some(handle) = &gltf_handle else {
             warn!("glTF not loaded yet, cannot spawn loaded course obstacles");
             continue;
         };
 
-        for instance in &course.instances {
-            let Some(def) = library.get(&instance.obstacle_id) else {
-                warn!(
-                    "Unknown obstacle '{}' in course file, skipping",
-                    instance.obstacle_id.0
-                );
-                continue;
-            };
-
-            let transform = Transform {
-                translation: instance.translation,
-                rotation: instance.rotation,
-                scale: instance.scale,
-            };
-
-            let spawned = crate::obstacle::spawning::spawn_obstacle(
-                &mut commands,
-                &gltf_assets,
-                &node_assets,
-                &mesh_assets,
-                &mut materials,
-                handle,
-                &def.id,
-                &def.glb_node_name,
-                transform,
-                def.model_offset,
-                def.trigger_volume.as_ref(),
-                None, // GateIndex not needed in editor — tracked in PlacedObstacle
-            );
-
-            if let Some(entity) = spawned {
-                commands.entity(entity).insert(PlacedObstacle {
-                    obstacle_id: instance.obstacle_id.clone(),
-                    gate_order: instance.gate_order,
-                });
-            } else {
-                warn!(
-                    "Failed to spawn '{}' (node '{}') from loaded course",
-                    instance.obstacle_id.0, def.glb_node_name
-                );
-            }
-        }
-
-        info!(
-            "Loaded course '{}' for editing ({} obstacles)",
-            course.name,
-            course.instances.len()
+        load_course_into_editor(
+            &mut commands,
+            &mut state,
+            &placed_query,
+            &library,
+            handle,
+            &gltf_assets,
+            &node_assets,
+            &mesh_assets,
+            &mut materials,
+            &course,
         );
+
+        commands.insert_resource(LastEditedCourse {
+            path: btn.0.clone(),
+        });
     }
+}
+
+/// Polls for a `PendingEditorCourse` and loads it once glTF assets are ready.
+pub fn auto_load_pending_course(
+    mut commands: Commands,
+    pending: Option<Res<PendingEditorCourse>>,
+    mut state: ResMut<PlacementState>,
+    placed_query: Query<Entity, With<PlacedObstacle>>,
+    library: Res<ObstacleLibrary>,
+    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
+    gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
+    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
+    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let Some(pending) = pending else { return };
+    let Some(handle) = &gltf_handle else { return };
+    // Wait until the glTF asset is actually loaded
+    if gltf_assets.get(&handle.0).is_none() {
+        return;
+    }
+
+    let path = std::path::Path::new(&pending.path);
+    let course = match load_course_from_file(path) {
+        Ok(c) => c,
+        Err(e) => {
+            error!("Failed to auto-load course: {e}");
+            commands.remove_resource::<PendingEditorCourse>();
+            return;
+        }
+    };
+
+    load_course_into_editor(
+        &mut commands,
+        &mut state,
+        &placed_query,
+        &library,
+        handle,
+        &gltf_assets,
+        &node_assets,
+        &mesh_assets,
+        &mut materials,
+        &course,
+    );
+
+    commands.insert_resource(LastEditedCourse {
+        path: pending.path.clone(),
+    });
+    commands.remove_resource::<PendingEditorCourse>();
 }
 
 pub fn handle_gate_order_toggle(

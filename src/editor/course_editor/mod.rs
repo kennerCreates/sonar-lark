@@ -30,6 +30,20 @@ pub enum TransformMode {
 
 // --- Resources ---
 
+/// Inserted before entering the editor to request auto-loading a specific course.
+/// Consumed by `auto_load_pending_course` once glTF assets are ready.
+#[derive(Resource)]
+pub struct PendingEditorCourse {
+    pub path: String,
+}
+
+/// Tracks the last course loaded or saved in the editor.
+/// Persists across states so the editor can reopen it.
+#[derive(Resource)]
+pub struct LastEditedCourse {
+    pub path: String,
+}
+
 #[derive(Resource)]
 pub struct PlacementState {
     /// Obstacle selected in the palette for placing.
@@ -146,6 +160,10 @@ impl Plugin for CourseEditorPlugin {
             )
             .add_systems(
                 Update,
+                ui::auto_load_pending_course.run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
                 (
                     ui::update_transform_mode_ui,
                     ui::update_gate_count_display,
@@ -218,6 +236,7 @@ fn cleanup_course_editor(
     commands.remove_resource::<MoveWidgetState>();
     commands.remove_resource::<RotateWidgetState>();
     commands.remove_resource::<ScaleWidgetState>();
+    commands.remove_resource::<PendingEditorCourse>();
     for entity in &placed_query {
         commands.entity(entity).despawn();
     }
