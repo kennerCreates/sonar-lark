@@ -5,6 +5,7 @@ pub mod spawning;
 
 use bevy::prelude::*;
 
+use crate::race::lifecycle::race_is_running;
 use crate::states::AppState;
 
 pub struct DronePlugin;
@@ -33,7 +34,7 @@ impl Plugin for DronePlugin {
                     physics::clamp_transform,
                 )
                     .chain()
-                    .run_if(in_state(AppState::Race)),
+                    .run_if(in_state(AppState::Race).and(race_is_running)),
             )
             // Cleanup resources on exit
             .add_systems(OnExit(AppState::Race), spawning::cleanup_drone_resources);

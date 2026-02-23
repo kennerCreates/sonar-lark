@@ -142,6 +142,10 @@ pub fn spawn_drones(
                 position,
                 velocity_hint: look_dir,
             },
+            DroneStartPosition {
+                translation: position,
+                rotation,
+            },
             DespawnOnExit(AppState::Race),
         ));
 

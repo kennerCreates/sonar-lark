@@ -72,3 +72,10 @@ pub struct DesiredPosition {
     pub position: Vec3,
     pub velocity_hint: Vec3,
 }
+
+/// Records the spawn position so drones can be reset on race restart.
+#[derive(Component)]
+pub struct DroneStartPosition {
+    pub translation: Vec3,
+    pub rotation: Quat,
+}

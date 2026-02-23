@@ -1,2 +1,36 @@
-// Race countdown, finish detection, and state transitions
-// Will be implemented in Phase 7
+use bevy::prelude::*;
+
+use crate::drone::components::*;
+
+#[derive(Resource, Default, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum RacePhase {
+    #[default]
+    WaitingToStart,
+    Racing,
+    Finished,
+}
+
+/// Run condition: returns true only when `RacePhase::Racing` is active.
+pub fn race_is_running(phase: Option<Res<RacePhase>>) -> bool {
+    phase.is_some_and(|p| *p == RacePhase::Racing)
+}
+
+/// Transitions from Racing → Finished when every drone has completed all waypoints.
+pub fn check_race_finished(
+    mut phase: ResMut<RacePhase>,
+    drones: Query<&AIController, With<Drone>>,
+) {
+    if *phase != RacePhase::Racing {
+        return;
+    }
+    if drones.is_empty() {
+        return;
+    }
+    let all_finished = drones
+        .iter()
+        .all(|ai| ai.current_waypoint >= ai.waypoints.len());
+    if all_finished {
+        *phase = RacePhase::Finished;
+        info!("Race finished! All drones completed the course.");
+    }
+}
