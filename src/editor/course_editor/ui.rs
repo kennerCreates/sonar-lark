@@ -10,7 +10,7 @@ use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::states::{AppState, EditorMode};
 
-use super::{PlacedObstacle, PlacementState};
+use super::{PlacedObstacle, PlacementState, TransformMode};
 
 const PANEL_BG: Color = Color::srgba(0.08, 0.08, 0.08, 0.9);
 const BUTTON_NORMAL: Color = Color::srgb(0.15, 0.15, 0.15);
@@ -53,13 +53,13 @@ pub struct CourseNameField;
 pub struct CourseNameDisplayText;
 
 #[derive(Component)]
-pub struct HeightDisplayText;
-
-#[derive(Component)]
 pub struct PaletteContainer;
 
 #[derive(Component)]
 pub struct ExistingCoursesContainer;
+
+#[derive(Component)]
+pub struct TransformModeButton(pub TransformMode);
 
 pub struct CourseEntry {
     pub display_name: String,
@@ -328,23 +328,28 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[Cour
             spawn_divider(panel);
 
             panel.spawn((
-                Text::new("Place Height: 0.0"),
+                Text::new("Transform Mode"),
                 TextFont {
-                    font_size: 13.0,
+                    font_size: 14.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.7, 0.8, 0.7)),
-                HeightDisplayText,
+                TextColor(Color::srgb(0.6, 0.6, 0.6)),
             ));
 
-            panel.spawn((
-                Text::new("Q / E  →  raise / lower height"),
-                TextFont {
-                    font_size: 12.0,
+            panel
+                .spawn((Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(4.0),
+                    width: Val::Percent(100.0),
                     ..default()
-                },
-                TextColor(Color::srgb(0.5, 0.5, 0.5)),
-            ));
+                },))
+                .with_children(|row| {
+                    spawn_transform_mode_button(row, "Move (G)", TransformMode::Move);
+                    spawn_transform_mode_button(row, "Rotate (R)", TransformMode::Rotate);
+                    spawn_transform_mode_button(row, "Scale (S)", TransformMode::Scale);
+                });
+
+            spawn_divider(panel);
 
             panel.spawn((
                 Text::new("Del  →  delete selected"),
@@ -356,7 +361,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[Cour
             ));
 
             panel.spawn((
-                Text::new("LMB empty  →  place obstacle"),
+                Text::new("LMB obstacle  →  select"),
                 TextFont {
                     font_size: 12.0,
                     ..default()
@@ -365,7 +370,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[Cour
             ));
 
             panel.spawn((
-                Text::new("LMB obstacle  →  select / drag"),
+                Text::new("LMB palette + empty  →  place"),
                 TextFont {
                     font_size: 12.0,
                     ..default()
@@ -518,6 +523,38 @@ fn spawn_divider(parent: &mut ChildSpawnerCommands) {
     ));
 }
 
+fn spawn_transform_mode_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    mode: TransformMode,
+) {
+    parent
+        .spawn((
+            Button,
+            TransformModeButton(mode),
+            Node {
+                flex_grow: 1.0,
+                height: Val::Px(30.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(BUTTON_NORMAL),
+            BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+        ))
+        .with_children(|btn| {
+            btn.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 11.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+            ));
+        });
+}
+
 // --- Interaction Systems ---
 
 pub fn handle_palette_selection(
@@ -664,7 +701,6 @@ pub fn handle_load_button(
 
         state.selected_entity = None;
         state.selected_palette_id = None;
-        state.drag_active = false;
         state.course_name = course.name.clone();
         state.next_gate_order = course
             .instances
@@ -820,27 +856,11 @@ pub fn update_display_values(
     state: Res<PlacementState>,
     mut name_text: Query<
         &mut Text,
-        (
-            With<CourseNameDisplayText>,
-            Without<HeightDisplayText>,
-            Without<GateOrderModeText>,
-        ),
-    >,
-    mut height_text: Query<
-        &mut Text,
-        (
-            With<HeightDisplayText>,
-            Without<CourseNameDisplayText>,
-            Without<GateOrderModeText>,
-        ),
+        (With<CourseNameDisplayText>, Without<GateOrderModeText>),
     >,
     mut gate_mode_text: Query<
         &mut Text,
-        (
-            With<GateOrderModeText>,
-            Without<CourseNameDisplayText>,
-            Without<HeightDisplayText>,
-        ),
+        (With<GateOrderModeText>, Without<CourseNameDisplayText>),
     >,
     mut gate_mode_bg: Query<
         &mut BackgroundColor,
@@ -867,10 +887,6 @@ pub fn update_display_values(
         } else {
             state.course_name.clone()
         };
-    }
-
-    if let Ok(mut text) = height_text.single_mut() {
-        **text = format!("Place Height: {:.1}", state.drag_height);
     }
 
     if let Ok(mut text) = gate_mode_text.single_mut() {
@@ -920,5 +936,32 @@ pub fn handle_button_hover(
             Interaction::Hovered => *bg = BackgroundColor(BUTTON_HOVERED),
             Interaction::None => *bg = BackgroundColor(BUTTON_NORMAL),
         }
+    }
+}
+
+pub fn handle_transform_mode_buttons(
+    mut state: ResMut<PlacementState>,
+    query: Query<(&Interaction, &TransformModeButton), Changed<Interaction>>,
+) {
+    for (interaction, btn) in &query {
+        if *interaction == Interaction::Pressed {
+            state.transform_mode = btn.0;
+        }
+    }
+}
+
+pub fn update_transform_mode_ui(
+    state: Res<PlacementState>,
+    mut buttons: Query<(&TransformModeButton, &mut BackgroundColor)>,
+) {
+    if !state.is_changed() {
+        return;
+    }
+    for (btn, mut bg) in &mut buttons {
+        *bg = BackgroundColor(if btn.0 == state.transform_mode {
+            BUTTON_SELECTED
+        } else {
+            BUTTON_NORMAL
+        });
     }
 }

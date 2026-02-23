@@ -1,5 +1,7 @@
 pub mod ui;
 
+use std::f32::consts::TAU;
+
 use bevy::{
     gizmos::config::{DefaultGizmoConfigGroup, GizmoConfigStore},
     prelude::*,
@@ -10,20 +12,31 @@ use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{spawn_obstacle, ObstaclesGltfHandle, TriggerVolume};
 use crate::states::EditorMode;
 
+use super::gizmos::{
+    closest_point_on_axis, perpendicular_basis, point_to_segment_distance, ray_intersect_plane,
+    Axis,
+};
+
+// --- Transform mode ---
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub enum TransformMode {
+    #[default]
+    Move,
+    Rotate,
+    Scale,
+}
+
 // --- Resources ---
 
 #[derive(Resource)]
 pub struct PlacementState {
     /// Obstacle selected in the palette for placing.
     pub selected_palette_id: Option<ObstacleId>,
-    /// The placed entity currently selected for dragging.
+    /// The placed entity currently selected for editing.
     pub selected_entity: Option<Entity>,
-    /// Whether a drag is active this frame.
-    pub drag_active: bool,
-    /// XZ offset from entity origin to the initial ray hit, preserves grab point.
-    pub drag_xz_offset: Vec2,
-    /// Y level used when placing new obstacles.
-    pub drag_height: f32,
+    /// Which transform gizmo is active.
+    pub transform_mode: TransformMode,
     /// When true, LMB on any placed obstacle assigns the next gate order.
     pub gate_order_mode: bool,
     /// Auto-incrementing counter for gate order assignment.
@@ -39,15 +52,38 @@ impl Default for PlacementState {
         Self {
             selected_palette_id: None,
             selected_entity: None,
-            drag_active: false,
-            drag_xz_offset: Vec2::ZERO,
-            drag_height: 0.0,
+            transform_mode: TransformMode::default(),
             gate_order_mode: false,
             next_gate_order: 0,
             course_name: "new_course".to_string(),
             editing_name: false,
         }
     }
+}
+
+// --- Widget resources ---
+
+#[derive(Resource, Default)]
+struct MoveWidgetState {
+    active_axis: Option<Axis>,
+    hovered_axis: Option<Axis>,
+    drag_offset: f32,
+}
+
+#[derive(Resource, Default)]
+struct RotateWidgetState {
+    active_axis: Option<Axis>,
+    hovered_axis: Option<Axis>,
+    drag_start_angle: f32,
+    entity_start_rotation: Quat,
+}
+
+#[derive(Resource, Default)]
+struct ScaleWidgetState {
+    active_axis: Option<Axis>,
+    hovered_axis: Option<Axis>,
+    drag_start_t: f32,
+    entity_start_scale: Vec3,
 }
 
 // --- Components ---
@@ -63,6 +99,20 @@ pub struct PlacedObstacle {
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
 struct CourseGizmoGroup;
+
+// --- Constants ---
+
+const ARROW_LENGTH: f32 = 2.5;
+const ARROW_HIT_THRESHOLD: f32 = 25.0;
+
+const RING_RADIUS: f32 = 2.0;
+const RING_SAMPLES: usize = 32;
+const RING_HIT_THRESHOLD: f32 = 15.0;
+
+const SCALE_HANDLE_LENGTH: f32 = 2.5;
+const SCALE_CUBE_SIZE: f32 = 0.3;
+const SCALE_HIT_THRESHOLD: f32 = 25.0;
+const SCALE_SENSITIVITY: f32 = 1.0;
 
 // --- Plugin ---
 
@@ -89,18 +139,32 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_name_text_input,
                     ui::update_display_values,
                     ui::handle_button_hover,
+                    ui::handle_transform_mode_buttons,
+                    ui::update_transform_mode_ui,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
             .add_systems(
                 Update,
                 (
-                    handle_placement_and_drag,
-                    handle_height_key,
+                    handle_placement_and_selection,
                     handle_delete_key,
+                    handle_transform_mode_keys,
                     draw_trigger_gizmos,
                     draw_gate_sequence_lines,
                     draw_selection_highlight,
+                )
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
+                (
+                    draw_move_gizmo,
+                    handle_move_gizmo,
+                    draw_rotate_gizmo,
+                    handle_rotate_gizmo,
+                    draw_scale_gizmo,
+                    handle_scale_gizmo,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -129,6 +193,9 @@ fn setup_course_editor(
     let existing_courses = ui::discover_existing_courses();
     ui::build_course_editor_ui(&mut commands, &library, &existing_courses);
     commands.insert_resource(PlacementState::default());
+    commands.insert_resource(MoveWidgetState::default());
+    commands.insert_resource(RotateWidgetState::default());
+    commands.insert_resource(ScaleWidgetState::default());
 
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = -1.0;
@@ -140,6 +207,9 @@ fn cleanup_course_editor(
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
     commands.remove_resource::<PlacementState>();
+    commands.remove_resource::<MoveWidgetState>();
+    commands.remove_resource::<RotateWidgetState>();
+    commands.remove_resource::<ScaleWidgetState>();
     for entity in &placed_query {
         commands.entity(entity).despawn();
     }
@@ -148,11 +218,14 @@ fn cleanup_course_editor(
     config.depth_bias = 0.0;
 }
 
-// --- Placement, Selection, and Dragging ---
+// --- Placement and Selection ---
 
-fn handle_placement_and_drag(
+fn handle_placement_and_selection(
     mut commands: Commands,
     mut state: ResMut<PlacementState>,
+    move_widget: Res<MoveWidgetState>,
+    rotate_widget: Res<RotateWidgetState>,
+    scale_widget: Res<ScaleWidgetState>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
@@ -169,6 +242,19 @@ fn handle_placement_and_drag(
         return;
     }
 
+    // Don't process clicks when a gizmo drag is active
+    if move_widget.active_axis.is_some()
+        || rotate_widget.active_axis.is_some()
+        || scale_widget.active_axis.is_some()
+    {
+        return;
+    }
+
+    let over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
+    if over_ui || !mouse_buttons.just_pressed(MouseButton::Left) {
+        return;
+    }
+
     let Ok(window) = windows.single() else {
         return;
     };
@@ -178,41 +264,10 @@ fn handle_placement_and_drag(
     let Ok((camera, camera_gt)) = camera_query.single() else {
         return;
     };
-    let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else {
-        return;
-    };
 
-    // Continue an active drag while LMB is held
-    if state.drag_active {
-        if mouse_buttons.pressed(MouseButton::Left) {
-            let selected = state.selected_entity;
-            let xz_offset = state.drag_xz_offset;
-            if let Some(entity) = selected {
-                if let Ok((_, mut transform, _)) = placed_query.get_mut(entity) {
-                    let drag_y = transform.translation.y;
-                    if let Some(hit) = ray_intersect_y_plane(ray, drag_y) {
-                        transform.translation.x = hit.x + xz_offset.x;
-                        transform.translation.z = hit.z + xz_offset.y;
-                    }
-                }
-            }
-        } else {
-            state.drag_active = false;
-        }
-        return;
-    }
-
-    // Only process new clicks below
-    let over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
-    if over_ui || !mouse_buttons.just_pressed(MouseButton::Left) {
-        return;
-    }
-
-    // Find the nearest placed entity to the cursor in screen space
     let nearest = find_nearest_to_cursor(&placed_query, camera, camera_gt, cursor_pos);
 
     if state.gate_order_mode {
-        // Assign the next gate order to the clicked obstacle
         if let Some(entity) = nearest {
             if let Ok((_, _, mut placed)) = placed_query.get_mut(entity) {
                 let order = state.next_gate_order;
@@ -225,19 +280,11 @@ fn handle_placement_and_drag(
     }
 
     if let Some(entity) = nearest {
-        // Select and begin dragging the existing obstacle
-        if let Ok((_, transform, _)) = placed_query.get(entity) {
-            let entity_pos = transform.translation;
-            let drag_y = entity_pos.y;
-            let hit = ray_intersect_y_plane(ray, drag_y)
-                .unwrap_or(Vec3::new(entity_pos.x, drag_y, entity_pos.z));
-            state.drag_xz_offset = Vec2::new(entity_pos.x - hit.x, entity_pos.z - hit.z);
-        }
+        // Select the obstacle — gizmos handle all transforms
         state.selected_entity = Some(entity);
-        state.drag_active = true;
         state.selected_palette_id = None;
     } else if let Some(id) = state.selected_palette_id.clone() {
-        // Place a new obstacle at the cursor's ground hit
+        // Place a new obstacle at world origin
         let Some(def) = library.get(&id) else {
             return;
         };
@@ -246,12 +293,7 @@ fn handle_placement_and_drag(
             return;
         };
 
-        let height = state.drag_height;
-        let Some(hit_pos) = ray_intersect_y_plane(ray, height) else {
-            return;
-        };
-
-        let transform = Transform::from_translation(hit_pos);
+        let transform = Transform::from_translation(Vec3::ZERO);
         let spawned = spawn_obstacle(
             &mut commands,
             &gltf_assets,
@@ -272,42 +314,16 @@ fn handle_placement_and_drag(
                 obstacle_id: id.clone(),
                 gate_order: None,
             });
+            state.selected_entity = Some(entity);
         } else {
             warn!(
                 "Failed to spawn obstacle '{}' (node '{}')",
                 def.id.0, def.glb_node_name
             );
         }
-    }
-}
-
-fn handle_height_key(
-    mut state: ResMut<PlacementState>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut placed_query: Query<&mut Transform, With<PlacedObstacle>>,
-) {
-    if state.editing_name {
-        return;
-    }
-
-    const STEP: f32 = 0.5;
-
-    if keyboard.just_pressed(KeyCode::KeyE) {
-        state.drag_height += STEP;
-        if let Some(entity) = state.selected_entity {
-            if let Ok(mut transform) = placed_query.get_mut(entity) {
-                transform.translation.y += STEP;
-            }
-        }
-    }
-
-    if keyboard.just_pressed(KeyCode::KeyQ) {
-        state.drag_height = (state.drag_height - STEP).max(0.0);
-        if let Some(entity) = state.selected_entity {
-            if let Ok(mut transform) = placed_query.get_mut(entity) {
-                transform.translation.y = (transform.translation.y - STEP).max(0.0);
-            }
-        }
+    } else {
+        // Clicked empty space with nothing selected — deselect
+        state.selected_entity = None;
     }
 }
 
@@ -323,12 +339,369 @@ fn handle_delete_key(
     if keyboard.just_pressed(KeyCode::Delete) {
         if let Some(entity) = state.selected_entity.take() {
             commands.entity(entity).despawn();
-            state.drag_active = false;
         }
     }
 }
 
-// --- Gizmos ---
+fn handle_transform_mode_keys(
+    mut state: ResMut<PlacementState>,
+    mut move_widget: ResMut<MoveWidgetState>,
+    mut rotate_widget: ResMut<RotateWidgetState>,
+    mut scale_widget: ResMut<ScaleWidgetState>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+) {
+    if state.editing_name {
+        return;
+    }
+
+    let new_mode = if keyboard.just_pressed(KeyCode::KeyG) {
+        Some(TransformMode::Move)
+    } else if keyboard.just_pressed(KeyCode::KeyR) {
+        Some(TransformMode::Rotate)
+    } else if keyboard.just_pressed(KeyCode::KeyS) {
+        Some(TransformMode::Scale)
+    } else {
+        None
+    };
+
+    if let Some(mode) = new_mode {
+        state.transform_mode = mode;
+        move_widget.active_axis = None;
+        move_widget.hovered_axis = None;
+        rotate_widget.active_axis = None;
+        rotate_widget.hovered_axis = None;
+        scale_widget.active_axis = None;
+        scale_widget.hovered_axis = None;
+    }
+}
+
+// --- Move Gizmo ---
+
+fn draw_move_gizmo(
+    mut gizmos: Gizmos,
+    state: Res<PlacementState>,
+    widget: Res<MoveWidgetState>,
+    placed_query: Query<&Transform, With<PlacedObstacle>>,
+) {
+    if state.transform_mode != TransformMode::Move {
+        return;
+    }
+    let Some(entity) = state.selected_entity else {
+        return;
+    };
+    let Ok(transform) = placed_query.get(entity) else {
+        return;
+    };
+
+    let origin = transform.translation;
+    for axis in [Axis::X, Axis::Y, Axis::Z] {
+        let is_hovered = widget.hovered_axis == Some(axis);
+        let is_active = widget.active_axis == Some(axis);
+        let color = axis.color(is_hovered, is_active);
+        let end = origin + axis.direction() * ARROW_LENGTH;
+        gizmos.arrow(origin, end, color);
+    }
+}
+
+fn handle_move_gizmo(
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    state: Res<PlacementState>,
+    mut widget: ResMut<MoveWidgetState>,
+    mut placed_query: Query<&mut Transform, With<PlacedObstacle>>,
+    interaction_query: Query<&Interaction>,
+) {
+    if state.transform_mode != TransformMode::Move {
+        widget.active_axis = None;
+        widget.hovered_axis = None;
+        return;
+    }
+    let Some(entity) = state.selected_entity else {
+        widget.active_axis = None;
+        widget.hovered_axis = None;
+        return;
+    };
+    let Ok(mut transform) = placed_query.get_mut(entity) else {
+        return;
+    };
+
+    let Ok(window) = windows.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else { return };
+    let Ok((camera, camera_gt)) = camera_query.single() else { return };
+    let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else { return };
+
+    let origin = transform.translation;
+    let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
+
+    if let Some(active_axis) = widget.active_axis {
+        if mouse_buttons.pressed(MouseButton::Left) {
+            let axis_dir = active_axis.direction();
+            let t = closest_point_on_axis(ray, origin, axis_dir);
+            let delta = t - widget.drag_offset;
+            transform.translation = origin + axis_dir * delta;
+        } else {
+            widget.active_axis = None;
+        }
+    } else {
+        let mut best_axis: Option<Axis> = None;
+        let mut best_dist = ARROW_HIT_THRESHOLD;
+
+        for axis in [Axis::X, Axis::Y, Axis::Z] {
+            let end = origin + axis.direction() * ARROW_LENGTH;
+            let Ok(screen_start) = camera.world_to_viewport(camera_gt, origin) else { continue };
+            let Ok(screen_end) = camera.world_to_viewport(camera_gt, end) else { continue };
+            let dist = point_to_segment_distance(cursor_pos, screen_start, screen_end);
+            if dist < best_dist {
+                best_dist = dist;
+                best_axis = Some(axis);
+            }
+        }
+
+        widget.hovered_axis = best_axis;
+
+        if !mouse_over_ui
+            && mouse_buttons.just_pressed(MouseButton::Left)
+            && let Some(axis) = best_axis
+        {
+            let axis_dir = axis.direction();
+            let t = closest_point_on_axis(ray, origin, axis_dir);
+            widget.active_axis = Some(axis);
+            widget.drag_offset = t;
+        }
+    }
+}
+
+// --- Rotate Gizmo ---
+
+fn draw_rotate_gizmo(
+    mut gizmos: Gizmos,
+    state: Res<PlacementState>,
+    widget: Res<RotateWidgetState>,
+    placed_query: Query<&Transform, With<PlacedObstacle>>,
+) {
+    if state.transform_mode != TransformMode::Rotate {
+        return;
+    }
+    let Some(entity) = state.selected_entity else {
+        return;
+    };
+    let Ok(transform) = placed_query.get(entity) else {
+        return;
+    };
+
+    let pos = transform.translation;
+
+    let ring_orientations = [
+        (Axis::X, Quat::from_rotation_arc(Vec3::Z, Vec3::X)),
+        (Axis::Y, Quat::from_rotation_arc(Vec3::Z, Vec3::Y)),
+        (Axis::Z, Quat::IDENTITY),
+    ];
+
+    for (axis, face_quat) in ring_orientations {
+        let is_hovered = widget.hovered_axis == Some(axis);
+        let is_active = widget.active_axis == Some(axis);
+        let color = axis.color(is_hovered, is_active);
+        let iso = Isometry3d::new(pos, face_quat);
+        gizmos.circle(iso, RING_RADIUS, color);
+    }
+}
+
+fn handle_rotate_gizmo(
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    state: Res<PlacementState>,
+    mut widget: ResMut<RotateWidgetState>,
+    mut placed_query: Query<&mut Transform, With<PlacedObstacle>>,
+    interaction_query: Query<&Interaction>,
+) {
+    if state.transform_mode != TransformMode::Rotate {
+        widget.active_axis = None;
+        widget.hovered_axis = None;
+        return;
+    }
+    let Some(entity) = state.selected_entity else {
+        widget.active_axis = None;
+        widget.hovered_axis = None;
+        return;
+    };
+    let Ok(mut transform) = placed_query.get_mut(entity) else {
+        return;
+    };
+
+    let Ok(window) = windows.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else { return };
+    let Ok((camera, camera_gt)) = camera_query.single() else { return };
+    let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else { return };
+
+    let pos = transform.translation;
+    let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
+
+    if let Some(active_axis) = widget.active_axis {
+        if mouse_buttons.pressed(MouseButton::Left) {
+            let axis_dir = active_axis.direction();
+            if let Some(hit) = ray_intersect_plane(ray, pos, axis_dir) {
+                let current_angle = angle_in_ring_plane(hit, pos, active_axis);
+                let delta = current_angle - widget.drag_start_angle;
+                transform.rotation =
+                    widget.entity_start_rotation * Quat::from_axis_angle(axis_dir, delta);
+            }
+        } else {
+            widget.active_axis = None;
+        }
+    } else {
+        let mut best_axis: Option<Axis> = None;
+        let mut best_dist = RING_HIT_THRESHOLD;
+
+        for axis in [Axis::X, Axis::Y, Axis::Z] {
+            let (ref1, ref2) = perpendicular_basis(axis);
+            let min_dist = sample_ring_screen_dist(
+                camera,
+                camera_gt,
+                cursor_pos,
+                pos,
+                ref1,
+                ref2,
+                RING_RADIUS,
+                RING_SAMPLES,
+            );
+            if min_dist < best_dist {
+                best_dist = min_dist;
+                best_axis = Some(axis);
+            }
+        }
+
+        widget.hovered_axis = best_axis;
+
+        if !mouse_over_ui
+            && mouse_buttons.just_pressed(MouseButton::Left)
+            && let Some(axis) = best_axis
+        {
+            let axis_dir = axis.direction();
+            if let Some(hit) = ray_intersect_plane(ray, pos, axis_dir) {
+                widget.active_axis = Some(axis);
+                widget.drag_start_angle = angle_in_ring_plane(hit, pos, axis);
+                widget.entity_start_rotation = transform.rotation;
+            }
+        }
+    }
+}
+
+// --- Scale Gizmo ---
+
+fn draw_scale_gizmo(
+    mut gizmos: Gizmos,
+    state: Res<PlacementState>,
+    widget: Res<ScaleWidgetState>,
+    placed_query: Query<&Transform, With<PlacedObstacle>>,
+) {
+    if state.transform_mode != TransformMode::Scale {
+        return;
+    }
+    let Some(entity) = state.selected_entity else {
+        return;
+    };
+    let Ok(transform) = placed_query.get(entity) else {
+        return;
+    };
+
+    let origin = transform.translation;
+    for axis in [Axis::X, Axis::Y, Axis::Z] {
+        let is_hovered = widget.hovered_axis == Some(axis);
+        let is_active = widget.active_axis == Some(axis);
+        let color = axis.color(is_hovered, is_active);
+        let tip = origin + axis.direction() * SCALE_HANDLE_LENGTH;
+        gizmos.line(origin, tip, color);
+        let cube_transform =
+            Transform::from_translation(tip).with_scale(Vec3::splat(SCALE_CUBE_SIZE));
+        gizmos.cube(cube_transform, color);
+    }
+}
+
+fn handle_scale_gizmo(
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    state: Res<PlacementState>,
+    mut widget: ResMut<ScaleWidgetState>,
+    mut placed_query: Query<&mut Transform, With<PlacedObstacle>>,
+    interaction_query: Query<&Interaction>,
+) {
+    if state.transform_mode != TransformMode::Scale {
+        widget.active_axis = None;
+        widget.hovered_axis = None;
+        return;
+    }
+    let Some(entity) = state.selected_entity else {
+        widget.active_axis = None;
+        widget.hovered_axis = None;
+        return;
+    };
+    let Ok(mut transform) = placed_query.get_mut(entity) else {
+        return;
+    };
+
+    let Ok(window) = windows.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else { return };
+    let Ok((camera, camera_gt)) = camera_query.single() else { return };
+    let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else { return };
+
+    let origin = transform.translation;
+    let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
+
+    if let Some(active_axis) = widget.active_axis {
+        if mouse_buttons.pressed(MouseButton::Left) {
+            let axis_dir = active_axis.direction();
+            let current_t = closest_point_on_axis(ray, origin, axis_dir);
+            let delta = current_t - widget.drag_start_t;
+            match active_axis {
+                Axis::X => {
+                    transform.scale.x =
+                        (widget.entity_start_scale.x + delta * SCALE_SENSITIVITY).max(0.01)
+                }
+                Axis::Y => {
+                    transform.scale.y =
+                        (widget.entity_start_scale.y + delta * SCALE_SENSITIVITY).max(0.01)
+                }
+                Axis::Z => {
+                    transform.scale.z =
+                        (widget.entity_start_scale.z + delta * SCALE_SENSITIVITY).max(0.01)
+                }
+            }
+        } else {
+            widget.active_axis = None;
+        }
+    } else {
+        let mut best_axis: Option<Axis> = None;
+        let mut best_dist = SCALE_HIT_THRESHOLD;
+
+        for axis in [Axis::X, Axis::Y, Axis::Z] {
+            let tip = origin + axis.direction() * SCALE_HANDLE_LENGTH;
+            let Ok(screen_start) = camera.world_to_viewport(camera_gt, origin) else { continue };
+            let Ok(screen_end) = camera.world_to_viewport(camera_gt, tip) else { continue };
+            let dist = point_to_segment_distance(cursor_pos, screen_start, screen_end);
+            if dist < best_dist {
+                best_dist = dist;
+                best_axis = Some(axis);
+            }
+        }
+
+        widget.hovered_axis = best_axis;
+
+        if !mouse_over_ui
+            && mouse_buttons.just_pressed(MouseButton::Left)
+            && let Some(axis) = best_axis
+        {
+            let axis_dir = axis.direction();
+            widget.active_axis = Some(axis);
+            widget.drag_start_t = closest_point_on_axis(ray, origin, axis_dir);
+            widget.entity_start_scale = transform.scale;
+        }
+    }
+}
+
+// --- Existing Gizmos ---
 
 fn draw_trigger_gizmos(
     mut gizmos: Gizmos<CourseGizmoGroup>,
@@ -355,14 +728,12 @@ fn draw_gate_sequence_lines(
 
     let line_color = Color::srgb(1.0, 0.8, 0.0);
 
-    // Draw lines between consecutive gates
     for pair in gates.windows(2) {
         let (_, from) = pair[0];
         let (_, to) = pair[1];
         gizmos.line(from, to, line_color);
     }
 
-    // Draw a sphere at each gate to mark position and show order via color gradient
     let count = gates.len();
     for (i, (_, pos)) in gates.iter().enumerate() {
         let t = if count > 1 {
@@ -370,7 +741,6 @@ fn draw_gate_sequence_lines(
         } else {
             0.0
         };
-        // Gradient: green (first) → red (last)
         let color = Color::srgb(t, 1.0 - t * 0.7, 0.0);
         let iso = Isometry3d::new(*pos, Quat::IDENTITY);
         gizmos.sphere(iso, 0.5, color);
@@ -389,27 +759,12 @@ fn draw_selection_highlight(
         return;
     };
 
-    // Wireframe box centered slightly above entity origin
     let center = transform.translation + Vec3::Y * 1.5;
     let hl_transform = Transform::from_translation(center).with_scale(Vec3::splat(3.5));
     gizmos.cube(hl_transform, Color::srgb(1.0, 1.0, 0.0));
 }
 
 // --- Helpers ---
-
-/// Intersect a ray with a horizontal plane at height `y`.
-/// Returns `None` if the ray is nearly parallel to the plane or misses it.
-fn ray_intersect_y_plane(ray: Ray3d, y: f32) -> Option<Vec3> {
-    let dir_y = ray.direction.y;
-    if dir_y.abs() < 1e-6 {
-        return None;
-    }
-    let t = (y - ray.origin.y) / dir_y;
-    if t < 0.0 {
-        return None;
-    }
-    Some(ray.origin + *ray.direction * t)
-}
 
 /// Find the placed entity whose world-space center is closest to the cursor
 /// in screen space. Returns `None` if nothing is within the pick threshold.
@@ -437,4 +792,38 @@ fn find_nearest_to_cursor(
     }
 
     best_entity
+}
+
+/// Sample a ring of `n` evenly-spaced world points and return the minimum
+/// screen-space distance from `cursor_pos` to any of those projected points.
+fn sample_ring_screen_dist(
+    camera: &Camera,
+    camera_gt: &GlobalTransform,
+    cursor_pos: Vec2,
+    center: Vec3,
+    ref1: Vec3,
+    ref2: Vec3,
+    radius: f32,
+    n: usize,
+) -> f32 {
+    let mut min_dist = f32::MAX;
+    for i in 0..n {
+        let angle = i as f32 * TAU / n as f32;
+        let world_pt = center + (ref1 * angle.cos() + ref2 * angle.sin()) * radius;
+        if let Ok(screen_pt) = camera.world_to_viewport(camera_gt, world_pt) {
+            let d = (cursor_pos - screen_pt).length();
+            if d < min_dist {
+                min_dist = d;
+            }
+        }
+    }
+    min_dist
+}
+
+/// Compute the signed angle (in radians) of a world-space `point` projected
+/// onto the plane perpendicular to `axis` through `center`.
+fn angle_in_ring_plane(point: Vec3, center: Vec3, axis: Axis) -> f32 {
+    let local = point - center;
+    let (ref1, ref2) = perpendicular_basis(axis);
+    local.dot(ref2).atan2(local.dot(ref1))
 }

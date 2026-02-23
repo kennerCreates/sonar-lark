@@ -1,5 +1,6 @@
 pub mod workshop;
 pub mod course_editor;
+pub(crate) mod gizmos;
 
 use bevy::prelude::*;
 
