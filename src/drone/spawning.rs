@@ -45,51 +45,39 @@ pub fn setup_drone_assets(
         return;
     };
 
-    // TODO: restore glTF drone model once visibility issue is resolved
-    {
-        let mesh = meshes.add(Cuboid::new(0.5, 0.3, 0.5));
-        let mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(0.8, 0.2, 0.2),
-            ..default()
-        });
-        commands.insert_resource(DroneAssets {
-            mesh_primitives: vec![(mesh, mat)],
-            mesh_transform: Transform::IDENTITY,
-        });
-        return;
+    let red_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.8, 0.2, 0.2),
+        ..default()
+    });
+
+    let node_name: Box<str> = "Drone".into();
+    if let Some(node_handle) = gltf.named_nodes.get(&node_name) {
+        if let Some(node) = node_assets.get(node_handle) {
+            if let Some(gltf_mesh_handle) = node.mesh.as_ref() {
+                if let Some(gltf_mesh) = mesh_assets.get(gltf_mesh_handle) {
+                    let primitives: Vec<(Handle<Mesh>, Handle<StandardMaterial>)> = gltf_mesh
+                        .primitives
+                        .iter()
+                        .map(|p| (p.mesh.clone(), red_mat.clone()))
+                        .collect();
+
+                    if !primitives.is_empty() {
+                        commands.insert_resource(DroneAssets {
+                            mesh_primitives: primitives,
+                            mesh_transform: node.transform,
+                        });
+                        return;
+                    }
+                }
+            }
+        }
     }
 
-    #[allow(unreachable_code)]
-    let node_name = "Drone";
-    let Some(node_handle) = gltf.named_nodes.get(node_name) else {
-        return;
-    };
-
-    let Some(node) = node_assets.get(node_handle) else {
-        return;
-    };
-    let Some(gltf_mesh_handle) = node.mesh.as_ref() else {
-        return;
-    };
-    let Some(gltf_mesh) = mesh_assets.get(gltf_mesh_handle) else {
-        return;
-    };
-
-    let primitives: Vec<(Handle<Mesh>, Handle<StandardMaterial>)> = gltf_mesh
-        .primitives
-        .iter()
-        .map(|p| {
-            let mat = match &p.material {
-                Some(m) => m.clone(),
-                None => materials.add(StandardMaterial::default()),
-            };
-            (p.mesh.clone(), mat)
-        })
-        .collect();
-
+    // Fallback: placeholder red cube if glTF node is missing or empty
+    let mesh = meshes.add(Cuboid::new(0.5, 0.3, 0.5));
     commands.insert_resource(DroneAssets {
-        mesh_primitives: primitives,
-        mesh_transform: node.transform,
+        mesh_primitives: vec![(mesh, red_mat)],
+        mesh_transform: Transform::IDENTITY,
     });
 }
 
