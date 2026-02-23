@@ -153,6 +153,10 @@ pub fn spawn_drones(
 
         let transform = Transform::from_translation(position).with_rotation(rotation);
 
+        // Desynchronize hover cycles so drones don't all move in unison.
+        let initial_timer = rng.gen_range(0.0f32..=3.0);
+        let hover_cycle = HoverCycle::new(position, config.hover_amp, initial_timer);
+
         let mut entity_cmd = commands.spawn((
             transform,
             Visibility::default(),
@@ -173,6 +177,7 @@ pub fn spawn_drones(
                 translation: position,
                 rotation,
             },
+            hover_cycle,
             DespawnOnExit(AppState::Race),
         ));
 
@@ -289,20 +294,10 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
         line_offset: rng.gen_range(-1.5..=1.5),
         noise_amplitude: rng.gen_range(0.3..=1.5),
         noise_frequency: rng.gen_range(0.5..=2.0),
-        hover_phase: Vec3::new(
-            rng.gen_range(0.0..std::f32::consts::TAU),
-            rng.gen_range(0.0..std::f32::consts::TAU),
-            rng.gen_range(0.0..std::f32::consts::TAU),
-        ),
-        hover_freq: Vec3::new(
-            rng.gen_range(0.72..=2.25),
-            rng.gen_range(0.9..=2.7),
-            rng.gen_range(0.54..=1.8),
-        ),
         hover_amp: Vec3::new(
-            if rng.gen_bool(0.5) { 1.0 } else { -1.0 } * rng.gen_range(0.9..=4.8),
-            rng.gen_range(0.45..=2.4),
-            if rng.gen_bool(0.5) { 1.0 } else { -1.0 } * rng.gen_range(0.6..=3.6),
+            rng.gen_range(0.3..=1.0),
+            rng.gen_range(0.1..=0.4),
+            rng.gen_range(0.2..=0.8),
         ),
     }
 }
@@ -564,16 +559,9 @@ mod tests {
             assert!(config.line_offset.abs() <= 1.5);
             assert!((0.3..=1.5).contains(&config.noise_amplitude));
             assert!((0.5..=2.0).contains(&config.noise_frequency));
-            // Hover parameters
-            assert!(config.hover_phase.x >= 0.0 && config.hover_phase.x < std::f32::consts::TAU);
-            assert!(config.hover_phase.y >= 0.0 && config.hover_phase.y < std::f32::consts::TAU);
-            assert!(config.hover_phase.z >= 0.0 && config.hover_phase.z < std::f32::consts::TAU);
-            assert!((0.72..=2.25).contains(&config.hover_freq.x));
-            assert!((0.9..=2.7).contains(&config.hover_freq.y));
-            assert!((0.54..=1.8).contains(&config.hover_freq.z));
-            assert!((0.9..=4.8).contains(&config.hover_amp.x.abs()));
-            assert!((0.45..=2.4).contains(&config.hover_amp.y));
-            assert!((0.6..=3.6).contains(&config.hover_amp.z.abs()));
+            assert!((0.3..=1.0).contains(&config.hover_amp.x));
+            assert!((0.1..=0.4).contains(&config.hover_amp.y));
+            assert!((0.2..=0.8).contains(&config.hover_amp.z));
         }
     }
 
@@ -584,8 +572,6 @@ mod tests {
             line_offset: 0.0,
             noise_amplitude: 1.0,
             noise_frequency: 1.0,
-            hover_phase: Vec3::ZERO,
-            hover_freq: Vec3::ONE,
             hover_amp: Vec3::splat(0.3),
         };
         let pid = create_pid_with_variation(&config);

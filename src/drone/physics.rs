@@ -9,27 +9,49 @@ const GROUND_HEIGHT: f32 = 0.3;
 const INTEGRAL_CLAMP: f32 = 10.0;
 const MAX_LEAN_ANGLE: f32 = 0.6;
 const ROTATION_SMOOTHING: f32 = 8.0;
-/// Per-drone idle hover: slow drift away from start position, fast snap back.
-/// 80% of each cycle is a gradual drift, 20% is an abrupt return — creating
-/// the jockeying / showing-off feel of competitors on a start line.
+/// Per-drone idle hover state machine.
+/// Cycle: slow drift to random offset → snap back past home (overshoot) → correct to home → repeat.
 pub fn hover_bob(
-    mut query: Query<(&DroneStartPosition, &mut DesiredPosition)>,
+    time: Res<Time>,
+    mut query: Query<(
+        &DroneStartPosition,
+        &DroneConfig,
+        &mut DesiredPosition,
+        &mut HoverCycle,
+    )>,
 ) {
-    // drift_snap disabled for debugging — drones hold their spawn positions.
-    for (start, mut desired) in &mut query {
-        desired.position = start.translation;
+    let dt = time.delta_secs();
+    if dt == 0.0 {
+        return;
     }
-}
 
-/// Asymmetric waveform: slow linear drift (0→1) then fast linear snap (1→0).
-/// Returns 0.0–1.0. The snap portion is 4× faster than the drift.
-fn drift_snap(t: f32, freq: f32, phase: f32) -> f32 {
-    const DRIFT: f32 = 0.8;
-    let cycle = (t * freq + phase).fract().abs();
-    if cycle < DRIFT {
-        cycle / DRIFT
-    } else {
-        (1.0 - cycle) / (1.0 - DRIFT)
+    for (start, config, mut desired, mut cycle) in &mut query {
+        cycle.timer += dt;
+        let pos_a = start.translation;
+
+        match cycle.phase {
+            HoverPhase::Drifting => {
+                let t = (cycle.timer / cycle.drift_duration).clamp(0.0, 1.0);
+                desired.position = pos_a.lerp(cycle.pos_r, t);
+                if cycle.timer >= cycle.drift_duration {
+                    cycle.phase = HoverPhase::Snapping;
+                    cycle.timer = 0.0;
+                }
+            }
+            HoverPhase::Snapping => {
+                desired.position = cycle.overshoot_pos;
+                if cycle.timer >= cycle.snap_duration {
+                    cycle.phase = HoverPhase::Correcting;
+                    cycle.timer = 0.0;
+                }
+            }
+            HoverPhase::Correcting => {
+                desired.position = pos_a;
+                if cycle.timer >= cycle.correct_duration {
+                    *cycle = HoverCycle::new(pos_a, config.hover_amp, 0.0);
+                }
+            }
+        }
     }
 }
 

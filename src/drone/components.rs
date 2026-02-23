@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use rand::Rng;
 
 #[derive(Component)]
 pub struct Drone {
@@ -57,12 +58,7 @@ pub struct DroneConfig {
     pub line_offset: f32,
     pub noise_amplitude: f32,
     pub noise_frequency: f32,
-    /// Per-axis phase offsets for hover animation (radians).
-    pub hover_phase: Vec3,
-    /// Per-axis primary oscillation frequencies (Hz) for idle hover.
-    pub hover_freq: Vec3,
-    /// Per-axis amplitude of idle hover movement (units). X/Z may be negative
-    /// to vary drift direction across drones; Y is always positive (drift up).
+    /// Per-axis max offset range for idle hover drift (units, always positive).
     pub hover_amp: Vec3,
 }
 
@@ -85,4 +81,53 @@ pub struct DesiredPosition {
 pub struct DroneStartPosition {
     pub translation: Vec3,
     pub rotation: Quat,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub enum HoverPhase {
+    #[default]
+    Drifting,
+    Snapping,
+    Correcting,
+}
+
+/// Per-drone state machine for idle hover animation.
+/// Cycle: drift to random offset → snap back past home (overshoot) → correct to home → repeat.
+#[derive(Component)]
+pub struct HoverCycle {
+    pub phase: HoverPhase,
+    pub timer: f32,
+    pub drift_duration: f32,
+    pub snap_duration: f32,
+    pub correct_duration: f32,
+    /// Random offset target for this cycle (world space).
+    pub pos_r: Vec3,
+    /// Overshoot position past home (world space).
+    pub overshoot_pos: Vec3,
+}
+
+impl HoverCycle {
+    pub fn new(pos_a: Vec3, hover_amp: Vec3, initial_timer: f32) -> Self {
+        let mut rng = rand::thread_rng();
+
+        let offset = Vec3::new(
+            rng.gen_range(-hover_amp.x.abs()..=hover_amp.x.abs()),
+            rng.gen_range(-hover_amp.y.abs()..=hover_amp.y.abs()),
+            rng.gen_range(-hover_amp.z.abs()..=hover_amp.z.abs()),
+        );
+        let pos_r = pos_a + offset;
+
+        let overshoot_fraction = rng.gen_range(0.15f32..=0.50);
+        let overshoot_pos = pos_a + (pos_a - pos_r) * overshoot_fraction;
+
+        Self {
+            phase: HoverPhase::Drifting,
+            timer: initial_timer,
+            drift_duration: rng.gen_range(2.0f32..=4.0),
+            snap_duration: rng.gen_range(0.3f32..=0.8),
+            correct_duration: rng.gen_range(0.5f32..=1.2),
+            pos_r,
+            overshoot_pos,
+        }
+    }
 }
