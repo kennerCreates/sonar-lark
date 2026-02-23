@@ -17,7 +17,8 @@ impl Plugin for RacePlugin {
                 Update,
                 (
                     ui::handle_start_race_button,
-                    ui::update_start_race_button_visuals,
+                    ui::update_start_button_visuals,
+                    ui::update_start_button_text,
                     lifecycle::check_race_finished,
                 )
                     .run_if(in_state(AppState::Race)),

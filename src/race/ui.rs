@@ -110,14 +110,17 @@ pub fn handle_start_race_button(
     }
 }
 
-pub fn update_start_race_button_visuals(
+pub fn update_start_button_visuals(
     phase: Res<RacePhase>,
     mut button_query: Query<
         (&Interaction, &mut BackgroundColor, &mut BorderColor),
         With<StartRaceButton>,
     >,
-    mut text_query: Query<(&mut Text, &mut TextColor), With<StartRaceButtonText>>,
+    interaction_changed: Query<(), (Changed<Interaction>, With<StartRaceButton>)>,
 ) {
+    if !phase.is_changed() && interaction_changed.is_empty() {
+        return;
+    }
     for (interaction, mut bg, mut border) in &mut button_query {
         match *phase {
             RacePhase::Racing => {
@@ -140,7 +143,15 @@ pub fn update_start_race_button_visuals(
             },
         }
     }
+}
 
+pub fn update_start_button_text(
+    phase: Res<RacePhase>,
+    mut text_query: Query<(&mut Text, &mut TextColor), With<StartRaceButtonText>>,
+) {
+    if !phase.is_changed() {
+        return;
+    }
     for (mut text, mut color) in &mut text_query {
         match *phase {
             RacePhase::WaitingToStart => {

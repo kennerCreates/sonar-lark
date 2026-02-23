@@ -22,19 +22,20 @@ impl Plugin for DronePlugin {
                     .chain()
                     .run_if(in_state(AppState::Race)),
             )
-            // Physics chain in FixedUpdate
+            // Physics chain in FixedUpdate.
+            // AI systems only run when racing; physics always runs so drones hover at start.
             .add_systems(
                 FixedUpdate,
                 (
-                    ai::update_ai_targets,
-                    ai::compute_racing_line,
+                    ai::update_ai_targets.run_if(race_is_running),
+                    ai::compute_racing_line.run_if(race_is_running),
                     physics::pid_compute,
                     physics::apply_forces,
                     physics::integrate_motion,
                     physics::clamp_transform,
                 )
                     .chain()
-                    .run_if(in_state(AppState::Race).and(race_is_running)),
+                    .run_if(in_state(AppState::Race)),
             )
             // Cleanup resources on exit
             .add_systems(OnExit(AppState::Race), spawning::cleanup_drone_resources);
