@@ -3,10 +3,17 @@
     instances: [
         (
             obstacle_id: ("gate_best"),
-            translation: (0.0, 0.0, 0.0),
-            rotation: (0.0, 0.0, 0.0, 1.0),
+            translation: (29.926182, 0.0, 0.0),
+            rotation: (0.0, -0.212828, 0.0, 0.9770897),
             scale: (1.0, 1.0, 1.0),
-            gate_order: None,
+            gate_order: Some(1),
+        ),
+        (
+            obstacle_id: ("gate_ground"),
+            translation: (-28.521376, 0.0, 0.0),
+            rotation: (0.0, -0.72936445, 0.0, 0.6841253),
+            scale: (1.0, 1.0, 1.0),
+            gate_order: Some(3),
         ),
     ],
 )

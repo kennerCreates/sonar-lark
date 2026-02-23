@@ -107,6 +107,11 @@ pub fn load_course_from_file(path: &Path) -> Result<CourseData, String> {
         .map_err(|e| format!("Failed to parse {}: {e}", path.display()))
 }
 
+pub fn delete_course(path: &Path) -> Result<(), String> {
+    fs::remove_file(path)
+        .map_err(|e| format!("Failed to delete {}: {e}", path.display()))
+}
+
 pub fn save_course(course: &CourseData, path: &Path) -> Result<(), String> {
     let pretty = ron::ser::PrettyConfig::default();
     let contents = ron::ser::to_string_pretty(course, pretty)
@@ -258,5 +263,20 @@ mod tests {
         // Quaternion comparison with tolerance for float serialization
         let diff = (inst.rotation.dot(rotation)).abs();
         assert!(diff > 0.999, "rotation not preserved: dot product = {diff}");
+    }
+
+    #[test]
+    fn delete_course_removes_file() {
+        let tmp = NamedTempFile::new().unwrap();
+        let (_, persisted_path) = tmp.keep().unwrap();
+        assert!(persisted_path.exists());
+
+        delete_course(&persisted_path).unwrap();
+        assert!(!persisted_path.exists());
+    }
+
+    #[test]
+    fn delete_nonexistent_course_returns_error() {
+        assert!(delete_course(Path::new("no_such_course.ron")).is_err());
     }
 }

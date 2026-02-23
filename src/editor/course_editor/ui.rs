@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::course::data::{CourseData, ObstacleInstance};
-use crate::course::loader::{load_course_from_file, save_course};
+use crate::course::loader::{delete_course, load_course_from_file, save_course};
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
@@ -60,6 +60,21 @@ pub struct PaletteContainer;
 
 #[derive(Component)]
 pub struct ExistingCoursesContainer;
+
+#[derive(Component)]
+pub struct DeleteCourseButton(pub String);
+
+#[derive(Component)]
+pub struct ConfirmDeleteYesButton;
+
+#[derive(Component)]
+pub struct ConfirmDeleteCancelButton;
+
+#[derive(Resource)]
+pub struct PendingCourseDelete {
+    pub path: String,
+    pub display_name: String,
+}
 
 #[derive(Component)]
 pub struct TransformModeButton(pub TransformMode);
@@ -436,29 +451,64 @@ pub fn spawn_existing_course_button(
     path: &str,
 ) {
     parent
-        .spawn((
-            Button,
-            ExistingCourseButton(path.to_string()),
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(26.0),
-                padding: UiRect::horizontal(Val::Px(8.0)),
-                align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(BUTTON_NORMAL),
-            BorderColor::all(Color::srgb(0.25, 0.25, 0.25)),
-        ))
-        .with_children(|btn| {
-            btn.spawn((
-                Text::new(display_name),
-                TextFont {
-                    font_size: 12.0,
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(2.0),
+            ..default()
+        })
+        .with_children(|row| {
+            // Load button (fills remaining space)
+            row.spawn((
+                Button,
+                ExistingCourseButton(path.to_string()),
+                Node {
+                    flex_grow: 1.0,
+                    height: Val::Px(26.0),
+                    padding: UiRect::horizontal(Val::Px(8.0)),
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
-                TextColor(Color::srgb(0.8, 0.8, 0.8)),
-            ));
+                BackgroundColor(BUTTON_NORMAL),
+                BorderColor::all(Color::srgb(0.25, 0.25, 0.25)),
+            ))
+            .with_children(|btn| {
+                btn.spawn((
+                    Text::new(display_name),
+                    TextFont {
+                        font_size: 12.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                ));
+            });
+
+            // Delete "X" button
+            row.spawn((
+                Button,
+                DeleteCourseButton(path.to_string()),
+                Node {
+                    width: Val::Px(26.0),
+                    height: Val::Px(26.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(1.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.35, 0.1, 0.1)),
+                BorderColor::all(Color::srgb(0.4, 0.15, 0.15)),
+            ))
+            .with_children(|btn| {
+                btn.spawn((
+                    Text::new("X"),
+                    TextFont {
+                        font_size: 12.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.9, 0.3, 0.3)),
+                ));
+            });
         });
 }
 
@@ -648,6 +698,99 @@ pub fn handle_back_to_menu(
     }
 }
 
+fn rebuild_courses_list(commands: &mut Commands, container: Entity) {
+    let courses = discover_existing_courses();
+    commands.entity(container).despawn_related::<Children>();
+    commands.entity(container).with_children(|parent| {
+        if courses.is_empty() {
+            parent.spawn((
+                Text::new("No courses found"),
+                TextFont {
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.5, 0.5, 0.5)),
+            ));
+        } else {
+            for course in &courses {
+                spawn_existing_course_button(parent, &course.display_name, &course.path);
+            }
+        }
+    });
+}
+
+fn spawn_delete_confirmation(commands: &mut Commands, container: Entity, display_name: &str) {
+    commands.entity(container).despawn_related::<Children>();
+    commands.entity(container).with_children(|parent| {
+        parent.spawn((
+            Text::new(format!("Delete \"{display_name}\"?")),
+            TextFont {
+                font_size: 13.0,
+                ..default()
+            },
+            TextColor(Color::srgb(1.0, 0.6, 0.6)),
+        ));
+        parent
+            .spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(4.0),
+                width: Val::Percent(100.0),
+                ..default()
+            })
+            .with_children(|row| {
+                row.spawn((
+                    Button,
+                    ConfirmDeleteYesButton,
+                    Node {
+                        flex_grow: 1.0,
+                        height: Val::Px(28.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.5, 0.1, 0.1)),
+                    BorderColor::all(Color::srgb(0.6, 0.2, 0.2)),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("Yes"),
+                        TextFont {
+                            font_size: 13.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(1.0, 0.8, 0.8)),
+                    ));
+                });
+
+                row.spawn((
+                    Button,
+                    ConfirmDeleteCancelButton,
+                    Node {
+                        flex_grow: 1.0,
+                        height: Val::Px(28.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(BUTTON_NORMAL),
+                    BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new("Cancel"),
+                        TextFont {
+                            font_size: 13.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                    ));
+                });
+            });
+    });
+}
+
 pub fn handle_save_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<SaveCourseButton>)>,
@@ -701,27 +844,122 @@ pub fn handle_save_button(
             }
         }
 
-        // Refresh the existing courses list
-        let courses = discover_existing_courses();
         if let Ok(container) = existing_courses_container.single() {
-            commands.entity(container).despawn_related::<Children>();
-            commands.entity(container).with_children(|parent| {
-                if courses.is_empty() {
-                    parent.spawn((
-                        Text::new("No courses found"),
-                        TextFont {
-                            font_size: 13.0,
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.5, 0.5, 0.5)),
-                    ));
-                } else {
-                    for course in &courses {
-                        spawn_existing_course_button(parent, &course.display_name, &course.path);
+            rebuild_courses_list(&mut commands, container);
+        }
+    }
+}
+
+pub fn handle_delete_button(
+    mut commands: Commands,
+    query: Query<(&Interaction, &DeleteCourseButton), Changed<Interaction>>,
+    existing_courses_container: Query<Entity, With<ExistingCoursesContainer>>,
+    pending: Option<Res<PendingCourseDelete>>,
+) {
+    if pending.is_some() {
+        return;
+    }
+
+    for (interaction, btn) in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        let path = &btn.0;
+        let display_name = Path::new(path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(path)
+            .trim_end_matches(".course")
+            .to_string();
+
+        commands.insert_resource(PendingCourseDelete {
+            path: path.clone(),
+            display_name: display_name.clone(),
+        });
+
+        if let Ok(container) = existing_courses_container.single() {
+            spawn_delete_confirmation(&mut commands, container, &display_name);
+        }
+
+        break;
+    }
+}
+
+pub fn handle_confirm_delete(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<ConfirmDeleteYesButton>)>,
+    pending: Option<Res<PendingCourseDelete>>,
+    mut state: ResMut<PlacementState>,
+    placed_query: Query<Entity, With<PlacedObstacle>>,
+    existing_courses_container: Query<Entity, With<ExistingCoursesContainer>>,
+    last_edited: Option<Res<LastEditedCourse>>,
+) {
+    let Some(pending) = pending else { return };
+
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        let path = Path::new(&pending.path);
+        match delete_course(path) {
+            Ok(()) => {
+                info!("Deleted course '{}'", pending.display_name);
+
+                // If we deleted the currently loaded course, clear the editor
+                if state.course_name == pending.display_name {
+                    for entity in &placed_query {
+                        commands.entity(entity).despawn();
+                    }
+                    state.selected_entity = None;
+                    state.selected_palette_id = None;
+                    state.course_name = "new_course".to_string();
+                    state.next_gate_order = 0;
+                }
+
+                // If the deleted course was the last edited, remove that resource
+                if let Some(last) = &last_edited {
+                    if last.path == pending.path {
+                        commands.remove_resource::<LastEditedCourse>();
                     }
                 }
-            });
+            }
+            Err(e) => {
+                error!("Failed to delete course: {e}");
+            }
         }
+
+        commands.remove_resource::<PendingCourseDelete>();
+
+        if let Ok(container) = existing_courses_container.single() {
+            rebuild_courses_list(&mut commands, container);
+        }
+
+        break;
+    }
+}
+
+pub fn handle_cancel_delete(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<ConfirmDeleteCancelButton>)>,
+    pending: Option<Res<PendingCourseDelete>>,
+    existing_courses_container: Query<Entity, With<ExistingCoursesContainer>>,
+) {
+    let Some(_pending) = pending else { return };
+
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        commands.remove_resource::<PendingCourseDelete>();
+
+        if let Ok(container) = existing_courses_container.single() {
+            rebuild_courses_list(&mut commands, container);
+        }
+
+        break;
     }
 }
 
@@ -1070,6 +1308,9 @@ pub fn handle_button_hover(
                 With<BackToMenuButton>,
                 With<ExistingCourseButton>,
                 With<ClearGateOrdersButton>,
+                With<DeleteCourseButton>,
+                With<ConfirmDeleteYesButton>,
+                With<ConfirmDeleteCancelButton>,
             )>,
         ),
     >,

@@ -160,6 +160,15 @@ impl Plugin for CourseEditorPlugin {
             )
             .add_systems(
                 Update,
+                (
+                    ui::handle_delete_button,
+                    ui::handle_confirm_delete,
+                    ui::handle_cancel_delete,
+                )
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
                 ui::auto_load_pending_course.run_if(in_state(EditorMode::CourseEditor)),
             )
             .add_systems(
@@ -237,6 +246,7 @@ fn cleanup_course_editor(
     commands.remove_resource::<RotateWidgetState>();
     commands.remove_resource::<ScaleWidgetState>();
     commands.remove_resource::<PendingEditorCourse>();
+    commands.remove_resource::<ui::PendingCourseDelete>();
     for entity in &placed_query {
         commands.entity(entity).despawn();
     }

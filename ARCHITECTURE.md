@@ -157,13 +157,13 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | Module | Tests | What's covered |
 |--------|-------|----------------|
 | `obstacle::library` | 8 | Insert/get, overwrite, save/load roundtrip, error cases, existing RON format |
-| `course::loader` | 7 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format |
+| `course::loader` | 9 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
 | `drone::spawning` | 13 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero), start positions (count, behind gate, no overlap), config randomization bounds, PID variation |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
-- `load_course_from_file` / `save_course` — pure file I/O, no Bevy systems
+- `load_course_from_file` / `save_course` / `delete_course` — pure file I/O, no Bevy systems
 - `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability
 - `generate_race_path(course)` / `compute_start_positions(...)` — pure geometry, no ECS
