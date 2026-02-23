@@ -545,11 +545,12 @@ pub fn handle_library_selection(
         state.node_name = def.glb_node_name.clone();
         state.is_gate = def.is_gate;
         state.has_trigger = def.trigger_volume.is_some();
+        state.model_offset = def.model_offset;
+        // Stored offset is in ground-anchor space; convert to model-relative for editing.
         if let Some(trigger) = &def.trigger_volume {
-            state.trigger_offset = trigger.offset;
+            state.trigger_offset = trigger.offset - def.model_offset;
             state.trigger_half_extents = trigger.half_extents;
         }
-        state.model_offset = def.model_offset;
 
         for entity in &preview_query {
             commands.entity(entity).despawn();
@@ -588,7 +589,9 @@ pub fn handle_save_button(
 
         let trigger_volume = if state.has_trigger {
             Some(TriggerVolumeConfig {
-                offset: state.trigger_offset,
+                // Store offset in ground-anchor space so spawn_obstacle places it correctly.
+                // trigger_offset is model-relative; adding model_offset converts to anchor space.
+                offset: state.model_offset + state.trigger_offset,
                 half_extents: state.trigger_half_extents,
             })
         } else {

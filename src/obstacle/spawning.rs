@@ -35,6 +35,7 @@ pub fn spawn_obstacle(
     obstacle_id: &ObstacleId,
     node_name: &str,
     transform: Transform,
+    model_offset: Vec3,
     trigger_config: Option<&TriggerVolumeConfig>,
     gate_index: Option<u32>,
 ) -> Option<Entity> {
@@ -43,6 +44,25 @@ pub fn spawn_obstacle(
     let node = node_assets.get(node_handle)?;
     let gltf_mesh_handle = node.mesh.as_ref()?;
     let gltf_mesh = mesh_assets.get(gltf_mesh_handle)?;
+
+    // Pre-collect primitive meshes and materials before entering with_children, since
+    // materials is &mut and cannot be borrowed inside the closure alongside entity_commands.
+    let mesh_transform = Transform {
+        translation: model_offset,
+        rotation: node.transform.rotation,
+        scale: node.transform.scale,
+    };
+    let primitives: Vec<(Handle<Mesh>, MeshMaterial3d<StandardMaterial>)> = gltf_mesh
+        .primitives
+        .iter()
+        .map(|p| {
+            let mat = match &p.material {
+                Some(m) => MeshMaterial3d(m.clone()),
+                None => MeshMaterial3d(materials.add(StandardMaterial::default())),
+            };
+            (p.mesh.clone(), mat)
+        })
+        .collect();
 
     let mut entity_commands = commands.spawn((
         transform,
@@ -56,34 +76,23 @@ pub fn spawn_obstacle(
         entity_commands.insert(crate::race::gate::GateIndex(order));
     }
 
-    let entity = entity_commands.id();
+    // Spawn children directly via with_children so their local Transform is never adjusted
+    // by set_parent_in_place (which would zero it out because GlobalTransform hasn't been
+    // propagated yet for newly-spawned entities).
+    entity_commands.with_children(|children| {
+        for (mesh, material) in primitives {
+            children.spawn((Mesh3d(mesh), material, mesh_transform));
+        }
 
-    // Spawn each primitive as a child with its mesh and material
-    for primitive in &gltf_mesh.primitives {
-        let material = match primitive.material {
-            Some(ref mat) => MeshMaterial3d(mat.clone()),
-            None => MeshMaterial3d(materials.add(StandardMaterial::default())),
-        };
-
-        commands
-            .spawn((
-                Mesh3d(primitive.mesh.clone()),
-                material,
-                node.transform,
-            ))
-            .set_parent_in_place(entity);
-    }
-
-    if let Some(trigger) = trigger_config {
-        commands
-            .spawn((
+        if let Some(trigger) = trigger_config {
+            children.spawn((
                 Transform::from_translation(trigger.offset),
                 TriggerVolume {
                     half_extents: trigger.half_extents,
                 },
-            ))
-            .set_parent_in_place(entity);
-    }
+            ));
+        }
+    });
 
-    Some(entity)
+    Some(entity_commands.id())
 }

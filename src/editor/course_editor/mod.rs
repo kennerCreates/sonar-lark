@@ -262,6 +262,7 @@ fn handle_placement_and_drag(
             &def.id,
             &def.glb_node_name,
             transform,
+            def.model_offset,
             def.trigger_volume.as_ref(),
             None,
         );

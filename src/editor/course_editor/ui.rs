@@ -704,6 +704,7 @@ pub fn handle_load_button(
                 &def.id,
                 &def.glb_node_name,
                 transform,
+                def.model_offset,
                 def.trigger_volume.as_ref(),
                 None, // GateIndex not needed in editor — tracked in PlacedObstacle
             );
