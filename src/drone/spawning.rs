@@ -243,9 +243,17 @@ pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Opt
         return None;
     }
 
-    // Build a cyclic Catmull-Rom spline. No need to duplicate the first point;
-    // to_curve_cyclic() wraps around automatically.
-    let spline = CubicCardinalSpline::new_catmull_rom(gate_positions.iter().copied())
+    // Build approach / center / departure waypoints per gate so the
+    // Catmull-Rom spline approaches each gate from the correct side.
+    const APPROACH_OFFSET: f32 = 4.0;
+    let mut control_points = Vec::with_capacity(gate_positions.len() * 3);
+    for (pos, fwd) in gate_positions.iter().zip(gate_forwards.iter()) {
+        control_points.push(*pos - *fwd * APPROACH_OFFSET);
+        control_points.push(*pos);
+        control_points.push(*pos + *fwd * APPROACH_OFFSET);
+    }
+
+    let spline = CubicCardinalSpline::new_catmull_rom(control_points.iter().copied())
         .to_curve_cyclic()
         .ok()?;
 
@@ -458,13 +466,15 @@ mod tests {
         };
 
         let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
+        // Gate i center is at spline_t = i * 3 + 1 (approach=3i, center=3i+1, departure=3i+2)
         for (i, gate_pos) in path.gate_positions.iter().enumerate() {
-            let spline_pos = path.spline.position(i as f32);
+            let t = i as f32 * POINTS_PER_GATE + 1.0;
+            let spline_pos = path.spline.position(t);
             let dist = (spline_pos - *gate_pos).length();
             assert!(
                 dist < 0.01,
                 "spline at t={} should pass through gate {}: spline={:?}, gate={:?}, dist={}",
-                i, i, spline_pos, gate_pos, dist
+                t, i, spline_pos, gate_pos, dist
             );
         }
     }
@@ -482,9 +492,9 @@ mod tests {
         };
 
         let path = generate_race_path(&course, &lib).expect("3 gates should produce a path");
-        let n = path.gate_positions.len() as f32;
+        let total_t = path.gate_positions.len() as f32 * POINTS_PER_GATE;
         for i in 0..30 {
-            let t = (i as f32 / 30.0) * n;
+            let t = (i as f32 / 30.0) * total_t;
             let vel = path.spline.velocity(t);
             assert!(
                 vel.length() > 0.001,
@@ -492,6 +502,68 @@ mod tests {
                 t, vel
             );
         }
+    }
+
+    #[test]
+    fn race_path_tangent_aligns_with_gate_forward() {
+        let lib = library_with_gate();
+        // 4 gates in a square — each with default NEG_Z forward
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+                gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
+            ],
+        };
+
+        let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
+        // Gate i center is at spline_t = i * 3 + 1. Catmull-Rom tangent
+        // at the center is proportional to (departure - approach) = 2 * fwd * offset,
+        // so it aligns with gate forward.
+        for (i, fwd) in path.gate_forwards.iter().enumerate() {
+            let t = i as f32 * POINTS_PER_GATE + 1.0;
+            let tangent = path.spline.velocity(t).normalize();
+            let dot = tangent.dot(*fwd);
+            assert!(
+                dot > 0.99,
+                "spline tangent at gate {} (t={}) should align with gate forward: dot={}, tangent={:?}, forward={:?}",
+                i, t, dot, tangent, fwd
+            );
+        }
+    }
+
+    #[test]
+    fn race_path_flipped_gate_reverses_tangent() {
+        let lib = library_with_gate();
+        let mut flipped = gate_instance(Vec3::new(0.0, 0.0, 0.0), 0);
+        flipped.gate_forward_flipped = true;
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                flipped,
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+                gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
+            ],
+        };
+
+        let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
+        // Gate 0 is flipped: forward is +Z. Center at t=1.
+        let tangent0 = path.spline.velocity(1.0).normalize();
+        assert!(
+            tangent0.dot(Vec3::Z) > 0.99,
+            "flipped gate tangent should point +Z, got {:?}",
+            tangent0
+        );
+        // Gate 1 is NOT flipped: forward is -Z. Center at t=4.
+        let tangent1 = path.spline.velocity(4.0).normalize();
+        assert!(
+            tangent1.dot(Vec3::NEG_Z) > 0.99,
+            "non-flipped gate tangent should point -Z, got {:?}",
+            tangent1
+        );
     }
 
     #[test]

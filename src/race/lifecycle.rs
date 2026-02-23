@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::drone::components::*;
+use crate::drone::components::{AIController, Drone, POINTS_PER_GATE};
 
 #[derive(Resource, Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum RacePhase {
@@ -28,7 +28,7 @@ pub fn check_race_finished(
     }
     let all_finished = drones
         .iter()
-        .all(|ai| ai.spline_t >= ai.gate_count as f32);
+        .all(|ai| ai.spline_t >= ai.gate_count as f32 * POINTS_PER_GATE);
     if all_finished {
         *phase = RacePhase::Finished;
         info!("Race finished! All drones completed the course.");

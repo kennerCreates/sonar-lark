@@ -9,7 +9,7 @@ const MAX_ADVANCE_PER_TICK: f32 = 0.15;
 
 pub fn update_ai_targets(mut query: Query<(&Transform, &mut AIController), With<Drone>>) {
     for (transform, mut ai) in &mut query {
-        let total_t = ai.gate_count as f32;
+        let total_t = ai.gate_count as f32 * POINTS_PER_GATE;
         if ai.spline_t >= total_t {
             continue;
         }
@@ -23,21 +23,26 @@ pub fn update_ai_targets(mut query: Query<(&Transform, &mut AIController), With<
             let tangent_dir = tangent / tangent_len;
             let displacement = transform.translation - curve_pos;
             let forward_proj = displacement.dot(tangent_dir);
-            let advance = (forward_proj / tangent_len).clamp(0.0, MAX_ADVANCE_PER_TICK);
+            let advance = (forward_proj / tangent_len)
+                .clamp(0.0, MAX_ADVANCE_PER_TICK * POINTS_PER_GATE);
             ai.spline_t += advance;
         }
 
         // Fallback: snap forward if drone is close to the next gate center.
-        // Handles edge cases where projection stalls (e.g., after an overshoot).
-        let next_gate_t = (ai.spline_t.floor() + 1.0).min(total_t);
-        let next_gate_idx = (next_gate_t as usize) % ai.gate_positions.len();
-        let dist_to_next =
-            (transform.translation - ai.gate_positions[next_gate_idx]).length();
-        if dist_to_next < WAYPOINT_REACH_DISTANCE {
-            ai.spline_t = ai.spline_t.max(next_gate_t);
+        // Gate centers are at spline_t = i * POINTS_PER_GATE + 1.0.
+        let next_gate_idx =
+            ((ai.spline_t - 1.0) / POINTS_PER_GATE + 1.0).floor() as usize;
+        if next_gate_idx < ai.gate_positions.len() {
+            let next_center_t = next_gate_idx as f32 * POINTS_PER_GATE + 1.0;
+            let dist_to_next =
+                (transform.translation - ai.gate_positions[next_gate_idx]).length();
+            if dist_to_next < WAYPOINT_REACH_DISTANCE {
+                ai.spline_t = ai.spline_t.max(next_center_t);
+            }
         }
 
-        ai.target_gate_index = (ai.spline_t.floor() as u32).min(ai.gate_count - 1);
+        ai.target_gate_index = (ai.spline_t / POINTS_PER_GATE).floor() as u32;
+        ai.target_gate_index = ai.target_gate_index.min(ai.gate_count - 1);
     }
 }
 
@@ -48,18 +53,18 @@ pub fn compute_racing_line(
     let elapsed = time.elapsed_secs();
 
     for (transform, ai, config, mut desired) in &mut query {
-        let total_t = ai.gate_count as f32;
+        let total_t = ai.gate_count as f32 * POINTS_PER_GATE;
         if ai.spline_t >= total_t {
             desired.position = transform.translation;
             desired.velocity_hint = Vec3::ZERO;
             continue;
         }
 
-        // Sample position and tangent ahead on the spline
-        let target_t = (ai.spline_t + LOOK_AHEAD_T).min(total_t);
+        // Sample position and tangent ahead on the spline (scaled for 3 points/gate)
+        let target_t = (ai.spline_t + LOOK_AHEAD_T * POINTS_PER_GATE).min(total_t);
         let target_pos = ai.spline.position(target_t);
 
-        let vel_t = (ai.spline_t + VELOCITY_LOOK_AHEAD_T).min(total_t);
+        let vel_t = (ai.spline_t + VELOCITY_LOOK_AHEAD_T * POINTS_PER_GATE).min(total_t);
         let tangent = ai.spline.velocity(vel_t).normalize_or(Vec3::NEG_Z);
 
         // Per-drone lateral offset and sine noise

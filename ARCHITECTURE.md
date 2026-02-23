@@ -136,7 +136,7 @@ Blender ──► drone.glb ──► DroneGltfHandle (Startup load)
                                 │
                           DroneAssets (Update poll until loaded)
                                 │
-CourseData ──► generate_race_path() ──► Catmull-Rom CubicCurve (cyclic)
+CourseData ──► generate_race_path() ──► Catmull-Rom CubicCurve (cyclic, 3 waypoints/gate)
                                                                │
                                                     spawn_drones() ──► 12 Drone entities
                                                                │

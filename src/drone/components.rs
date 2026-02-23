@@ -1,6 +1,9 @@
 use bevy::math::cubic_splines::CubicCurve;
 use bevy::prelude::*;
 
+/// Spline control points per gate: approach, center, departure.
+pub const POINTS_PER_GATE: f32 = 3.0;
+
 #[derive(Component)]
 pub struct Drone {
     pub index: u8,
