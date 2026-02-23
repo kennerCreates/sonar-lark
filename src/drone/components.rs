@@ -39,11 +39,13 @@ pub struct AttitudePd {
 
 impl Default for AttitudePd {
     fn default() -> Self {
+        // Gains are tuned for discrete stability at ~64 Hz fixed timestep with
+        // moment_of_inertia (0.003, 0.005, 0.003).  Rule of thumb: kd·dt/I < 2.
         Self {
-            kp_roll_pitch: 25.0,
-            kd_roll_pitch: 8.0,
-            kp_yaw: 15.0,
-            kd_yaw: 5.0,
+            kp_roll_pitch: 5.0,
+            kd_roll_pitch: 0.24,
+            kp_yaw: 3.0,
+            kd_yaw: 0.25,
             max_angular_rate: Vec3::new(20.0, 20.0, 10.0),
         }
     }

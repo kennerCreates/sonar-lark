@@ -65,18 +65,14 @@ pub fn position_pid(
             Vec3::splat(INTEGRAL_CLAMP),
         );
 
-        let derivative = (error - pid.prev_error) / dt;
-        pid.prev_error = error;
+        // Derivative-on-measurement: use -velocity instead of d(error)/dt.
+        // Avoids derivative kick when the desired position changes abruptly.
+        let derivative = -dynamics.velocity;
 
         let pid_output = pid.kp * error + pid.ki * pid.integral + pid.kd * derivative;
 
         // Desired acceleration = PID + gravity compensation
         let desired_accel = pid_output + Vec3::Y * GRAVITY;
-
-        // Thrust magnitude
-        let accel_magnitude = desired_accel.length();
-        attitude.thrust_magnitude =
-            (accel_magnitude * dynamics.mass).clamp(0.0, dynamics.max_thrust);
 
         // Desired body-up direction: aligned with desired acceleration
         let desired_up = desired_accel.normalize_or(Vec3::Y);
@@ -89,6 +85,13 @@ pub fn position_pid(
         } else {
             desired_up
         };
+
+        // Thrust magnitude: sized so the vertical component matches desired_accel.y.
+        // This prevents excess vertical force when tilt is clamped.
+        // (When unclamped this reduces to |desired_accel| * mass.)
+        let cos_tilt = clamped_up.y.max(0.05);
+        attitude.thrust_magnitude =
+            (desired_accel.y * dynamics.mass / cos_tilt).clamp(0.0, dynamics.max_thrust);
 
         // Yaw: face movement direction from velocity_hint, or keep current heading
         let yaw_dir = if desired.velocity_hint.length_squared() > 0.01 {

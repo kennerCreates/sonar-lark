@@ -154,8 +154,11 @@ pub fn spawn_drones(
 
         let transform = Transform::from_translation(position).with_rotation(rotation);
 
-        let dynamics = DroneDynamics::default();
+        let mut dynamics = DroneDynamics::default();
         let hover_thrust = GRAVITY * dynamics.mass;
+        // Start motors at hover thrust so there's no initial drop/overshoot
+        dynamics.thrust = hover_thrust;
+        dynamics.commanded_thrust = hover_thrust;
 
         let mut entity_cmd = commands.spawn((
             transform,
@@ -299,14 +302,14 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
         noise_amplitude: rng.gen_range(0.3..=1.5),
         noise_frequency: rng.gen_range(0.5..=2.0),
         hover_noise_amp: Vec3::new(
-            rng.gen_range(0.01..=0.03),
-            rng.gen_range(0.005..=0.015),
-            rng.gen_range(0.01..=0.025),
+            rng.gen_range(0.05..=0.15),
+            rng.gen_range(0.02..=0.06),
+            rng.gen_range(0.05..=0.12),
         ),
         hover_noise_freq: Vec3::new(
-            rng.gen_range(0.3..=1.5),
-            rng.gen_range(0.5..=2.0),
-            rng.gen_range(0.3..=1.2),
+            rng.gen_range(0.1..=0.5),
+            rng.gen_range(0.15..=0.5),
+            rng.gen_range(0.1..=0.4),
         ),
     }
 }
@@ -568,12 +571,12 @@ mod tests {
             assert!(config.line_offset.abs() <= 1.5);
             assert!((0.3..=1.5).contains(&config.noise_amplitude));
             assert!((0.5..=2.0).contains(&config.noise_frequency));
-            assert!((0.01..=0.03).contains(&config.hover_noise_amp.x));
-            assert!((0.005..=0.015).contains(&config.hover_noise_amp.y));
-            assert!((0.01..=0.025).contains(&config.hover_noise_amp.z));
-            assert!((0.3..=1.5).contains(&config.hover_noise_freq.x));
-            assert!((0.5..=2.0).contains(&config.hover_noise_freq.y));
-            assert!((0.3..=1.2).contains(&config.hover_noise_freq.z));
+            assert!((0.05..=0.15).contains(&config.hover_noise_amp.x));
+            assert!((0.02..=0.06).contains(&config.hover_noise_amp.y));
+            assert!((0.05..=0.12).contains(&config.hover_noise_amp.z));
+            assert!((0.1..=0.5).contains(&config.hover_noise_freq.x));
+            assert!((0.15..=0.5).contains(&config.hover_noise_freq.y));
+            assert!((0.1..=0.4).contains(&config.hover_noise_freq.z));
         }
     }
 
