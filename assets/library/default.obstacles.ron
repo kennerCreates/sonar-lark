@@ -3,8 +3,8 @@
         id: ("gate_loop"),
         glb_node_name: "gate_loop",
         trigger_volume: Some((
-            offset: (0.40586996, 11.862752, -0.7648617),
-            half_extents: (6.2807226, 1.4139888, 1.3150666),
+            offset: (0.40586996, 11.697282, 0.053014994),
+            half_extents: (6.2807226, 3.9215417, 0.94731396),
         )),
         is_gate: true,
         model_offset: (-0.071406126, 0.0, 0.02642262),

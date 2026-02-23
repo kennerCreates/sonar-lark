@@ -39,10 +39,10 @@ src/
 │       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, placement/drag/gizmo systems
 │       └── ui.rs        Palette UI, save/load, gate order mode, name field
 ├── drone/               Drone simulation
-│   ├── components.rs    Drone, PidController, DroneDynamics, DroneConfig, AIController
-│   ├── physics.rs       PID-lite physics (FixedUpdate)
-│   ├── ai.rs            AI target tracking, racing line variation
-│   └── spawning.rs      Spawn 12 drones with randomized configs
+│   ├── components.rs    Drone, PidController, DroneDynamics, DroneConfig, AIController, DesiredPosition
+│   ├── physics.rs       pid_compute, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
+│   ├── ai.rs            update_ai_targets, compute_racing_line (FixedUpdate)
+│   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, waypoint generation
 ├── race/                Race mechanics
 │   ├── gate.rs          GateIndex, trigger volume overlap detection
 │   ├── progress.rs      RaceProgress, per-drone state tracking
@@ -108,12 +108,16 @@ CourseData ──► spawn obstacles + drones
 | `PreviewObstacle` | Component | editor/workshop | Marker on the 3D preview entity in the workshop |
 | `PlacementState` | Resource | editor/course_editor | Selected palette obstacle, dragging entity, drag height, gate order mode |
 | `PlacedObstacle` | Component | editor/course_editor | Marker on every obstacle entity spawned in the course editor; carries `obstacle_id` and `gate_order` |
+| `DroneAssets` | Resource | drone/spawning | Shared mesh/material handles for all drone entities (from glTF or placeholder) |
+| `DroneGltfHandle` | Resource | drone/spawning | Handle to the loaded drone glTF asset |
+| `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint |
 
 ## Assets
 
 ```
 assets/
 ├── models/obstacles.glb              Single Blender file, all obstacle meshes
+├── models/drone.glb                  Drone model (named node "Drone"), materials from glb
 ├── library/default.obstacles.ron     Obstacle type definitions
 └── courses/*.course.ron              Saved race courses
 ```
@@ -126,6 +130,20 @@ assets/
 - No system ordering constraints between unrelated plugins — maximum parallelism
 - `DespawnOnExit` for automatic entity cleanup on state transitions
 
+## Drone Pipeline
+```
+Blender ──► drone.glb ──► DroneGltfHandle (Startup load)
+                                │
+                          DroneAssets (Update poll until loaded)
+                                │
+CourseData ──► generate_waypoints() ──► spawn_drones() ──► 12 Drone entities
+                                                               │
+                                                    FixedUpdate chain:
+                                                    AI targets → racing line → PID → forces → integration → clamp
+```
+
+Drone spawning uses an async polling pattern: `setup_drone_assets` and `spawn_drones` run every `Update` frame, returning early until the glTF asset and `CourseData` are both available. Once drones spawn, the early-return guards make them no-ops.
+
 ## Testing
 
 Unit tests cover the pure-logic data layers. Run with `cargo test`.
@@ -135,8 +153,11 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `obstacle::library` | 8 | Insert/get, overwrite, save/load roundtrip, error cases, existing RON format |
 | `course::loader` | 7 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
+| `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
+| `drone::spawning` | 8 | Waypoint generation (sort, filter, empty), start positions (count, behind gate, no overlap), config randomization bounds, PID variation |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
 - `load_course_from_file` / `save_course` — pure file I/O, no Bevy systems
 - `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability
+- `generate_waypoints(course)` / `compute_start_positions(waypoints, count)` — pure geometry, no ECS

@@ -2,7 +2,6 @@ pub mod ui;
 
 use bevy::{
     gizmos::config::{DefaultGizmoConfigGroup, GizmoConfigStore},
-    input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll},
     prelude::*,
 };
 
@@ -128,7 +127,6 @@ impl Plugin for WorkshopPlugin {
         .add_systems(
             Update,
             (
-                workshop_camera,
                 draw_ground_gizmo,
                 draw_move_arrows,
                 handle_move_widget,
@@ -348,79 +346,6 @@ fn draw_trigger_gizmo(
     let transform = Transform::from_translation(center).with_scale(size);
 
     gizmos.cube(transform, color);
-}
-
-// --- Workshop Camera ---
-
-fn workshop_camera(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mouse_buttons: Res<ButtonInput<MouseButton>>,
-    mouse_motion: Res<AccumulatedMouseMotion>,
-    mouse_scroll: Res<AccumulatedMouseScroll>,
-    time: Res<Time>,
-    state: Res<WorkshopState>,
-    mut query: Query<&mut Transform, With<Camera3d>>,
-) {
-    let Ok(mut transform) = query.single_mut() else {
-        return;
-    };
-
-    // Right-click drag for rotation
-    if mouse_buttons.pressed(MouseButton::Right) {
-        let delta = mouse_motion.delta;
-        if delta != Vec2::ZERO {
-            let (yaw, pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
-            let new_yaw = yaw - delta.x * 0.003;
-            let new_pitch = (pitch - delta.y * 0.003).clamp(-1.5, 1.5);
-            transform.rotation = Quat::from_euler(EulerRot::YXZ, new_yaw, new_pitch, 0.0);
-        }
-    }
-
-    // Scroll wheel for zoom (dolly along forward vector)
-    let scroll_y = mouse_scroll.delta.y;
-    if scroll_y != 0.0 {
-        let forward = transform.forward().as_vec3();
-        let zoom_speed = 3.0;
-        let new_pos = transform.translation + forward * scroll_y * zoom_speed;
-        // Clamp Y to stay above ground
-        if new_pos.y > 0.5 {
-            transform.translation = new_pos;
-        }
-    }
-
-    // WASD for ground-plane movement (skip when editing text fields)
-    if state.editing_name {
-        return;
-    }
-
-    let speed = 20.0;
-    let dt = time.delta_secs();
-
-    let cam_forward = transform.forward().as_vec3();
-    let cam_right = transform.right().as_vec3();
-
-    // Project onto XZ plane
-    let ground_forward = Vec3::new(cam_forward.x, 0.0, cam_forward.z).normalize_or_zero();
-    let ground_right = Vec3::new(cam_right.x, 0.0, cam_right.z).normalize_or_zero();
-
-    let mut movement = Vec3::ZERO;
-
-    if keyboard.pressed(KeyCode::KeyW) {
-        movement += ground_forward;
-    }
-    if keyboard.pressed(KeyCode::KeyS) {
-        movement -= ground_forward;
-    }
-    if keyboard.pressed(KeyCode::KeyA) {
-        movement -= ground_right;
-    }
-    if keyboard.pressed(KeyCode::KeyD) {
-        movement += ground_right;
-    }
-
-    if movement != Vec3::ZERO {
-        transform.translation += movement.normalize() * speed * dt;
-    }
 }
 
 // --- Ground Center Gizmo ---

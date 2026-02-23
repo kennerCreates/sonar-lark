@@ -10,20 +10,7 @@
 - [x] **Testing**: Unit tests for obstacle library, course data, and menu discovery (22 tests)
 - [x] **Bugfix**: Workshop preview placeholder spawn race condition with deferred despawns
 - [x] **Phase 5**: Editor — Course Editor (PlacementState, palette UI, click-to-place, XZ drag, Q/E height, gate ordering, trigger gizmos, gate sequence lines, save/load)
-
-### Phase 6: Drone Physics + AI
-- [ ] `DroneAssets` resource: shared placeholder mesh + material
-- [ ] `spawn_drones`: 12 drones at start line with randomized `DroneConfig`
-  - Vary PID gains (±15%), line offset, noise amplitude/frequency
-- [ ] `DespawnOnExit(AppState::Race)` on all drone entities
-- [ ] PID controller: compute error from desired vs actual orientation/position
-- [ ] `apply_forces`: convert PID output to thrust and torque
-- [ ] `integrate_motion`: Euler integration, gravity, drag
-- [ ] `clamp_transform`: prevent drones going below ground
-- [ ] All physics systems in `FixedUpdate`, `.chain()`-ed
-- [ ] AI: `update_ai_targets` — advance waypoint when close enough
-- [ ] AI: `compute_racing_line` — apply per-drone noise + lateral offset
-- [ ] Generate initial waypoints from gate positions in `CourseData`
+- [x] **Phase 6**: Drone Physics + AI (DroneAssets, spawn 12 drones with randomized PID/configs, PID-lite physics in FixedUpdate, AI waypoint tracking + racing line noise, DespawnOnExit cleanup)
 
 ### Phase 7: Race — Gate Validation, Timing, Lifecycle
 - [ ] `RaceProgress` resource: per-drone state (next gate, gates passed, crashed, finished, time)
