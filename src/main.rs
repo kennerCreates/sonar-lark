@@ -9,11 +9,12 @@ mod race;
 mod results;
 mod states;
 
+use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins((DefaultPlugins, MeshPickingPlugin))
         .init_state::<states::AppState>()
         .add_sub_state::<states::EditorMode>()
         .add_plugins((

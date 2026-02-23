@@ -1,3 +1,4 @@
+use bevy::picking::Pickable;
 use bevy::prelude::*;
 
 pub struct CommonPlugin;
@@ -22,9 +23,10 @@ fn setup_environment(
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.5, -0.5, 0.0)),
     ));
 
-    // Ground plane
+    // Ground plane (not pickable — clicks pass through to obstacles)
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(200.0, 200.0))),
         MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
+        Pickable::IGNORE,
     ));
 }

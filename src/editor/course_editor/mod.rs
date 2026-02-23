@@ -4,6 +4,7 @@ use std::f32::consts::TAU;
 
 use bevy::{
     gizmos::config::{DefaultGizmoConfigGroup, GizmoConfigStore},
+    picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings},
     prelude::*,
 };
 
@@ -228,9 +229,10 @@ fn handle_placement_and_selection(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    mut placed_query: Query<(Entity, &Children, &mut PlacedObstacle)>,
-    mesh_gt_query: Query<&GlobalTransform, With<Mesh3d>>,
+    mut placed_query: Query<(Entity, &mut PlacedObstacle)>,
+    parent_query: Query<&ChildOf>,
     interaction_query: Query<&Interaction>,
+    mut ray_cast: MeshRayCast,
 ) {
     if state.editing_name {
         return;
@@ -258,13 +260,20 @@ fn handle_placement_and_selection(
     let Ok((camera, camera_gt)) = camera_query.single() else {
         return;
     };
+    let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else {
+        return;
+    };
 
-    let nearest =
-        find_nearest_to_cursor(&placed_query, &mesh_gt_query, camera, camera_gt, cursor_pos);
+    let nearest = find_placed_ancestor_from_ray(
+        &mut ray_cast,
+        ray,
+        &placed_query,
+        &parent_query,
+    );
 
     if state.gate_order_mode {
         if let Some(entity) = nearest {
-            if let Ok((_, _, mut placed)) = placed_query.get_mut(entity) {
+            if let Ok((_, mut placed)) = placed_query.get_mut(entity) {
                 let order = state.next_gate_order;
                 placed.gate_order = Some(order);
                 state.next_gate_order += 1;
@@ -724,38 +733,31 @@ fn draw_selection_highlight(
 
 // --- Helpers ---
 
-/// Find the placed entity whose child mesh is closest to the cursor
-/// in screen space. Returns `None` if nothing is within the pick threshold.
-fn find_nearest_to_cursor(
-    placed_query: &Query<(Entity, &Children, &mut PlacedObstacle)>,
-    mesh_gt_query: &Query<&GlobalTransform, With<Mesh3d>>,
-    camera: &Camera,
-    camera_gt: &GlobalTransform,
-    cursor_pos: Vec2,
+/// Cast a ray into the scene and return the `PlacedObstacle` ancestor of the
+/// nearest hit mesh, if any. Walks up the entity hierarchy from the hit child
+/// to find the parent that carries the `PlacedObstacle` component.
+fn find_placed_ancestor_from_ray(
+    ray_cast: &mut MeshRayCast,
+    ray: Ray3d,
+    placed_query: &Query<(Entity, &mut PlacedObstacle)>,
+    parent_query: &Query<&ChildOf>,
 ) -> Option<Entity> {
-    const THRESHOLD_PX: f32 = 50.0;
-
-    let mut best_entity = None;
-    let mut best_dist = THRESHOLD_PX;
-
-    for (entity, children, _) in placed_query.iter() {
-        for child in children.iter() {
-            let Ok(child_gt) = mesh_gt_query.get(child) else {
-                continue;
-            };
-            let world_pos = child_gt.translation();
-            let Ok(screen_pos) = camera.world_to_viewport(camera_gt, world_pos) else {
-                continue;
-            };
-            let dist = (cursor_pos - screen_pos).length();
-            if dist < best_dist {
-                best_dist = dist;
-                best_entity = Some(entity);
+    let hits = ray_cast.cast_ray(ray, &MeshRayCastSettings::default());
+    for (hit_entity, _) in hits {
+        // Walk up the hierarchy from the hit mesh child to find the PlacedObstacle parent
+        let mut current = *hit_entity;
+        loop {
+            if placed_query.get(current).is_ok() {
+                return Some(current);
+            }
+            if let Ok(child_of) = parent_query.get(current) {
+                current = child_of.parent();
+            } else {
+                break;
             }
         }
     }
-
-    best_entity
+    None
 }
 
 /// Sample a ring of `n` evenly-spaced world points and return the minimum
