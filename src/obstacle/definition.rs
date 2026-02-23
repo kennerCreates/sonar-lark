@@ -8,6 +8,13 @@ pub struct ObstacleId(pub String);
 pub struct TriggerVolumeConfig {
     pub offset: Vec3,
     pub half_extents: Vec3,
+    /// Local-space forward direction of the gate (the expected approach direction).
+    #[serde(default = "default_forward")]
+    pub forward: Vec3,
+}
+
+fn default_forward() -> Vec3 {
+    Vec3::NEG_Z
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

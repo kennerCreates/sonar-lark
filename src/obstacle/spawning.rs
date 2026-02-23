@@ -10,6 +10,8 @@ pub struct ObstacleMarker {
 #[derive(Component)]
 pub struct TriggerVolume {
     pub half_extents: Vec3,
+    /// Local-space forward direction of the gate (for gizmo drawing).
+    pub forward: Vec3,
 }
 
 /// Handle to the loaded obstacles glTF asset.
@@ -38,6 +40,7 @@ pub fn spawn_obstacle(
     model_offset: Vec3,
     trigger_config: Option<&TriggerVolumeConfig>,
     gate_index: Option<u32>,
+    gate_forward_flipped: bool,
 ) -> Option<Entity> {
     let gltf = gltf_assets.get(&gltf_handle.0)?;
     let node_handle = gltf.named_nodes.get(node_name)?;
@@ -74,6 +77,11 @@ pub fn spawn_obstacle(
 
     if let Some(order) = gate_index {
         entity_commands.insert(crate::race::gate::GateIndex(order));
+        if let Some(trigger) = trigger_config {
+            let local_fwd = if gate_forward_flipped { -trigger.forward } else { trigger.forward };
+            let world_fwd = transform.rotation * local_fwd;
+            entity_commands.insert(crate::race::gate::GateForward(world_fwd));
+        }
     }
 
     // Spawn children directly via with_children so their local Transform is never adjusted
@@ -89,6 +97,7 @@ pub fn spawn_obstacle(
                 Transform::from_translation(trigger.offset),
                 TriggerVolume {
                     half_extents: trigger.half_extents,
+                    forward: trigger.forward,
                 },
             ));
         }

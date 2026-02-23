@@ -414,6 +414,15 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[Cour
                 },
                 TextColor(Color::srgb(0.5, 0.5, 0.5)),
             ));
+
+            panel.spawn((
+                Text::new("F  →  flip gate direction"),
+                TextFont {
+                    font_size: 12.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.5, 0.5, 0.5)),
+            ));
         });
 }
 
@@ -658,12 +667,14 @@ pub fn handle_palette_selection(
             def.model_offset,
             def.trigger_volume.as_ref(),
             None,
+            false,
         );
 
         if let Some(entity) = spawned {
             commands.entity(entity).insert(PlacedObstacle {
                 obstacle_id: btn.0.clone(),
                 gate_order: None,
+                gate_forward_flipped: false,
             });
             state.selected_entity = Some(entity);
             state.selected_palette_id = None;
@@ -816,6 +827,7 @@ pub fn handle_save_button(
                 rotation: transform.rotation,
                 scale: transform.scale,
                 gate_order: placed.gate_order,
+                gate_forward_flipped: placed.gate_forward_flipped,
             })
             .collect();
 
@@ -1020,12 +1032,14 @@ fn load_course_into_editor(
             def.model_offset,
             def.trigger_volume.as_ref(),
             None,
+            instance.gate_forward_flipped,
         );
 
         if let Some(entity) = spawned {
             commands.entity(entity).insert(PlacedObstacle {
                 obstacle_id: instance.obstacle_id.clone(),
                 gate_order: instance.gate_order,
+                gate_forward_flipped: instance.gate_forward_flipped,
             });
         } else {
             warn!(

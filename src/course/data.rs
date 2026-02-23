@@ -10,6 +10,9 @@ pub struct ObstacleInstance {
     pub rotation: Quat,
     pub scale: Vec3,
     pub gate_order: Option<u32>,
+    /// When true, the gate's forward direction is flipped 180 degrees.
+    #[serde(default)]
+    pub gate_forward_flipped: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Resource)]

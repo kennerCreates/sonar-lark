@@ -89,6 +89,7 @@ mod tests {
                 Some(TriggerVolumeConfig {
                     offset: Vec3::new(0.0, 1.0, 0.0),
                     half_extents: Vec3::new(2.0, 2.0, 0.5),
+                    forward: Vec3::NEG_Z,
                 })
             } else {
                 None

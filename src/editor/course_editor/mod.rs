@@ -108,6 +108,7 @@ struct ScaleWidgetState {
 pub struct PlacedObstacle {
     pub obstacle_id: ObstacleId,
     pub gate_order: Option<u32>,
+    pub gate_forward_flipped: bool,
 }
 
 // --- Gizmo group ---
@@ -185,8 +186,10 @@ impl Plugin for CourseEditorPlugin {
                     handle_placement_and_selection,
                     handle_delete_key,
                     handle_transform_mode_keys,
+                    handle_flip_gate_key,
                     draw_trigger_gizmos,
                     draw_gate_sequence_lines,
+                    draw_gate_forward_arrows,
                     draw_selection_highlight,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
@@ -756,6 +759,59 @@ fn draw_gate_sequence_lines(
         let iso = Isometry3d::new(*pos, Quat::IDENTITY);
         gizmos.sphere(iso, 0.5, color);
     }
+}
+
+fn draw_gate_forward_arrows(
+    mut gizmos: Gizmos<CourseGizmoGroup>,
+    placed_query: Query<(&PlacedObstacle, &Transform)>,
+    library: Res<ObstacleLibrary>,
+) {
+    for (placed, transform) in &placed_query {
+        if placed.gate_order.is_none() {
+            continue;
+        }
+        let Some(def) = library.get(&placed.obstacle_id) else {
+            continue;
+        };
+        let Some(tv) = &def.trigger_volume else {
+            continue;
+        };
+        let center = transform.translation + transform.rotation * tv.offset;
+        let local_fwd = if placed.gate_forward_flipped {
+            -tv.forward
+        } else {
+            tv.forward
+        };
+        let world_fwd = transform.rotation * local_fwd;
+        gizmos.arrow(center, center + world_fwd * 3.0, Color::srgb(0.0, 1.0, 1.0));
+    }
+}
+
+fn handle_flip_gate_key(
+    state: Res<PlacementState>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut placed_query: Query<&mut PlacedObstacle>,
+) {
+    if state.editing_name {
+        return;
+    }
+    if !keyboard.just_pressed(KeyCode::KeyF) {
+        return;
+    }
+    let Some(entity) = state.selected_entity else {
+        return;
+    };
+    let Ok(mut placed) = placed_query.get_mut(entity) else {
+        return;
+    };
+    if placed.gate_order.is_none() {
+        return;
+    }
+    placed.gate_forward_flipped = !placed.gate_forward_flipped;
+    info!(
+        "Gate direction flipped (now {})",
+        if placed.gate_forward_flipped { "flipped" } else { "default" }
+    );
 }
 
 fn draw_selection_highlight(

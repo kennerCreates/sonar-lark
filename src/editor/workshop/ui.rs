@@ -593,6 +593,7 @@ pub fn handle_save_button(
                 // trigger_offset is model-relative; adding model_offset converts to anchor space.
                 offset: state.model_offset + state.trigger_offset,
                 half_extents: state.trigger_half_extents,
+                forward: Vec3::NEG_Z,
             })
         } else {
             None

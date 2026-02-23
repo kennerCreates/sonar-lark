@@ -123,13 +123,11 @@ pub fn spawn_drones(
         .and_then(|def| def.trigger_volume.as_ref())
         .map(|tv| tv.half_extents.x)
         .unwrap_or(5.0);
-    let next_waypoint = race_path.gate_positions.get(1).copied();
-
     let start_positions = compute_start_positions(
         first_gate.translation,
         first_gate.rotation,
         gate_half_width,
-        next_waypoint,
+        race_path.gate_forwards[0],
         DRONE_COUNT,
     );
     let mut rng = rand::thread_rng();
@@ -167,6 +165,7 @@ pub fn spawn_drones(
                 spline: race_path.spline.clone(),
                 spline_t: 0.0,
                 gate_positions: race_path.gate_positions.clone(),
+                gate_forwards: race_path.gate_forwards.clone(),
             },
             DesiredPosition {
                 position,
@@ -212,27 +211,33 @@ pub fn cleanup_drone_resources(mut commands: Commands) {
 pub struct RacePath {
     pub spline: CubicCurve<Vec3>,
     pub gate_positions: Vec<Vec3>,
+    pub gate_forwards: Vec<Vec3>,
 }
 
 pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Option<RacePath> {
-    let mut gates: Vec<(u32, Vec3)> = course
+    let mut gates: Vec<(u32, Vec3, Vec3)> = course
         .instances
         .iter()
         .filter_map(|inst| {
             inst.gate_order.map(|order| {
+                let tv = library
+                    .get(&inst.obstacle_id)
+                    .and_then(|def| def.trigger_volume.as_ref());
                 // Use the trigger volume center as the fly-through target,
                 // not the obstacle origin (which is at ground level).
-                let fly_through_offset = library
-                    .get(&inst.obstacle_id)
-                    .and_then(|def| def.trigger_volume.as_ref())
+                let fly_through_offset = tv
                     .map(|tv| inst.rotation * tv.offset)
                     .unwrap_or(Vec3::ZERO);
-                (order, inst.translation + fly_through_offset)
+                let local_fwd = tv.map(|tv| tv.forward).unwrap_or(Vec3::NEG_Z);
+                let world_fwd = inst.rotation
+                    * if inst.gate_forward_flipped { -local_fwd } else { local_fwd };
+                (order, inst.translation + fly_through_offset, world_fwd)
             })
         })
         .collect();
-    gates.sort_by_key(|(order, _)| *order);
-    let gate_positions: Vec<Vec3> = gates.into_iter().map(|(_, pos)| pos).collect();
+    gates.sort_by_key(|(order, _, _)| *order);
+    let gate_positions: Vec<Vec3> = gates.iter().map(|(_, pos, _)| *pos).collect();
+    let gate_forwards: Vec<Vec3> = gates.iter().map(|(_, _, fwd)| *fwd).collect();
 
     if gate_positions.len() < 2 {
         return None;
@@ -244,33 +249,18 @@ pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Opt
         .to_curve_cyclic()
         .ok()?;
 
-    Some(RacePath { spline, gate_positions })
+    Some(RacePath { spline, gate_positions, gate_forwards })
 }
 
 pub fn compute_start_positions(
     gate_translation: Vec3,
     gate_rotation: Quat,
     gate_half_width: f32,
-    next_waypoint: Option<Vec3>,
+    gate_forward: Vec3,
     count: u8,
 ) -> Vec<Vec3> {
-    // Gate's local Z axis = fly-through axis
-    let gate_z = gate_rotation * Vec3::Z;
-    let gate_z_flat = Vec3::new(gate_z.x, 0.0, gate_z.z).normalize_or(Vec3::Z);
-
-    // Determine which direction along the gate's Z axis leads toward the next gate.
-    // Drones start on the opposite side and fly through.
-    let through_dir = if let Some(next) = next_waypoint {
-        let to_next = next - gate_translation;
-        let to_next_flat = Vec3::new(to_next.x, 0.0, to_next.z).normalize_or(gate_z_flat);
-        if gate_z_flat.dot(to_next_flat) > 0.0 {
-            gate_z_flat
-        } else {
-            -gate_z_flat
-        }
-    } else {
-        gate_z_flat
-    };
+    // Use the explicit gate forward direction (projected to XZ plane).
+    let through_dir = Vec3::new(gate_forward.x, 0.0, gate_forward.z).normalize_or(Vec3::NEG_Z);
 
     // Start line center: behind the gate at ground level
     let start_center = Vec3::new(gate_translation.x, 0.0, gate_translation.z)
@@ -347,6 +337,7 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
             gate_order: Some(order),
+            gate_forward_flipped: false,
         }
     }
 
@@ -357,6 +348,7 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: Vec3::ONE,
             gate_order: None,
+            gate_forward_flipped: false,
         }
     }
 
@@ -368,6 +360,7 @@ mod tests {
             trigger_volume: Some(TriggerVolumeConfig {
                 offset: Vec3::new(0.0, 5.0, 0.0),
                 half_extents: Vec3::new(3.0, 3.0, 0.5),
+                forward: Vec3::NEG_Z,
             }),
             is_gate: true,
             model_offset: Vec3::ZERO,
@@ -502,12 +495,71 @@ mod tests {
     }
 
     #[test]
+    fn race_path_returns_gate_forwards() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 0.0), 1),
+            ],
+        };
+
+        let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
+        assert_eq!(path.gate_forwards.len(), 2);
+        // Identity rotation + NEG_Z forward = NEG_Z world forward
+        for fwd in &path.gate_forwards {
+            assert!((fwd.z - (-1.0)).abs() < 0.001, "expected NEG_Z forward, got {:?}", fwd);
+        }
+    }
+
+    #[test]
+    fn race_path_flipped_gate_negates_forward() {
+        let lib = library_with_gate();
+        let mut inst = gate_instance(Vec3::new(0.0, 0.0, 0.0), 0);
+        inst.gate_forward_flipped = true;
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                inst,
+                gate_instance(Vec3::new(20.0, 0.0, 0.0), 1),
+            ],
+        };
+
+        let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
+        // Flipped gate should have +Z forward
+        assert!((path.gate_forwards[0].z - 1.0).abs() < 0.001, "expected +Z forward for flipped gate");
+        // Non-flipped gate should have -Z forward
+        assert!((path.gate_forwards[1].z - (-1.0)).abs() < 0.001, "expected -Z forward for non-flipped gate");
+    }
+
+    #[test]
+    fn race_path_rotation_applied_to_forward() {
+        let lib = library_with_gate();
+        let mut inst = gate_instance(Vec3::new(0.0, 0.0, 0.0), 0);
+        // 90 degree rotation around Y: NEG_Z becomes NEG_X
+        inst.rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                inst,
+                gate_instance(Vec3::new(20.0, 0.0, 0.0), 1),
+            ],
+        };
+
+        let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
+        // Rotated 90° around Y: NEG_Z → NEG_X
+        assert!((path.gate_forwards[0].x - (-1.0)).abs() < 0.01, "expected NEG_X forward, got {:?}", path.gate_forwards[0]);
+        assert!(path.gate_forwards[0].z.abs() < 0.01, "Z should be ~0 after 90° Y rotation");
+    }
+
+    #[test]
     fn compute_start_positions_correct_count() {
         let positions = compute_start_positions(
             Vec3::ZERO,
             Quat::IDENTITY,
             5.0,
-            Some(Vec3::new(0.0, 0.0, -20.0)),
+            Vec3::NEG_Z,
             12,
         );
         assert_eq!(positions.len(), 12);
@@ -522,7 +574,7 @@ mod tests {
             gate_pos,
             Quat::IDENTITY,
             5.0,
-            Some(Vec3::new(0.0, 2.0, -20.0)),
+            Vec3::NEG_Z,
             12,
         );
 
@@ -542,7 +594,7 @@ mod tests {
             Vec3::new(0.0, 10.0, 0.0), // elevated gate
             Quat::IDENTITY,
             5.0,
-            Some(Vec3::new(0.0, 0.0, -20.0)),
+            Vec3::NEG_Z,
             4,
         );
 
@@ -563,7 +615,7 @@ mod tests {
             Vec3::ZERO,
             Quat::IDENTITY,
             half_width,
-            Some(Vec3::new(0.0, 0.0, -20.0)),
+            Vec3::NEG_Z,
             12,
         );
 
@@ -585,7 +637,7 @@ mod tests {
             Vec3::ZERO,
             Quat::IDENTITY,
             8.0,
-            Some(Vec3::new(0.0, 0.0, -20.0)),
+            Vec3::NEG_Z,
             12,
         );
 
@@ -605,7 +657,7 @@ mod tests {
             Vec3::ZERO,
             rotation,
             5.0,
-            Some(Vec3::new(-20.0, 0.0, 0.0)),
+            Vec3::NEG_X,
             3,
         );
 

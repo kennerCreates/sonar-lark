@@ -110,6 +110,8 @@ pub struct AIController {
     pub spline_t: f32,
     /// Gate centers in order, for fallback distance checks.
     pub gate_positions: Vec<Vec3>,
+    /// World-space forward direction for each gate (expected approach direction).
+    pub gate_forwards: Vec<Vec3>,
 }
 
 /// Bridge between AI and PID: AI writes the desired position, PID reads it.

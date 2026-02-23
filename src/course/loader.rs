@@ -83,6 +83,7 @@ pub fn spawn_course(
             def.model_offset,
             def.trigger_volume.as_ref(),
             instance.gate_order,
+            instance.gate_forward_flipped,
         );
 
         if spawned.is_none() {
@@ -146,6 +147,7 @@ mod tests {
                     rotation: Quat::IDENTITY,
                     scale: Vec3::ONE,
                     gate_order: Some(0),
+                    gate_forward_flipped: false,
                 },
                 ObstacleInstance {
                     obstacle_id: ObstacleId("gate_air".to_string()),
@@ -153,6 +155,7 @@ mod tests {
                     rotation: Quat::from_rotation_y(std::f32::consts::FRAC_PI_4),
                     scale: Vec3::splat(1.5),
                     gate_order: Some(1),
+                    gate_forward_flipped: false,
                 },
                 ObstacleInstance {
                     obstacle_id: ObstacleId("wall_short".to_string()),
@@ -160,6 +163,7 @@ mod tests {
                     rotation: Quat::IDENTITY,
                     scale: Vec3::ONE,
                     gate_order: None,
+                    gate_forward_flipped: false,
                 },
             ],
         }
@@ -249,6 +253,7 @@ mod tests {
                 rotation,
                 scale: Vec3::new(0.5, 1.0, 2.0),
                 gate_order: Some(7),
+                gate_forward_flipped: false,
             }],
         };
         let tmp = NamedTempFile::new().unwrap();
