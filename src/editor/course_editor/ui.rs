@@ -558,18 +558,57 @@ fn spawn_transform_mode_button(
 // --- Interaction Systems ---
 
 pub fn handle_palette_selection(
+    mut commands: Commands,
     mut state: ResMut<PlacementState>,
     query: Query<(&Interaction, &PaletteButton), Changed<Interaction>>,
+    library: Res<ObstacleLibrary>,
+    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
+    gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
+    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
+    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
-        if state.selected_palette_id.as_ref() == Some(&btn.0) {
+
+        let Some(def) = library.get(&btn.0) else {
+            continue;
+        };
+        let Some(handle) = &gltf_handle else {
+            warn!("glTF not loaded yet, cannot place obstacle");
+            continue;
+        };
+
+        let transform = Transform::from_translation(Vec3::ZERO);
+        let spawned = crate::obstacle::spawning::spawn_obstacle(
+            &mut commands,
+            &gltf_assets,
+            &node_assets,
+            &mesh_assets,
+            &mut materials,
+            handle,
+            &def.id,
+            &def.glb_node_name,
+            transform,
+            def.model_offset,
+            def.trigger_volume.as_ref(),
+            None,
+        );
+
+        if let Some(entity) = spawned {
+            commands.entity(entity).insert(PlacedObstacle {
+                obstacle_id: btn.0.clone(),
+                gate_order: None,
+            });
+            state.selected_entity = Some(entity);
             state.selected_palette_id = None;
         } else {
-            state.selected_palette_id = Some(btn.0.clone());
-            state.selected_entity = None;
+            warn!(
+                "Failed to spawn obstacle '{}' (node '{}')",
+                def.id.0, def.glb_node_name
+            );
         }
     }
 }

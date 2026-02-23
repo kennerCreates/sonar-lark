@@ -9,7 +9,7 @@ use bevy::{
 
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::{spawn_obstacle, ObstaclesGltfHandle, TriggerVolume};
+use crate::obstacle::spawning::{ObstaclesGltfHandle, TriggerVolume};
 use crate::states::EditorMode;
 
 use super::gizmos::{
@@ -221,7 +221,6 @@ fn cleanup_course_editor(
 // --- Placement and Selection ---
 
 fn handle_placement_and_selection(
-    mut commands: Commands,
     mut state: ResMut<PlacementState>,
     move_widget: Res<MoveWidgetState>,
     rotate_widget: Res<RotateWidgetState>,
@@ -229,14 +228,9 @@ fn handle_placement_and_selection(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    mut placed_query: Query<(Entity, &mut Transform, &mut PlacedObstacle)>,
+    mut placed_query: Query<(Entity, &Children, &mut PlacedObstacle)>,
+    mesh_gt_query: Query<&GlobalTransform, With<Mesh3d>>,
     interaction_query: Query<&Interaction>,
-    library: Res<ObstacleLibrary>,
-    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
-    gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
-    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
-    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     if state.editing_name {
         return;
@@ -265,7 +259,8 @@ fn handle_placement_and_selection(
         return;
     };
 
-    let nearest = find_nearest_to_cursor(&placed_query, camera, camera_gt, cursor_pos);
+    let nearest =
+        find_nearest_to_cursor(&placed_query, &mesh_gt_query, camera, camera_gt, cursor_pos);
 
     if state.gate_order_mode {
         if let Some(entity) = nearest {
@@ -280,49 +275,8 @@ fn handle_placement_and_selection(
     }
 
     if let Some(entity) = nearest {
-        // Select the obstacle — gizmos handle all transforms
         state.selected_entity = Some(entity);
-        state.selected_palette_id = None;
-    } else if let Some(id) = state.selected_palette_id.clone() {
-        // Place a new obstacle at world origin
-        let Some(def) = library.get(&id) else {
-            return;
-        };
-        let Some(handle) = &gltf_handle else {
-            warn!("glTF not loaded yet, cannot place obstacle");
-            return;
-        };
-
-        let transform = Transform::from_translation(Vec3::ZERO);
-        let spawned = spawn_obstacle(
-            &mut commands,
-            &gltf_assets,
-            &node_assets,
-            &mesh_assets,
-            &mut materials,
-            handle,
-            &def.id,
-            &def.glb_node_name,
-            transform,
-            def.model_offset,
-            def.trigger_volume.as_ref(),
-            None,
-        );
-
-        if let Some(entity) = spawned {
-            commands.entity(entity).insert(PlacedObstacle {
-                obstacle_id: id.clone(),
-                gate_order: None,
-            });
-            state.selected_entity = Some(entity);
-        } else {
-            warn!(
-                "Failed to spawn obstacle '{}' (node '{}')",
-                def.id.0, def.glb_node_name
-            );
-        }
     } else {
-        // Clicked empty space with nothing selected — deselect
         state.selected_entity = None;
     }
 }
@@ -708,9 +662,13 @@ fn draw_trigger_gizmos(
     trigger_query: Query<(&TriggerVolume, &GlobalTransform)>,
 ) {
     for (trigger, gt) in &trigger_query {
-        let center = gt.translation();
-        let size = trigger.half_extents * 2.0;
-        let transform = Transform::from_translation(center).with_scale(size);
+        let (parent_scale, parent_rotation, center) = gt.to_scale_rotation_translation();
+        let size = trigger.half_extents * 2.0 * parent_scale;
+        let transform = Transform {
+            translation: center,
+            rotation: parent_rotation,
+            scale: size,
+        };
         gizmos.cube(transform, Color::srgb(0.2, 1.0, 0.2));
     }
 }
@@ -766,10 +724,11 @@ fn draw_selection_highlight(
 
 // --- Helpers ---
 
-/// Find the placed entity whose world-space center is closest to the cursor
+/// Find the placed entity whose child mesh is closest to the cursor
 /// in screen space. Returns `None` if nothing is within the pick threshold.
 fn find_nearest_to_cursor(
-    placed_query: &Query<(Entity, &mut Transform, &mut PlacedObstacle)>,
+    placed_query: &Query<(Entity, &Children, &mut PlacedObstacle)>,
+    mesh_gt_query: &Query<&GlobalTransform, With<Mesh3d>>,
     camera: &Camera,
     camera_gt: &GlobalTransform,
     cursor_pos: Vec2,
@@ -779,15 +738,20 @@ fn find_nearest_to_cursor(
     let mut best_entity = None;
     let mut best_dist = THRESHOLD_PX;
 
-    for (entity, transform, _) in placed_query.iter() {
-        let world_pos = transform.translation;
-        let Ok(screen_pos) = camera.world_to_viewport(camera_gt, world_pos) else {
-            continue;
-        };
-        let dist = (cursor_pos - screen_pos).length();
-        if dist < best_dist {
-            best_dist = dist;
-            best_entity = Some(entity);
+    for (entity, children, _) in placed_query.iter() {
+        for child in children.iter() {
+            let Ok(child_gt) = mesh_gt_query.get(child) else {
+                continue;
+            };
+            let world_pos = child_gt.translation();
+            let Ok(screen_pos) = camera.world_to_viewport(camera_gt, world_pos) else {
+                continue;
+            };
+            let dist = (cursor_pos - screen_pos).length();
+            if dist < best_dist {
+                best_dist = dist;
+                best_entity = Some(entity);
+            }
         }
     }
 

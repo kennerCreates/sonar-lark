@@ -12,7 +12,7 @@ pub enum AppState {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, SubStates)]
 #[source(AppState = AppState::Editor)]
 pub enum EditorMode {
-    #[default]
     ObstacleWorkshop,
+    #[default]
     CourseEditor,
 }
