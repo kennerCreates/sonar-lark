@@ -12,6 +12,10 @@ pub struct SelectedCourse {
     pub path: String,
 }
 
+/// Marker inserted after obstacles have been spawned, prevents re-running.
+#[derive(Resource)]
+pub struct CourseSpawned;
+
 pub fn load_course(mut commands: Commands, selected: Option<Res<SelectedCourse>>) {
     let Some(selected) = selected else {
         warn!("No course selected, cannot load");
@@ -42,12 +46,17 @@ pub fn spawn_course(
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    already_spawned: Option<Res<CourseSpawned>>,
 ) {
-    let Some(course) = course else { return };
-    let Some(gltf_handle) = gltf_handle else {
-        warn!("Obstacles glTF not loaded yet");
+    if already_spawned.is_some() {
         return;
-    };
+    }
+    let Some(course) = course else { return };
+    let Some(gltf_handle) = gltf_handle else { return };
+    // Poll until the glTF asset is actually loaded (async)
+    if gltf_assets.get(&gltf_handle.0).is_none() {
+        return;
+    }
 
     for instance in &course.instances {
         let Some(def) = library.get(&instance.obstacle_id) else {
@@ -83,6 +92,12 @@ pub fn spawn_course(
             );
         }
     }
+
+    commands.insert_resource(CourseSpawned);
+}
+
+pub fn cleanup_course_spawned(mut commands: Commands) {
+    commands.remove_resource::<CourseSpawned>();
 }
 
 pub fn load_course_from_file(path: &Path) -> Result<CourseData, String> {

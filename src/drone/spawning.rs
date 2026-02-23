@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::course::data::CourseData;
+use crate::obstacle::library::ObstacleLibrary;
 use crate::states::AppState;
 use super::components::*;
 
@@ -93,6 +94,7 @@ pub fn spawn_drones(
     mut commands: Commands,
     drone_assets: Option<Res<DroneAssets>>,
     course: Option<Res<CourseData>>,
+    library: Res<ObstacleLibrary>,
     existing_drones: Query<(), With<Drone>>,
 ) {
     if !existing_drones.is_empty() {
@@ -101,7 +103,7 @@ pub fn spawn_drones(
     let Some(assets) = drone_assets else { return };
     let Some(course) = course else { return };
 
-    let waypoints = generate_waypoints(&course);
+    let waypoints = generate_waypoints(&course, &library);
     if waypoints.is_empty() {
         warn!("No gates found in course, cannot spawn drones");
         return;
@@ -166,11 +168,22 @@ pub fn cleanup_drone_resources(mut commands: Commands) {
 
 // --- Pure helper functions (testable) ---
 
-pub fn generate_waypoints(course: &CourseData) -> Vec<Vec3> {
+pub fn generate_waypoints(course: &CourseData, library: &ObstacleLibrary) -> Vec<Vec3> {
     let mut gates: Vec<(u32, Vec3)> = course
         .instances
         .iter()
-        .filter_map(|inst| inst.gate_order.map(|order| (order, inst.translation)))
+        .filter_map(|inst| {
+            inst.gate_order.map(|order| {
+                // Use the trigger volume center as the fly-through target,
+                // not the obstacle origin (which is at ground level).
+                let fly_through_offset = library
+                    .get(&inst.obstacle_id)
+                    .and_then(|def| def.trigger_volume.as_ref())
+                    .map(|tv| inst.rotation * tv.offset)
+                    .unwrap_or(Vec3::ZERO);
+                (order, inst.translation + fly_through_offset)
+            })
+        })
         .collect();
     gates.sort_by_key(|(order, _)| *order);
     gates.into_iter().map(|(_, pos)| pos).collect()
@@ -240,7 +253,8 @@ fn create_pid_with_variation(config: &DroneConfig) -> PidController {
 mod tests {
     use super::*;
     use crate::course::data::ObstacleInstance;
-    use crate::obstacle::definition::ObstacleId;
+    use crate::obstacle::definition::{ObstacleId, ObstacleDef, TriggerVolumeConfig};
+    use crate::obstacle::library::ObstacleLibrary;
     use bevy::math::{Quat, Vec3};
 
     fn gate_instance(translation: Vec3, order: u32) -> ObstacleInstance {
@@ -263,8 +277,24 @@ mod tests {
         }
     }
 
+    fn library_with_gate() -> ObstacleLibrary {
+        let mut lib = ObstacleLibrary::default();
+        lib.insert(ObstacleDef {
+            id: ObstacleId("gate".to_string()),
+            glb_node_name: "gate".to_string(),
+            trigger_volume: Some(TriggerVolumeConfig {
+                offset: Vec3::new(0.0, 5.0, 0.0),
+                half_extents: Vec3::new(3.0, 3.0, 0.5),
+            }),
+            is_gate: true,
+            model_offset: Vec3::ZERO,
+        });
+        lib
+    }
+
     #[test]
     fn generate_waypoints_sorts_by_gate_order() {
+        let lib = library_with_gate();
         let course = CourseData {
             name: "Test".to_string(),
             instances: vec![
@@ -274,15 +304,17 @@ mod tests {
             ],
         };
 
-        let waypoints = generate_waypoints(&course);
+        let waypoints = generate_waypoints(&course, &lib);
         assert_eq!(waypoints.len(), 3);
-        assert_eq!(waypoints[0], Vec3::new(0.0, 0.0, 0.0));
-        assert_eq!(waypoints[1], Vec3::new(5.0, 0.0, 0.0));
-        assert_eq!(waypoints[2], Vec3::new(10.0, 0.0, 0.0));
+        // Trigger volume offset adds Y=5.0
+        assert_eq!(waypoints[0], Vec3::new(0.0, 5.0, 0.0));
+        assert_eq!(waypoints[1], Vec3::new(5.0, 5.0, 0.0));
+        assert_eq!(waypoints[2], Vec3::new(10.0, 5.0, 0.0));
     }
 
     #[test]
     fn generate_waypoints_excludes_non_gates() {
+        let lib = library_with_gate();
         let course = CourseData {
             name: "Test".to_string(),
             instances: vec![
@@ -291,19 +323,38 @@ mod tests {
             ],
         };
 
-        let waypoints = generate_waypoints(&course);
+        let waypoints = generate_waypoints(&course, &lib);
         assert_eq!(waypoints.len(), 1);
-        assert_eq!(waypoints[0], Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(waypoints[0], Vec3::new(1.0, 5.0, 0.0));
     }
 
     #[test]
     fn generate_waypoints_empty_course() {
+        let lib = ObstacleLibrary::default();
         let course = CourseData {
             name: "Empty".to_string(),
             instances: vec![],
         };
-        let waypoints = generate_waypoints(&course);
+        let waypoints = generate_waypoints(&course, &lib);
         assert!(waypoints.is_empty());
+    }
+
+    #[test]
+    fn generate_waypoints_applies_rotation_to_offset() {
+        let lib = library_with_gate();
+        // Rotate gate 90 degrees around Y axis — offset (0,5,0) stays (0,5,0)
+        let mut inst = gate_instance(Vec3::new(10.0, 0.0, 0.0), 0);
+        inst.rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![inst],
+        };
+
+        let waypoints = generate_waypoints(&course, &lib);
+        assert_eq!(waypoints.len(), 1);
+        // Y offset is along Y axis, unaffected by Y-axis rotation
+        assert!((waypoints[0].y - 5.0).abs() < 0.001);
     }
 
     #[test]
