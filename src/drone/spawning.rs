@@ -46,7 +46,7 @@ pub fn setup_drone_assets(
 
     // TODO: restore glTF drone model once visibility issue is resolved
     {
-        let mesh = meshes.add(Cuboid::new(0.3, 0.1, 0.3));
+        let mesh = meshes.add(Cuboid::new(0.5, 0.3, 0.5));
         let mat = materials.add(StandardMaterial {
             base_color: Color::srgb(0.8, 0.2, 0.2),
             ..default()
