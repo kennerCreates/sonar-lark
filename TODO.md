@@ -9,19 +9,7 @@
 - [x] **Phase 4**: Editor — Obstacle Workshop (WorkshopState, scene browser, trigger gizmo, save/load/delete)
 - [x] **Testing**: Unit tests for obstacle library, course data, and menu discovery (22 tests)
 - [x] **Bugfix**: Workshop preview placeholder spawn race condition with deferred despawns
-
-### Phase 5: Editor — Course Editor
-- [ ] `PlacementState` resource (selected obstacle, dragging entity, drag height)
-- [ ] Obstacle palette UI: browse library, select obstacle to place
-- [ ] Click-to-place: raycast to ground plane, spawn obstacle instance
-- [ ] XZ drag to reposition placed obstacles
-- [ ] Separate Y height control (scroll wheel or key)
-- [ ] Gate ordering UI: click gates to set sequence order
-- [ ] Gizmo: trigger volume wireframes on all placed obstacles
-- [ ] Gizmo: lines connecting gates in sequence order
-- [ ] Sync entity transforms back to `CourseData` resource
-- [ ] Save course to RON file
-- [ ] Load existing course for editing
+- [x] **Phase 5**: Editor — Course Editor (PlacementState, palette UI, click-to-place, XZ drag, Q/E height, gate ordering, trigger gizmos, gate sequence lines, save/load)
 
 ### Phase 6: Drone Physics + AI
 - [ ] `DroneAssets` resource: shared placeholder mesh + material

@@ -36,6 +36,8 @@ src/
 │   │   ├── mod.rs       WorkshopPlugin, WorkshopState, preview spawning, gizmo
 │   │   └── ui.rs        Workshop UI layout, interaction handlers, text input
 │   └── course_editor/   Place obstacles, set gate order
+│       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, placement/drag/gizmo systems
+│       └── ui.rs        Palette UI, save/load, gate order mode, name field
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, PidController, DroneDynamics, DroneConfig, AIController
 │   ├── physics.rs       PID-lite physics (FixedUpdate)
@@ -104,6 +106,8 @@ CourseData ──► spawn obstacles + drones
 | `SelectedCourse` | Resource | course/loader | User's course selection for racing |
 | `WorkshopState` | Resource | editor/workshop | Current obstacle being edited (scene, trigger config, preview) |
 | `PreviewObstacle` | Component | editor/workshop | Marker on the 3D preview entity in the workshop |
+| `PlacementState` | Resource | editor/course_editor | Selected palette obstacle, dragging entity, drag height, gate order mode |
+| `PlacedObstacle` | Component | editor/course_editor | Marker on every obstacle entity spawned in the course editor; carries `obstacle_id` and `gate_order` |
 
 ## Assets
 

@@ -1,0 +1,33 @@
+(
+    name: "new_course",
+    instances: [
+        (
+            obstacle_id: ("gate_best"),
+            translation: (-23.927948, 0.0, -27.768314),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            scale: (1.0, 1.0, 1.0),
+            gate_order: None,
+        ),
+        (
+            obstacle_id: ("gate_ground"),
+            translation: (-23.98776, 0.0, -1.8267899),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            scale: (1.0, 1.0, 1.0),
+            gate_order: None,
+        ),
+        (
+            obstacle_id: ("gate_loop"),
+            translation: (15.566471, 0.0, -4.5856285),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            scale: (1.0, 1.0, 1.0),
+            gate_order: None,
+        ),
+        (
+            obstacle_id: ("gate_loop"),
+            translation: (6.631541, 0.0, -26.125362),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            scale: (1.0, 1.0, 1.0),
+            gate_order: None,
+        ),
+    ],
+)
