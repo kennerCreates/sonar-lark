@@ -9,6 +9,7 @@ use super::components::*;
 const DRONE_COUNT: u8 = 12;
 const START_DISTANCE_BEHIND_GATE: f32 = 5.0;
 const HOVER_HEIGHT: f32 = 1.5;
+const GRAVITY: f32 = 9.81;
 /// Fraction of gate width used for the start line (leaves margin at edges).
 const GATE_WIDTH_USAGE: f32 = 0.8;
 
@@ -153,16 +154,16 @@ pub fn spawn_drones(
 
         let transform = Transform::from_translation(position).with_rotation(rotation);
 
-        // Desynchronize hover cycles so drones don't all move in unison.
-        let initial_timer = rng.gen_range(0.0f32..=3.0);
-        let hover_cycle = HoverCycle::new(position, config.hover_amp, initial_timer);
+        let dynamics = DroneDynamics::default();
+        let hover_thrust = GRAVITY * dynamics.mass;
 
         let mut entity_cmd = commands.spawn((
             transform,
             Visibility::default(),
             Drone { index: i },
             pid,
-            DroneDynamics::default(),
+            AttitudePd::default(),
+            dynamics,
             config,
             AIController {
                 target_gate_index: 0,
@@ -173,11 +174,14 @@ pub fn spawn_drones(
                 position,
                 velocity_hint: look_dir,
             },
+            DesiredAttitude {
+                orientation: rotation,
+                thrust_magnitude: hover_thrust,
+            },
             DroneStartPosition {
                 translation: position,
                 rotation,
             },
-            hover_cycle,
             DespawnOnExit(AppState::Race),
         ));
 
@@ -294,17 +298,22 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
         line_offset: rng.gen_range(-1.5..=1.5),
         noise_amplitude: rng.gen_range(0.3..=1.5),
         noise_frequency: rng.gen_range(0.5..=2.0),
-        hover_amp: Vec3::new(
-            rng.gen_range(0.3..=1.0),
-            rng.gen_range(0.1..=0.4),
-            rng.gen_range(0.2..=0.8),
+        hover_noise_amp: Vec3::new(
+            rng.gen_range(0.01..=0.03),
+            rng.gen_range(0.005..=0.015),
+            rng.gen_range(0.01..=0.025),
+        ),
+        hover_noise_freq: Vec3::new(
+            rng.gen_range(0.3..=1.5),
+            rng.gen_range(0.5..=2.0),
+            rng.gen_range(0.3..=1.2),
         ),
     }
 }
 
-fn create_pid_with_variation(config: &DroneConfig) -> PidController {
-    let base = PidController::default();
-    PidController {
+fn create_pid_with_variation(config: &DroneConfig) -> PositionPid {
+    let base = PositionPid::default();
+    PositionPid {
         kp: base.kp * (Vec3::ONE + config.pid_variation),
         ki: base.ki * (Vec3::ONE + config.pid_variation),
         kd: base.kd * (Vec3::ONE + config.pid_variation),
@@ -559,9 +568,12 @@ mod tests {
             assert!(config.line_offset.abs() <= 1.5);
             assert!((0.3..=1.5).contains(&config.noise_amplitude));
             assert!((0.5..=2.0).contains(&config.noise_frequency));
-            assert!((0.3..=1.0).contains(&config.hover_amp.x));
-            assert!((0.1..=0.4).contains(&config.hover_amp.y));
-            assert!((0.2..=0.8).contains(&config.hover_amp.z));
+            assert!((0.01..=0.03).contains(&config.hover_noise_amp.x));
+            assert!((0.005..=0.015).contains(&config.hover_noise_amp.y));
+            assert!((0.01..=0.025).contains(&config.hover_noise_amp.z));
+            assert!((0.3..=1.5).contains(&config.hover_noise_freq.x));
+            assert!((0.5..=2.0).contains(&config.hover_noise_freq.y));
+            assert!((0.3..=1.2).contains(&config.hover_noise_freq.z));
         }
     }
 
@@ -572,10 +584,11 @@ mod tests {
             line_offset: 0.0,
             noise_amplitude: 1.0,
             noise_frequency: 1.0,
-            hover_amp: Vec3::splat(0.3),
+            hover_noise_amp: Vec3::splat(0.02),
+            hover_noise_freq: Vec3::splat(1.0),
         };
         let pid = create_pid_with_variation(&config);
-        let base = PidController::default();
+        let base = PositionPid::default();
 
         assert!((pid.kp.x - base.kp.x * 1.1).abs() < 0.001);
         assert!((pid.kp.y - base.kp.y * 0.9).abs() < 0.001);

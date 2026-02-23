@@ -6,7 +6,7 @@ This is a **drone racing simulator with a built-in map editor**, built in **Rust
 
 Key facts:
 - **State machine**: `AppState` (Menu → Editor → Race → Results) with `EditorMode` SubStates (ObstacleWorkshop, CourseEditor)
-- **Physics**: PID-lite quadrotor in `FixedUpdate`, 12 AI drones with per-drone variation
+- **Physics**: Thrust-through-body quadrotor with cascaded PID (position → attitude) in `FixedUpdate`, 12 AI drones with per-drone variation. Quadratic drag, angular dynamics with moment of inertia, motor lag.
 - **Data**: Obstacle definitions and courses serialized as RON. Single `.glb` file for all obstacle 3D models, separate `.glb` for drone model.
 - **Gate validation**: Trigger volumes (AABB), gates must be passed in order. Hit/miss = crash.
 
@@ -48,7 +48,7 @@ The performance target is a stable **60fps**. Performance is paramount.
 - **Bevy 0.18 specifics**: `set_parent_in_place()` (not `set_parent()`), `SceneRoot` (not `SceneBundle`), `Mesh3d`/`MeshMaterial3d` components, `ChildSpawnerCommands` (not `ChildBuilder`) for `with_children` closures in commands context, `AccumulatedMouseMotion`/`AccumulatedMouseScroll` from `bevy::input::mouse` (not in prelude). `MessageReader<T>` (not `EventReader<T>`) for reading events. `KeyboardInput` from `bevy::input::keyboard`. System tuples max ~12 elements for `run_if`; split larger groups into multiple `add_systems` calls. `Gltf::named_nodes`/`named_scenes` use `Box<str>` keys (not `String`).
 - **Menu pattern**: `AvailableCourses` resource is created on `OnEnter(Menu)` and removed on `OnExit(Menu)`. `SelectedCourse` resource persists across states to carry the user's course selection into Race.
 - **Workshop pattern**: `WorkshopState` resource is created on `OnEnter(ObstacleWorkshop)` and removed on `OnExit`. Preview entities use `PreviewObstacle` component and are manually despawned on exit (not part of UI hierarchy). glTF node list populates asynchronously once the asset is loaded. If no glb scene matches, a placeholder cube is spawned.
-- **Drone pattern**: `DroneGltfHandle` is loaded `OnEnter(Race)`. `DroneAssets` is extracted from the glTF in an `Update` polling system (async pattern). `spawn_drones` polls until both `DroneAssets` and `CourseData` are available, then spawns 12 drones with `DespawnOnExit(AppState::Race)`. Resources are cleaned up `OnExit(Race)`. Physics runs in `FixedUpdate` as a 6-system `.chain()`. If the drone glb is missing, a red placeholder cube is used.
+- **Drone pattern**: `DroneGltfHandle` is loaded `OnEnter(Race)`. `DroneAssets` is extracted from the glTF in an `Update` polling system (async pattern). `spawn_drones` polls until both `DroneAssets` and `CourseData` are available, then spawns 12 drones with `DespawnOnExit(AppState::Race)`. Resources are cleaned up `OnExit(Race)`. Physics runs in `FixedUpdate` as a 9-system `.chain()` using a thrust-through-body model: `hover_target → position_pid → attitude_controller → motor_lag → apply_forces → integrate_motion → clamp_transform` (plus 2 AI systems when racing). Key components: `PositionPid` (outer loop), `AttitudePd` (inner loop), `DesiredAttitude` (bridge between loops), `DroneDynamics` (velocity, angular velocity, thrust with motor lag, quadratic drag). If the drone glb is missing, a red placeholder cube is used.
 
 ## Post-Phase Checklist
 

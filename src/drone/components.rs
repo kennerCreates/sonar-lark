@@ -1,13 +1,13 @@
 use bevy::prelude::*;
-use rand::Rng;
 
 #[derive(Component)]
 pub struct Drone {
     pub index: u8,
 }
 
+/// Outer-loop position PID: position error → desired acceleration.
 #[derive(Component)]
-pub struct PidController {
+pub struct PositionPid {
     pub kp: Vec3,
     pub ki: Vec3,
     pub kd: Vec3,
@@ -15,7 +15,7 @@ pub struct PidController {
     pub prev_error: Vec3,
 }
 
-impl Default for PidController {
+impl Default for PositionPid {
     fn default() -> Self {
         Self {
             kp: Vec3::new(6.0, 8.0, 6.0),
@@ -27,15 +27,46 @@ impl Default for PidController {
     }
 }
 
+/// Inner-loop attitude PD: orientation error → torque.
+#[derive(Component)]
+pub struct AttitudePd {
+    pub kp_roll_pitch: f32,
+    pub kd_roll_pitch: f32,
+    pub kp_yaw: f32,
+    pub kd_yaw: f32,
+    pub max_angular_rate: Vec3,
+}
+
+impl Default for AttitudePd {
+    fn default() -> Self {
+        Self {
+            kp_roll_pitch: 25.0,
+            kd_roll_pitch: 8.0,
+            kp_yaw: 15.0,
+            kd_yaw: 5.0,
+            max_angular_rate: Vec3::new(20.0, 20.0, 10.0),
+        }
+    }
+}
+
+/// Bridge between position PID (outer loop) and attitude controller (inner loop).
+#[derive(Component)]
+pub struct DesiredAttitude {
+    pub orientation: Quat,
+    pub thrust_magnitude: f32,
+}
+
 #[derive(Component)]
 pub struct DroneDynamics {
     pub velocity: Vec3,
     pub angular_velocity: Vec3,
     pub thrust: f32,
-    pub thrust_direction: Vec3,
+    pub commanded_thrust: f32,
     pub max_thrust: f32,
     pub mass: f32,
-    pub drag_coefficient: f32,
+    pub drag_constant: f32,
+    pub moment_of_inertia: Vec3,
+    pub motor_time_constant: f32,
 }
 
 impl Default for DroneDynamics {
@@ -44,10 +75,12 @@ impl Default for DroneDynamics {
             velocity: Vec3::ZERO,
             angular_velocity: Vec3::ZERO,
             thrust: 0.0,
-            thrust_direction: Vec3::Y,
-            max_thrust: 40.0,
+            commanded_thrust: 0.0,
+            max_thrust: 55.0,
             mass: 0.8,
-            drag_coefficient: 0.3,
+            drag_constant: 0.025,
+            moment_of_inertia: Vec3::new(0.003, 0.005, 0.003),
+            motor_time_constant: 0.040,
         }
     }
 }
@@ -58,8 +91,8 @@ pub struct DroneConfig {
     pub line_offset: f32,
     pub noise_amplitude: f32,
     pub noise_frequency: f32,
-    /// Per-axis max offset range for idle hover drift (units, always positive).
-    pub hover_amp: Vec3,
+    pub hover_noise_amp: Vec3,
+    pub hover_noise_freq: Vec3,
 }
 
 #[derive(Component)]
@@ -81,53 +114,4 @@ pub struct DesiredPosition {
 pub struct DroneStartPosition {
     pub translation: Vec3,
     pub rotation: Quat,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum HoverPhase {
-    #[default]
-    Drifting,
-    Snapping,
-    Correcting,
-}
-
-/// Per-drone state machine for idle hover animation.
-/// Cycle: drift to random offset → snap back past home (overshoot) → correct to home → repeat.
-#[derive(Component)]
-pub struct HoverCycle {
-    pub phase: HoverPhase,
-    pub timer: f32,
-    pub drift_duration: f32,
-    pub snap_duration: f32,
-    pub correct_duration: f32,
-    /// Random offset target for this cycle (world space).
-    pub pos_r: Vec3,
-    /// Overshoot position past home (world space).
-    pub overshoot_pos: Vec3,
-}
-
-impl HoverCycle {
-    pub fn new(pos_a: Vec3, hover_amp: Vec3, initial_timer: f32) -> Self {
-        let mut rng = rand::thread_rng();
-
-        let offset = Vec3::new(
-            rng.gen_range(-hover_amp.x.abs()..=hover_amp.x.abs()),
-            rng.gen_range(-hover_amp.y.abs()..=hover_amp.y.abs()),
-            rng.gen_range(-hover_amp.z.abs()..=hover_amp.z.abs()),
-        );
-        let pos_r = pos_a + offset;
-
-        let overshoot_fraction = rng.gen_range(0.15f32..=0.50);
-        let overshoot_pos = pos_a + (pos_a - pos_r) * overshoot_fraction;
-
-        Self {
-            phase: HoverPhase::Drifting,
-            timer: initial_timer,
-            drift_duration: rng.gen_range(2.0f32..=4.0),
-            snap_duration: rng.gen_range(0.3f32..=0.8),
-            correct_duration: rng.gen_range(0.5f32..=1.2),
-            pos_r,
-            overshoot_pos,
-        }
-    }
 }

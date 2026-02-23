@@ -39,8 +39,8 @@ src/
 │       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, placement/drag/gizmo systems
 │       └── ui.rs        Palette UI, save/load, gate order mode, name field
 ├── drone/               Drone simulation
-│   ├── components.rs    Drone, PidController, DroneDynamics, DroneConfig, AIController, DesiredPosition
-│   ├── physics.rs       pid_compute, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
+│   ├── components.rs    Drone, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
+│   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
 │   ├── ai.rs            update_ai_targets, compute_racing_line (FixedUpdate)
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, waypoint generation
 ├── race/                Race mechanics
@@ -138,9 +138,13 @@ Blender ──► drone.glb ──► DroneGltfHandle (Startup load)
                                 │
 CourseData ──► generate_waypoints() ──► spawn_drones() ──► 12 Drone entities
                                                                │
-                                                    FixedUpdate chain:
-                                                    AI targets → racing line → PID → forces → integration → clamp
+                                                    FixedUpdate chain (9-system, thrust-through-body):
+                                                    AI targets → racing line → hover_target
+                                                    → position_pid → attitude_controller → motor_lag
+                                                    → apply_forces → integration → clamp
 ```
+
+The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior.
 
 Drone spawning uses an async polling pattern: `setup_drone_assets` and `spawn_drones` run every `Update` frame, returning early until the glTF asset and `CourseData` are both available. Once drones spawn, the early-return guards make them no-ops.
 
@@ -154,7 +158,7 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `course::loader` | 7 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
-| `drone::spawning` | 8 | Waypoint generation (sort, filter, empty), start positions (count, behind gate, no overlap), config randomization bounds, PID variation |
+| `drone::spawning` | 10 | Waypoint generation (sort, filter, empty), start positions (count, behind gate, no overlap), config randomization bounds (hover noise amp/freq), PID variation |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems

@@ -65,8 +65,9 @@ pub fn handle_start_race_button(
     mut drones: Query<(
         &mut AIController,
         &mut DroneDynamics,
-        &mut PidController,
+        &mut PositionPid,
         &mut DesiredPosition,
+        &mut DesiredAttitude,
         &mut Transform,
         &DroneStartPosition,
     )>,
@@ -83,7 +84,7 @@ pub fn handle_start_race_button(
             }
             RacePhase::Racing => {}
             RacePhase::Finished => {
-                for (mut ai, mut dynamics, mut pid, mut desired, mut transform, start_pos) in
+                for (mut ai, mut dynamics, mut pid, mut desired, mut attitude, mut transform, start_pos) in
                     &mut drones
                 {
                     ai.current_waypoint = 0;
@@ -92,7 +93,7 @@ pub fn handle_start_race_button(
                     dynamics.velocity = Vec3::ZERO;
                     dynamics.angular_velocity = Vec3::ZERO;
                     dynamics.thrust = 0.0;
-                    dynamics.thrust_direction = Vec3::Y;
+                    dynamics.commanded_thrust = 0.0;
 
                     pid.integral = Vec3::ZERO;
                     pid.prev_error = Vec3::ZERO;
@@ -102,6 +103,9 @@ pub fn handle_start_race_button(
 
                     desired.position = start_pos.translation;
                     desired.velocity_hint = Vec3::ZERO;
+
+                    attitude.orientation = start_pos.rotation;
+                    attitude.thrust_magnitude = 9.81 * dynamics.mass;
                 }
                 *phase = RacePhase::WaitingToStart;
                 info!("Race reset!");

@@ -29,8 +29,10 @@ impl Plugin for DronePlugin {
                 (
                     ai::update_ai_targets.run_if(race_is_running),
                     ai::compute_racing_line.run_if(race_is_running),
-                    physics::hover_bob.run_if(not(race_is_running)),
-                    physics::pid_compute,
+                    physics::hover_target.run_if(not(race_is_running)),
+                    physics::position_pid,
+                    physics::attitude_controller,
+                    physics::motor_lag,
                     physics::apply_forces,
                     physics::integrate_motion,
                     physics::clamp_transform,
