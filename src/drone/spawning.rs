@@ -8,8 +8,8 @@ use super::components::*;
 
 const DRONE_COUNT: u8 = 12;
 const START_DISTANCE_BEHIND_GATE: f32 = 15.0;
-const LATERAL_SPACING: f32 = 2.0;
-const ROWS: usize = 3;
+const LATERAL_SPACING: f32 = 2.5;
+const ROWS: usize = 1;
 const HOVER_HEIGHT: f32 = 1.5;
 
 #[derive(Resource)]
@@ -247,6 +247,23 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
         line_offset: rng.gen_range(-1.5..=1.5),
         noise_amplitude: rng.gen_range(0.3..=1.5),
         noise_frequency: rng.gen_range(0.5..=2.0),
+        hover_phase: Vec3::new(
+            rng.gen_range(0.0..std::f32::consts::TAU),
+            rng.gen_range(0.0..std::f32::consts::TAU),
+            rng.gen_range(0.0..std::f32::consts::TAU),
+        ),
+        hover_freq: Vec3::new(
+            rng.gen_range(0.8..=2.5),
+            rng.gen_range(1.0..=3.0),
+            rng.gen_range(0.6..=2.0),
+        ),
+        hover_amp: Vec3::new(
+            rng.gen_range(0.3..=0.8),
+            rng.gen_range(0.2..=0.5),
+            rng.gen_range(0.2..=0.6),
+        ),
+        hover_jerk_freq: rng.gen_range(3.0..=6.0),
+        hover_jerk_amp: rng.gen_range(0.1..=0.3),
     }
 }
 
@@ -418,6 +435,18 @@ mod tests {
             assert!(config.line_offset.abs() <= 1.5);
             assert!((0.3..=1.5).contains(&config.noise_amplitude));
             assert!((0.5..=2.0).contains(&config.noise_frequency));
+            // Hover parameters
+            assert!(config.hover_phase.x >= 0.0 && config.hover_phase.x < std::f32::consts::TAU);
+            assert!(config.hover_phase.y >= 0.0 && config.hover_phase.y < std::f32::consts::TAU);
+            assert!(config.hover_phase.z >= 0.0 && config.hover_phase.z < std::f32::consts::TAU);
+            assert!((0.8..=2.5).contains(&config.hover_freq.x));
+            assert!((1.0..=3.0).contains(&config.hover_freq.y));
+            assert!((0.6..=2.0).contains(&config.hover_freq.z));
+            assert!((0.3..=0.8).contains(&config.hover_amp.x));
+            assert!((0.2..=0.5).contains(&config.hover_amp.y));
+            assert!((0.2..=0.6).contains(&config.hover_amp.z));
+            assert!((3.0..=6.0).contains(&config.hover_jerk_freq));
+            assert!((0.1..=0.3).contains(&config.hover_jerk_amp));
         }
     }
 
@@ -428,6 +457,11 @@ mod tests {
             line_offset: 0.0,
             noise_amplitude: 1.0,
             noise_frequency: 1.0,
+            hover_phase: Vec3::ZERO,
+            hover_freq: Vec3::ONE,
+            hover_amp: Vec3::splat(0.3),
+            hover_jerk_freq: 4.0,
+            hover_jerk_amp: 0.2,
         };
         let pid = create_pid_with_variation(&config);
         let base = PidController::default();

@@ -57,6 +57,16 @@ pub struct DroneConfig {
     pub line_offset: f32,
     pub noise_amplitude: f32,
     pub noise_frequency: f32,
+    /// Per-axis phase offsets for hover animation (radians).
+    pub hover_phase: Vec3,
+    /// Per-axis primary oscillation frequencies (Hz) for idle hover.
+    pub hover_freq: Vec3,
+    /// Per-axis amplitude of idle hover movement (units).
+    pub hover_amp: Vec3,
+    /// Frequency of sharp "jerk" impulses during hover.
+    pub hover_jerk_freq: f32,
+    /// Amplitude of jerk impulses.
+    pub hover_jerk_amp: f32,
 }
 
 #[derive(Component)]

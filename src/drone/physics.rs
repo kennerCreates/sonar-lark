@@ -8,6 +8,35 @@ const GROUND_HEIGHT: f32 = 0.3;
 const INTEGRAL_CLAMP: f32 = 10.0;
 const MAX_LEAN_ANGLE: f32 = 0.6;
 const ROTATION_SMOOTHING: f32 = 8.0;
+/// Layered, per-drone idle hover animation.
+/// Each drone gets its own frequencies, amplitudes, and phase offsets producing
+/// distinct jockeying, bobbing, and jerking behavior on all three axes.
+pub fn hover_bob(
+    time: Res<Time>,
+    mut query: Query<(&DroneConfig, &DroneStartPosition, &mut DesiredPosition)>,
+) {
+    let t = time.elapsed_secs();
+    for (config, start, mut desired) in &mut query {
+        let p = config.hover_phase;
+        let f = config.hover_freq;
+        let a = config.hover_amp;
+
+        // Lateral sway — jockeying for position
+        let x = (t * f.x + p.x).sin() * a.x
+            + (t * f.x * 2.3 + p.x * 1.7).sin() * a.x * 0.4;
+
+        // Vertical bob — two harmonics plus sharp jerk impulses (sin³)
+        let y = (t * f.y + p.y).sin() * a.y
+            + (t * f.y * 1.8 + p.y * 2.3).sin() * a.y * 0.35
+            + (t * config.hover_jerk_freq + p.y).sin().powi(3) * config.hover_jerk_amp;
+
+        // Forward/back drift — subtle positioning
+        let z = (t * f.z + p.z).sin() * a.z
+            + (t * f.z * 1.6 + p.z * 0.9).sin() * a.z * 0.5;
+
+        desired.position = start.translation + Vec3::new(x, y, z);
+    }
+}
 
 pub fn pid_compute(
     time: Res<Time>,
