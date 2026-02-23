@@ -41,8 +41,8 @@ src/
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
-│   ├── ai.rs            update_ai_targets, compute_racing_line (FixedUpdate)
-│   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, waypoint generation
+│   ├── ai.rs            update_ai_targets, compute_racing_line (FixedUpdate, spline-based)
+│   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, RacePath/spline generation
 ├── race/                Race mechanics
 │   ├── gate.rs          GateIndex, trigger volume overlap detection
 │   ├── progress.rs      RaceProgress, per-drone state tracking
@@ -126,7 +126,7 @@ assets/
 
 - All drone physics in `FixedUpdate` (64Hz default), `.chain()`-ed for correctness
 - Gate trigger checks: O(drones × gates) = O(12 × ~20) = O(240) AABB tests per frame
-- AI waypoint updates: O(12) per fixed tick
+- AI spline sampling: O(12) per fixed tick (polynomial eval per drone)
 - No system ordering constraints between unrelated plugins — maximum parallelism
 - `DespawnOnExit` for automatic entity cleanup on state transitions
 
@@ -136,12 +136,14 @@ Blender ──► drone.glb ──► DroneGltfHandle (Startup load)
                                 │
                           DroneAssets (Update poll until loaded)
                                 │
-CourseData ──► generate_waypoints() ──► spawn_drones() ──► 12 Drone entities
+CourseData ──► generate_race_path() ──► Catmull-Rom CubicCurve (cyclic)
+                                                               │
+                                                    spawn_drones() ──► 12 Drone entities
                                                                │
                                                     FixedUpdate chain (9-system, thrust-through-body):
-                                                    AI targets → racing line → hover_target
-                                                    → position_pid → attitude_controller → motor_lag
-                                                    → apply_forces → integration → clamp
+                                                    AI targets (spline projection) → racing line (spline sampling)
+                                                    → hover_target → position_pid → attitude_controller
+                                                    → motor_lag → apply_forces → integration → clamp
 ```
 
 The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior.
@@ -158,10 +160,10 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `course::loader` | 7 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
-| `drone::spawning` | 10 | Waypoint generation (sort, filter, empty), start positions (count, behind gate, no overlap), config randomization bounds (hover noise amp/freq), PID variation |
+| `drone::spawning` | 13 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero), start positions (count, behind gate, no overlap), config randomization bounds, PID variation |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
 - `load_course_from_file` / `save_course` — pure file I/O, no Bevy systems
 - `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability
-- `generate_waypoints(course)` / `compute_start_positions(waypoints, count)` — pure geometry, no ECS
+- `generate_race_path(course)` / `compute_start_positions(...)` — pure geometry, no ECS

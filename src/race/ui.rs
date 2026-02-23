@@ -90,7 +90,7 @@ pub fn handle_start_race_button(
                 for (mut ai, mut dynamics, mut pid, mut desired, mut attitude, mut transform, start_pos) in
                     &mut drones
                 {
-                    ai.current_waypoint = 0;
+                    ai.spline_t = 0.0;
                     ai.target_gate_index = 0;
 
                     dynamics.velocity = Vec3::ZERO;

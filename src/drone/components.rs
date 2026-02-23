@@ -1,3 +1,4 @@
+use bevy::math::cubic_splines::CubicCurve;
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -99,9 +100,16 @@ pub struct DroneConfig {
 
 #[derive(Component)]
 pub struct AIController {
+    /// Which gate the drone is heading toward (0-indexed).
     pub target_gate_index: u32,
-    pub waypoints: Vec<Vec3>,
-    pub current_waypoint: usize,
+    /// Total number of gates in the course.
+    pub gate_count: u32,
+    /// Catmull-Rom spline through gate centers (cyclic). Parameter t in [0, gate_count].
+    pub spline: CubicCurve<Vec3>,
+    /// Continuous progress along the spline. Race complete when >= gate_count.
+    pub spline_t: f32,
+    /// Gate centers in order, for fallback distance checks.
+    pub gate_positions: Vec<Vec3>,
 }
 
 /// Bridge between AI and PID: AI writes the desired position, PID reads it.

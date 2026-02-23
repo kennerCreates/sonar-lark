@@ -28,7 +28,7 @@ pub fn check_race_finished(
     }
     let all_finished = drones
         .iter()
-        .all(|ai| ai.current_waypoint >= ai.waypoints.len());
+        .all(|ai| ai.spline_t >= ai.gate_count as f32);
     if all_finished {
         *phase = RacePhase::Finished;
         info!("Race finished! All drones completed the course.");

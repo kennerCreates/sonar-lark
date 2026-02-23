@@ -1,3 +1,4 @@
+use bevy::math::cubic_splines::{CubicCardinalSpline, CubicCurve, CyclicCubicGenerator};
 use bevy::prelude::*;
 use rand::Rng;
 
@@ -100,12 +101,11 @@ pub fn spawn_drones(
     let Some(assets) = drone_assets else { return };
     let Some(course) = course else { return };
 
-    let waypoints = generate_waypoints(&course, &library);
-    if waypoints.is_empty() {
-        warn!("No gates found in course — drones will not spawn");
+    let Some(race_path) = generate_race_path(&course, &library) else {
+        warn!("Not enough gates for a race path — drones will not spawn");
         commands.insert_resource(NoGatesCourse);
         return;
-    }
+    };
 
     let first_gate_inst = course
         .instances
@@ -123,11 +123,7 @@ pub fn spawn_drones(
         .and_then(|def| def.trigger_volume.as_ref())
         .map(|tv| tv.half_extents.x)
         .unwrap_or(5.0);
-    let next_waypoint = if waypoints.len() > 1 {
-        Some(waypoints[1])
-    } else {
-        None
-    };
+    let next_waypoint = race_path.gate_positions.get(1).copied();
 
     let start_positions = compute_start_positions(
         first_gate.translation,
@@ -143,7 +139,8 @@ pub fn spawn_drones(
         let pid = create_pid_with_variation(&config);
         let position = start_positions[i as usize];
 
-        let look_dir = (waypoints[0] - position).normalize_or(Vec3::NEG_Z);
+        let look_dir =
+            (race_path.gate_positions[0] - position).normalize_or(Vec3::NEG_Z);
         let flat_dir =
             Vec3::new(look_dir.x, 0.0, look_dir.z).normalize_or(Vec3::NEG_Z);
         let rotation = Quat::from_rotation_arc(Vec3::NEG_Z, flat_dir);
@@ -152,10 +149,10 @@ pub fn spawn_drones(
 
         let mut dynamics = DroneDynamics::default();
         let hover_thrust = GRAVITY * dynamics.mass;
-        // Start motors at hover thrust so there's no initial drop/overshoot
         dynamics.thrust = hover_thrust;
         dynamics.commanded_thrust = hover_thrust;
 
+        let gate_count = race_path.gate_positions.len() as u32;
         let mut entity_cmd = commands.spawn((
             transform,
             Visibility::default(),
@@ -166,8 +163,10 @@ pub fn spawn_drones(
             config,
             AIController {
                 target_gate_index: 0,
-                waypoints: waypoints.clone(),
-                current_waypoint: 0,
+                gate_count,
+                spline: race_path.spline.clone(),
+                spline_t: 0.0,
+                gate_positions: race_path.gate_positions.clone(),
             },
             DesiredPosition {
                 position,
@@ -196,9 +195,9 @@ pub fn spawn_drones(
     }
 
     info!(
-        "Spawned {} drones with {} waypoints",
+        "Spawned {} drones on {}-gate spline course",
         DRONE_COUNT,
-        waypoints.len()
+        race_path.gate_positions.len()
     );
 }
 
@@ -210,7 +209,12 @@ pub fn cleanup_drone_resources(mut commands: Commands) {
 
 // --- Pure helper functions (testable) ---
 
-pub fn generate_waypoints(course: &CourseData, library: &ObstacleLibrary) -> Vec<Vec3> {
+pub struct RacePath {
+    pub spline: CubicCurve<Vec3>,
+    pub gate_positions: Vec<Vec3>,
+}
+
+pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Option<RacePath> {
     let mut gates: Vec<(u32, Vec3)> = course
         .instances
         .iter()
@@ -228,13 +232,19 @@ pub fn generate_waypoints(course: &CourseData, library: &ObstacleLibrary) -> Vec
         })
         .collect();
     gates.sort_by_key(|(order, _)| *order);
-    let mut waypoints: Vec<Vec3> = gates.into_iter().map(|(_, pos)| pos).collect();
-    // Close the loop: append the first gate as the final waypoint so drones
-    // fly back to the start after passing all gates.
-    if waypoints.len() >= 2 {
-        waypoints.push(waypoints[0]);
+    let gate_positions: Vec<Vec3> = gates.into_iter().map(|(_, pos)| pos).collect();
+
+    if gate_positions.len() < 2 {
+        return None;
     }
-    waypoints
+
+    // Build a cyclic Catmull-Rom spline. No need to duplicate the first point;
+    // to_curve_cyclic() wraps around automatically.
+    let spline = CubicCardinalSpline::new_catmull_rom(gate_positions.iter().copied())
+        .to_curve_cyclic()
+        .ok()?;
+
+    Some(RacePath { spline, gate_positions })
 }
 
 pub fn compute_start_positions(
@@ -366,7 +376,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_waypoints_sorts_by_gate_order() {
+    fn race_path_sorts_by_gate_order() {
         let lib = library_with_gate();
         let course = CourseData {
             name: "Test".to_string(),
@@ -377,60 +387,118 @@ mod tests {
             ],
         };
 
-        let waypoints = generate_waypoints(&course, &lib);
-        // 3 gates + 1 loop-closing waypoint back to gate 0
-        assert_eq!(waypoints.len(), 4);
+        let path = generate_race_path(&course, &lib).expect("3 gates should produce a path");
+        assert_eq!(path.gate_positions.len(), 3);
         // Trigger volume offset adds Y=5.0
-        assert_eq!(waypoints[0], Vec3::new(0.0, 5.0, 0.0));
-        assert_eq!(waypoints[1], Vec3::new(5.0, 5.0, 0.0));
-        assert_eq!(waypoints[2], Vec3::new(10.0, 5.0, 0.0));
-        assert_eq!(waypoints[3], waypoints[0]); // loop closure
+        assert_eq!(path.gate_positions[0], Vec3::new(0.0, 5.0, 0.0));
+        assert_eq!(path.gate_positions[1], Vec3::new(5.0, 5.0, 0.0));
+        assert_eq!(path.gate_positions[2], Vec3::new(10.0, 5.0, 0.0));
     }
 
     #[test]
-    fn generate_waypoints_excludes_non_gates() {
+    fn race_path_excludes_non_gates() {
         let lib = library_with_gate();
         let course = CourseData {
             name: "Test".to_string(),
             instances: vec![
                 wall_instance(Vec3::ZERO),
                 gate_instance(Vec3::new(1.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(10.0, 0.0, 0.0), 1),
             ],
         };
 
-        let waypoints = generate_waypoints(&course, &lib);
-        // Single gate: no loop closure (need >= 2 gates)
-        assert_eq!(waypoints.len(), 1);
-        assert_eq!(waypoints[0], Vec3::new(1.0, 5.0, 0.0));
+        let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
+        // Only gates appear in gate_positions, not walls
+        assert_eq!(path.gate_positions.len(), 2);
     }
 
     #[test]
-    fn generate_waypoints_empty_course() {
+    fn race_path_single_gate_returns_none() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![gate_instance(Vec3::new(1.0, 0.0, 0.0), 0)],
+        };
+        assert!(generate_race_path(&course, &lib).is_none());
+    }
+
+    #[test]
+    fn race_path_empty_course_returns_none() {
         let lib = ObstacleLibrary::default();
         let course = CourseData {
             name: "Empty".to_string(),
             instances: vec![],
         };
-        let waypoints = generate_waypoints(&course, &lib);
-        assert!(waypoints.is_empty());
+        assert!(generate_race_path(&course, &lib).is_none());
     }
 
     #[test]
-    fn generate_waypoints_applies_rotation_to_offset() {
+    fn race_path_applies_rotation_to_offset() {
         let lib = library_with_gate();
-        // Rotate gate 90 degrees around Y axis — offset (0,5,0) stays (0,5,0)
-        let mut inst = gate_instance(Vec3::new(10.0, 0.0, 0.0), 0);
-        inst.rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let mut inst0 = gate_instance(Vec3::new(10.0, 0.0, 0.0), 0);
+        inst0.rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
 
         let course = CourseData {
             name: "Test".to_string(),
-            instances: vec![inst],
+            instances: vec![
+                inst0,
+                gate_instance(Vec3::new(20.0, 0.0, 0.0), 1),
+            ],
         };
 
-        let waypoints = generate_waypoints(&course, &lib);
-        assert_eq!(waypoints.len(), 1);
+        let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
         // Y offset is along Y axis, unaffected by Y-axis rotation
-        assert!((waypoints[0].y - 5.0).abs() < 0.001);
+        assert!((path.gate_positions[0].y - 5.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn race_path_spline_passes_through_gates() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+                gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
+            ],
+        };
+
+        let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
+        for (i, gate_pos) in path.gate_positions.iter().enumerate() {
+            let spline_pos = path.spline.position(i as f32);
+            let dist = (spline_pos - *gate_pos).length();
+            assert!(
+                dist < 0.01,
+                "spline at t={} should pass through gate {}: spline={:?}, gate={:?}, dist={}",
+                i, i, spline_pos, gate_pos, dist
+            );
+        }
+    }
+
+    #[test]
+    fn race_path_tangent_nonzero() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+            ],
+        };
+
+        let path = generate_race_path(&course, &lib).expect("3 gates should produce a path");
+        let n = path.gate_positions.len() as f32;
+        for i in 0..30 {
+            let t = (i as f32 / 30.0) * n;
+            let vel = path.spline.velocity(t);
+            assert!(
+                vel.length() > 0.001,
+                "tangent at t={} should be nonzero, got {:?}",
+                t, vel
+            );
+        }
     }
 
     #[test]
