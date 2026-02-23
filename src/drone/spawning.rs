@@ -13,6 +13,11 @@ const GRAVITY: f32 = 9.81;
 /// Fraction of gate width used for the start line (leaves margin at edges).
 const GATE_WIDTH_USAGE: f32 = 0.8;
 
+/// Marker resource inserted when `spawn_drones` detects the course has no gates.
+/// Prevents the warning from repeating every frame and signals the UI to show a banner.
+#[derive(Resource)]
+pub struct NoGatesCourse;
+
 #[derive(Resource)]
 pub struct DroneGltfHandle(pub Handle<bevy::gltf::Gltf>);
 
@@ -87,8 +92,9 @@ pub fn spawn_drones(
     course: Option<Res<CourseData>>,
     library: Res<ObstacleLibrary>,
     existing_drones: Query<(), With<Drone>>,
+    no_gates: Option<Res<NoGatesCourse>>,
 ) {
-    if !existing_drones.is_empty() {
+    if !existing_drones.is_empty() || no_gates.is_some() {
         return;
     }
     let Some(assets) = drone_assets else { return };
@@ -96,7 +102,8 @@ pub fn spawn_drones(
 
     let waypoints = generate_waypoints(&course, &library);
     if waypoints.is_empty() {
-        warn!("No gates found in course, cannot spawn drones");
+        warn!("No gates found in course — drones will not spawn");
+        commands.insert_resource(NoGatesCourse);
         return;
     }
 
@@ -107,7 +114,8 @@ pub fn spawn_drones(
         .min_by_key(|(order, _)| *order)
         .map(|(_, inst)| inst);
     let Some(first_gate) = first_gate_inst else {
-        warn!("No gate instances found in course");
+        warn!("No gate instances found in course — drones will not spawn");
+        commands.insert_resource(NoGatesCourse);
         return;
     };
     let gate_half_width = library
@@ -197,6 +205,7 @@ pub fn spawn_drones(
 pub fn cleanup_drone_resources(mut commands: Commands) {
     commands.remove_resource::<DroneAssets>();
     commands.remove_resource::<DroneGltfHandle>();
+    commands.remove_resource::<NoGatesCourse>();
 }
 
 // --- Pure helper functions (testable) ---

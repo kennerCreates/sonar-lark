@@ -19,6 +19,9 @@ impl Plugin for RacePlugin {
                     ui::handle_start_race_button,
                     ui::update_start_button_visuals,
                     ui::update_start_button_text,
+                    ui::show_no_gates_banner,
+                    ui::handle_open_editor_button,
+                    ui::update_open_editor_button_visuals,
                     lifecycle::check_race_finished,
                 )
                     .run_if(in_state(AppState::Race)),
