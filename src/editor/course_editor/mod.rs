@@ -141,7 +141,14 @@ impl Plugin for CourseEditorPlugin {
                     ui::update_display_values,
                     ui::handle_button_hover,
                     ui::handle_transform_mode_buttons,
+                )
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
+                (
                     ui::update_transform_mode_ui,
+                    ui::update_gate_count_display,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -699,6 +706,14 @@ fn draw_gate_sequence_lines(
         let (_, from) = pair[0];
         let (_, to) = pair[1];
         gizmos.line(from, to, line_color);
+    }
+
+    // Draw loop-closing line from last gate back to first gate
+    if gates.len() >= 2 {
+        let (_, first) = gates[0];
+        let (_, last) = gates[gates.len() - 1];
+        let loop_color = Color::srgb(0.4, 0.8, 1.0);
+        gizmos.line(last, first, loop_color);
     }
 
     let count = gates.len();

@@ -186,7 +186,13 @@ pub fn generate_waypoints(course: &CourseData, library: &ObstacleLibrary) -> Vec
         })
         .collect();
     gates.sort_by_key(|(order, _)| *order);
-    gates.into_iter().map(|(_, pos)| pos).collect()
+    let mut waypoints: Vec<Vec3> = gates.into_iter().map(|(_, pos)| pos).collect();
+    // Close the loop: append the first gate as the final waypoint so drones
+    // fly back to the start after passing all gates.
+    if waypoints.len() >= 2 {
+        waypoints.push(waypoints[0]);
+    }
+    waypoints
 }
 
 pub fn compute_start_positions(waypoints: &[Vec3], count: u8) -> Vec<Vec3> {
@@ -305,11 +311,13 @@ mod tests {
         };
 
         let waypoints = generate_waypoints(&course, &lib);
-        assert_eq!(waypoints.len(), 3);
+        // 3 gates + 1 loop-closing waypoint back to gate 0
+        assert_eq!(waypoints.len(), 4);
         // Trigger volume offset adds Y=5.0
         assert_eq!(waypoints[0], Vec3::new(0.0, 5.0, 0.0));
         assert_eq!(waypoints[1], Vec3::new(5.0, 5.0, 0.0));
         assert_eq!(waypoints[2], Vec3::new(10.0, 5.0, 0.0));
+        assert_eq!(waypoints[3], waypoints[0]); // loop closure
     }
 
     #[test]
@@ -324,6 +332,7 @@ mod tests {
         };
 
         let waypoints = generate_waypoints(&course, &lib);
+        // Single gate: no loop closure (need >= 2 gates)
         assert_eq!(waypoints.len(), 1);
         assert_eq!(waypoints[0], Vec3::new(1.0, 5.0, 0.0));
     }

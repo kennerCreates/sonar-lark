@@ -47,6 +47,9 @@ pub struct GateOrderModeText;
 pub struct ClearGateOrdersButton;
 
 #[derive(Component)]
+pub struct GateCountText;
+
+#[derive(Component)]
 pub struct CourseNameField;
 
 #[derive(Component)]
@@ -294,6 +297,16 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[Cour
                     ..default()
                 },
                 TextColor(Color::srgb(0.6, 0.6, 0.6)),
+            ));
+
+            panel.spawn((
+                Text::new("Gates: 0 (loop)"),
+                TextFont {
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.4, 0.8, 1.0)),
+                GateCountText,
             ));
 
             panel
@@ -808,13 +821,20 @@ pub fn handle_load_button(
 pub fn handle_gate_order_toggle(
     mut state: ResMut<PlacementState>,
     query: Query<&Interaction, (Changed<Interaction>, With<GateOrderModeButton>)>,
+    placed_query: Query<&PlacedObstacle>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             state.gate_order_mode = !state.gate_order_mode;
             if state.gate_order_mode {
-                // Reset counter when entering gate mode so user assigns fresh sequence
-                state.next_gate_order = 0;
+                // Continue from max existing gate order so the user can add gates
+                // incrementally without losing previous assignments.
+                state.next_gate_order = placed_query
+                    .iter()
+                    .filter_map(|p| p.gate_order)
+                    .max()
+                    .map(|m| m + 1)
+                    .unwrap_or(0);
                 state.selected_entity = None;
             }
         }
@@ -1002,5 +1022,20 @@ pub fn update_transform_mode_ui(
         } else {
             BUTTON_NORMAL
         });
+    }
+}
+
+pub fn update_gate_count_display(
+    placed_query: Query<&PlacedObstacle>,
+    mut text_query: Query<(&mut Text, &mut TextColor), With<GateCountText>>,
+) {
+    let gate_count = placed_query.iter().filter(|p| p.gate_order.is_some()).count();
+    if let Ok((mut text, mut color)) = text_query.single_mut() {
+        **text = format!("Gates: {gate_count} (loop)");
+        *color = if gate_count >= 2 {
+            TextColor(Color::srgb(0.4, 0.8, 1.0))
+        } else {
+            TextColor(Color::srgb(0.8, 0.4, 0.2))
+        };
     }
 }
