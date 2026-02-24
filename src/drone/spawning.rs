@@ -170,6 +170,7 @@ pub fn spawn_drones(
             DesiredPosition {
                 position,
                 velocity_hint: look_dir,
+                max_speed: 45.0,
             },
             DesiredAttitude {
                 orientation: rotation,

@@ -2,32 +2,20 @@
     name: "new_course",
     instances: [
         (
-            obstacle_id: ("gate_best"),
-            translation: (29.926182, 0.0, 0.0),
-            rotation: (0.0, -0.212828, 0.0, 0.9770897),
+            obstacle_id: ("gate_ground"),
+            translation: (-1.8180573, 0.0, -34.398098),
+            rotation: (0.0, 0.0, 0.0, 1.0),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(0),
-        ),
-        (
-            obstacle_id: ("gate_ground"),
-            translation: (-28.521376, 0.0, 0.0),
-            rotation: (0.0, -0.72936445, 0.0, 0.6841253),
-            scale: (1.0, 1.0, 1.0),
-            gate_order: Some(2),
+            gate_forward_flipped: false,
         ),
         (
             obstacle_id: ("gate_best"),
-            translation: (0.0, 13.5665655, -44.88242),
+            translation: (0.0, 0.0, 17.720837),
             rotation: (0.0, 0.0, 0.0, 1.0),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(1),
-        ),
-        (
-            obstacle_id: ("gate_loop"),
-            translation: (0.0, 5.834842, 54.090614),
-            rotation: (-0.1580094, 0.35280484, -0.37696844, -0.84169865),
-            scale: (1.0, 1.0, 1.0),
-            gate_order: Some(3),
+            gate_forward_flipped: false,
         ),
     ],
 )

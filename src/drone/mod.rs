@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod components;
 pub mod debug_draw;
+pub mod dev_dashboard;
 pub mod physics;
 pub mod spawning;
 
@@ -8,12 +9,15 @@ use bevy::prelude::*;
 
 use crate::race::lifecycle::drones_are_active;
 use crate::states::AppState;
+use components::AiTuningParams;
 
 pub struct DronePlugin;
 
 impl Plugin for DronePlugin {
     fn build(&self, app: &mut App) {
         app
+            // AI tuning params persist across race restarts
+            .init_resource::<AiTuningParams>()
             // Start loading drone glTF when entering Race
             .add_systems(OnEnter(AppState::Race), spawning::load_drone_gltf)
             // Poll for asset readiness and spawn drones once ready
@@ -50,6 +54,18 @@ impl Plugin for DronePlugin {
                     debug_draw::draw_gate_markers,
                     debug_draw::draw_drone_state,
                     debug_draw::draw_progress_indicators,
+                )
+                    .run_if(in_state(AppState::Race)),
+            )
+            // Dev dashboard (F4 to toggle)
+            .add_systems(
+                Update,
+                (
+                    dev_dashboard::toggle_dev_dashboard,
+                    dev_dashboard::handle_param_buttons,
+                    dev_dashboard::handle_reset_button,
+                    dev_dashboard::update_param_labels,
+                    dev_dashboard::update_button_colors,
                 )
                     .run_if(in_state(AppState::Race)),
             )

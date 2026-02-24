@@ -123,6 +123,8 @@ pub struct AIController {
 pub struct DesiredPosition {
     pub position: Vec3,
     pub velocity_hint: Vec3,
+    /// Curvature-aware speed limit (m/s). Set by AI based on upcoming turn tightness.
+    pub max_speed: f32,
 }
 
 /// Records the spawn position so drones can be reset on race restart.
@@ -147,4 +149,92 @@ pub struct ReturnPath {
     pub spline: CubicCurve<Vec3>,
     pub spline_t: f32,
     pub total_t: f32,
+}
+
+/// Runtime-tunable AI and physics parameters. Exposed via the dev dashboard (F4).
+/// Persists across race restarts so tweaked values carry over.
+#[derive(Resource)]
+pub struct AiTuningParams {
+    pub safe_lateral_accel: f32,
+    pub curvature_look_ahead_scale: f32,
+    pub min_look_ahead_fraction: f32,
+    pub min_curvature_speed: f32,
+    pub min_advance_speed_fraction: f32,
+    pub speed_curvature_range: f32,
+    pub look_ahead_t: f32,
+    pub max_speed: f32,
+    pub max_tilt_angle: f32,
+}
+
+impl Default for AiTuningParams {
+    fn default() -> Self {
+        Self {
+            safe_lateral_accel: 25.0,
+            curvature_look_ahead_scale: 30.0,
+            min_look_ahead_fraction: 0.33,
+            min_curvature_speed: 8.0,
+            min_advance_speed_fraction: 0.25,
+            speed_curvature_range: 2.0,
+            look_ahead_t: 0.3,
+            max_speed: 45.0,
+            max_tilt_angle: 1.3,
+        }
+    }
+}
+
+/// Metadata for each tunable parameter: display name, step size, min, max.
+pub struct ParamMeta {
+    pub name: &'static str,
+    pub step: f32,
+    pub min: f32,
+    pub max: f32,
+}
+
+/// Ordered list of parameter metadata matching `AiTuningParams` field order.
+pub const PARAM_META: [ParamMeta; 9] = [
+    ParamMeta { name: "Lateral Accel",   step: 1.0,  min: 5.0,   max: 60.0 },
+    ParamMeta { name: "Curv Look Scale", step: 2.0,  min: 5.0,   max: 80.0 },
+    ParamMeta { name: "Min Look Frac",   step: 0.05, min: 0.1,   max: 1.0 },
+    ParamMeta { name: "Min Curv Speed",  step: 1.0,  min: 2.0,   max: 30.0 },
+    ParamMeta { name: "Min Advance",     step: 0.05, min: 0.05,  max: 1.0 },
+    ParamMeta { name: "Speed Curv Range",step: 0.25, min: 0.5,   max: 5.0 },
+    ParamMeta { name: "Look Ahead T",    step: 0.05, min: 0.05,  max: 1.0 },
+    ParamMeta { name: "Max Speed",       step: 1.0,  min: 10.0,  max: 80.0 },
+    ParamMeta { name: "Max Tilt Angle",  step: 0.05, min: 0.5,   max: 1.57 },
+];
+
+impl AiTuningParams {
+    /// Get the value of the i-th parameter (field order matches PARAM_META).
+    pub fn get(&self, index: usize) -> f32 {
+        match index {
+            0 => self.safe_lateral_accel,
+            1 => self.curvature_look_ahead_scale,
+            2 => self.min_look_ahead_fraction,
+            3 => self.min_curvature_speed,
+            4 => self.min_advance_speed_fraction,
+            5 => self.speed_curvature_range,
+            6 => self.look_ahead_t,
+            7 => self.max_speed,
+            8 => self.max_tilt_angle,
+            _ => 0.0,
+        }
+    }
+
+    /// Set the i-th parameter, clamping to its valid range.
+    pub fn set(&mut self, index: usize, value: f32) {
+        let meta = &PARAM_META[index];
+        let clamped = value.clamp(meta.min, meta.max);
+        match index {
+            0 => self.safe_lateral_accel = clamped,
+            1 => self.curvature_look_ahead_scale = clamped,
+            2 => self.min_look_ahead_fraction = clamped,
+            3 => self.min_curvature_speed = clamped,
+            4 => self.min_advance_speed_fraction = clamped,
+            5 => self.speed_curvature_range = clamped,
+            6 => self.look_ahead_t = clamped,
+            7 => self.max_speed = clamped,
+            8 => self.max_tilt_angle = clamped,
+            _ => {}
+        }
+    }
 }

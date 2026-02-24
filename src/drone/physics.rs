@@ -3,14 +3,13 @@ use bevy::prelude::*;
 use super::components::*;
 
 const GRAVITY: f32 = 9.81;
-const MAX_SPEED: f32 = 45.0;
 const GROUND_HEIGHT: f32 = 0.3;
 const INTEGRAL_CLAMP: f32 = 10.0;
-const MAX_TILT_ANGLE: f32 = 1.3;
 
 /// Noise-driven hover target. Layered sine waves produce organic 1–3 cm drift.
 pub fn hover_target(
     time: Res<Time>,
+    tuning: Res<AiTuningParams>,
     mut query: Query<(
         &Drone,
         &DroneStartPosition,
@@ -41,6 +40,7 @@ pub fn hover_target(
 
         desired.position = start.translation + noise;
         desired.velocity_hint = Vec3::ZERO;
+        desired.max_speed = tuning.max_speed;
     }
 }
 
@@ -48,6 +48,7 @@ pub fn hover_target(
 /// then maps that to a desired body orientation and thrust magnitude.
 pub fn position_pid(
     time: Res<Time>,
+    tuning: Res<AiTuningParams>,
     mut query: Query<(
         &Transform,
         &DesiredPosition,
@@ -81,11 +82,12 @@ pub fn position_pid(
         // Desired body-up direction: aligned with desired acceleration
         let desired_up = desired_accel.normalize_or(Vec3::Y);
 
-        // Clamp tilt angle
+        // Clamp tilt angle (read from tuning resource)
+        let max_tilt = tuning.max_tilt_angle;
         let tilt_angle = desired_up.angle_between(Vec3::Y);
-        let clamped_up = if tilt_angle > MAX_TILT_ANGLE {
+        let clamped_up = if tilt_angle > max_tilt {
             let tilt_axis = Vec3::Y.cross(desired_up).normalize_or(Vec3::X);
-            (Quat::from_axis_angle(tilt_axis, MAX_TILT_ANGLE) * Vec3::Y).normalize()
+            (Quat::from_axis_angle(tilt_axis, max_tilt) * Vec3::Y).normalize()
         } else {
             desired_up
         };
@@ -182,16 +184,19 @@ pub fn motor_lag(time: Res<Time>, mut query: Query<(&mut DroneDynamics, &Desired
 }
 
 /// Applies thrust (along body-up), gravity, and quadratic drag to update velocity.
+/// Uses per-drone curvature-aware speed limit from `DesiredPosition.max_speed`,
+/// capped by the global `AiTuningParams.max_speed`.
 pub fn apply_forces(
     time: Res<Time>,
-    mut query: Query<(&Transform, &mut DroneDynamics), With<Drone>>,
+    tuning: Res<AiTuningParams>,
+    mut query: Query<(&Transform, &mut DroneDynamics, &DesiredPosition), With<Drone>>,
 ) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    for (transform, mut dynamics) in &mut query {
+    for (transform, mut dynamics, desired) in &mut query {
         // Thrust always along body-up axis
         let body_up = transform.rotation * Vec3::Y;
         let thrust_force = body_up * dynamics.thrust;
@@ -211,9 +216,11 @@ pub fn apply_forces(
 
         dynamics.velocity += acceleration * dt;
 
+        // Per-drone speed limit (curvature-aware), capped by global max_speed.
+        let effective_max = desired.max_speed.min(tuning.max_speed);
         let new_speed = dynamics.velocity.length();
-        if new_speed > MAX_SPEED {
-            dynamics.velocity = dynamics.velocity.normalize() * MAX_SPEED;
+        if new_speed > effective_max {
+            dynamics.velocity = dynamics.velocity.normalize() * effective_max;
         }
     }
 }
