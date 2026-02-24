@@ -243,13 +243,14 @@ pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Opt
         return None;
     }
 
-    // Build approach / center / departure waypoints per gate so the
-    // Catmull-Rom spline approaches each gate from the correct side.
-    const APPROACH_OFFSET: f32 = 4.0;
-    let mut control_points = Vec::with_capacity(gate_positions.len() * 3);
+    // Build approach / departure waypoints per gate so the Catmull-Rom
+    // spline approaches each gate from the correct side.  No center point —
+    // the spline sweeps smoothly through the gate region between approach
+    // and departure, allowing diagonal lines when gates aren't aligned.
+    const APPROACH_OFFSET: f32 = 8.0;
+    let mut control_points = Vec::with_capacity(gate_positions.len() * 2);
     for (pos, fwd) in gate_positions.iter().zip(gate_forwards.iter()) {
         control_points.push(*pos - *fwd * APPROACH_OFFSET);
-        control_points.push(*pos);
         control_points.push(*pos + *fwd * APPROACH_OFFSET);
     }
 
@@ -453,7 +454,7 @@ mod tests {
     }
 
     #[test]
-    fn race_path_spline_passes_through_gates() {
+    fn race_path_spline_passes_near_gates() {
         let lib = library_with_gate();
         let course = CourseData {
             name: "Test".to_string(),
@@ -466,15 +467,17 @@ mod tests {
         };
 
         let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
-        // Gate i center is at spline_t = i * 3 + 1 (approach=3i, center=3i+1, departure=3i+2)
+        // With 2 points per gate (approach + departure, no center), the spline
+        // passes through control points but sweeps near (not exactly through)
+        // the gate center.  The midpoint in spline space is i * PPG + 0.5.
         for (i, gate_pos) in path.gate_positions.iter().enumerate() {
-            let t = i as f32 * POINTS_PER_GATE + 1.0;
-            let spline_pos = path.spline.position(t);
+            let mid_t = i as f32 * POINTS_PER_GATE + 0.5;
+            let spline_pos = path.spline.position(mid_t);
             let dist = (spline_pos - *gate_pos).length();
             assert!(
-                dist < 0.01,
-                "spline at t={} should pass through gate {}: spline={:?}, gate={:?}, dist={}",
-                t, i, spline_pos, gate_pos, dist
+                dist < 3.0,
+                "spline midpoint at t={} should pass near gate {}: spline={:?}, gate={:?}, dist={}",
+                mid_t, i, spline_pos, gate_pos, dist
             );
         }
     }
@@ -519,17 +522,16 @@ mod tests {
         };
 
         let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
-        // Gate i center is at spline_t = i * 3 + 1. Catmull-Rom tangent
-        // at the center is proportional to (departure - approach) = 2 * fwd * offset,
-        // so it aligns with gate forward.
+        // Gate midpoint in spline space is at i * PPG + 0.5. The tangent
+        // there should have a strong component along the gate forward direction.
         for (i, fwd) in path.gate_forwards.iter().enumerate() {
-            let t = i as f32 * POINTS_PER_GATE + 1.0;
-            let tangent = path.spline.velocity(t).normalize();
+            let mid_t = i as f32 * POINTS_PER_GATE + 0.5;
+            let tangent = path.spline.velocity(mid_t).normalize();
             let dot = tangent.dot(*fwd);
             assert!(
-                dot > 0.99,
-                "spline tangent at gate {} (t={}) should align with gate forward: dot={}, tangent={:?}, forward={:?}",
-                i, t, dot, tangent, fwd
+                dot > 0.7,
+                "spline tangent at gate {} (t={}) should roughly align with gate forward: dot={}, tangent={:?}, forward={:?}",
+                i, mid_t, dot, tangent, fwd
             );
         }
     }
@@ -550,18 +552,18 @@ mod tests {
         };
 
         let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
-        // Gate 0 is flipped: forward is +Z. Center at t=1.
-        let tangent0 = path.spline.velocity(1.0).normalize();
+        // Gate 0 is flipped: forward is +Z. Midpoint at t = 0 * 2 + 0.5 = 0.5.
+        let tangent0 = path.spline.velocity(0.5).normalize();
         assert!(
-            tangent0.dot(Vec3::Z) > 0.99,
-            "flipped gate tangent should point +Z, got {:?}",
+            tangent0.dot(Vec3::Z) > 0.7,
+            "flipped gate tangent should point roughly +Z, got {:?}",
             tangent0
         );
-        // Gate 1 is NOT flipped: forward is -Z. Center at t=4.
-        let tangent1 = path.spline.velocity(4.0).normalize();
+        // Gate 1 is NOT flipped: forward is -Z. Midpoint at t = 1 * 2 + 0.5 = 2.5.
+        let tangent1 = path.spline.velocity(2.5).normalize();
         assert!(
-            tangent1.dot(Vec3::NEG_Z) > 0.99,
-            "non-flipped gate tangent should point -Z, got {:?}",
+            tangent1.dot(Vec3::NEG_Z) > 0.7,
+            "non-flipped gate tangent should point roughly -Z, got {:?}",
             tangent1
         );
     }

@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod components;
+pub mod debug_draw;
 pub mod physics;
 pub mod spawning;
 
@@ -38,6 +39,18 @@ impl Plugin for DronePlugin {
                     physics::clamp_transform,
                 )
                     .chain()
+                    .run_if(in_state(AppState::Race)),
+            )
+            // Flight debug visualization (F3 to toggle)
+            .add_systems(
+                Update,
+                (
+                    debug_draw::toggle_debug_draw,
+                    debug_draw::draw_spline_path,
+                    debug_draw::draw_gate_markers,
+                    debug_draw::draw_drone_state,
+                    debug_draw::draw_progress_indicators,
+                )
                     .run_if(in_state(AppState::Race)),
             )
             // Cleanup resources on exit

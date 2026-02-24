@@ -29,11 +29,12 @@ pub fn update_ai_targets(mut query: Query<(&Transform, &mut AIController), With<
         }
 
         // Fallback: snap forward if drone is close to the next gate center.
-        // Gate centers are at spline_t = i * POINTS_PER_GATE + 1.0.
+        // With 2 points per gate (approach at i*PPG, departure at i*PPG+1),
+        // the gate midpoint in spline space is at t = i * PPG + 0.5.
         let next_gate_idx =
-            ((ai.spline_t - 1.0) / POINTS_PER_GATE + 1.0).floor() as usize;
+            ((ai.spline_t - 0.5) / POINTS_PER_GATE + 1.0).floor() as usize;
         if next_gate_idx < ai.gate_positions.len() {
-            let next_center_t = next_gate_idx as f32 * POINTS_PER_GATE + 1.0;
+            let next_center_t = next_gate_idx as f32 * POINTS_PER_GATE + 0.5;
             let dist_to_next =
                 (transform.translation - ai.gate_positions[next_gate_idx]).length();
             if dist_to_next < WAYPOINT_REACH_DISTANCE {

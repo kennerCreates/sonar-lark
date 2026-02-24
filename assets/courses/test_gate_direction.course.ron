@@ -23,7 +23,7 @@
             rotation: (0.0, -0.7660942, 0.0, 0.64272827),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(3),
-            gate_forward_flipped: false,
+            gate_forward_flipped: true,
         ),
         (
             obstacle_id: ("gate_ground"),
@@ -31,7 +31,7 @@
             rotation: (0.0, -0.2374509, 0.0, 0.97139955),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(0),
-            gate_forward_flipped: true,
+            gate_forward_flipped: false,
         ),
         (
             obstacle_id: ("gate_best"),
@@ -39,7 +39,7 @@
             rotation: (0.0, -0.9371305, 0.0, 0.34897906),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(2),
-            gate_forward_flipped: false,
+            gate_forward_flipped: true,
         ),
         (
             obstacle_id: ("gate_ground"),
@@ -47,7 +47,7 @@
             rotation: (0.0, 0.71192074, 0.0, 0.70225984),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(4),
-            gate_forward_flipped: true,
+            gate_forward_flipped: false,
         ),
         (
             obstacle_id: ("gate_loop"),
@@ -55,7 +55,7 @@
             rotation: (0.0, 0.0, 0.0, 1.0),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(1),
-            gate_forward_flipped: true,
+            gate_forward_flipped: false,
         ),
     ],
 )
