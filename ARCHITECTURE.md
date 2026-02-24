@@ -141,7 +141,10 @@ Blender ──► drone.glb ──► DroneGltfHandle (Startup load)
                                 │
                           DroneAssets (Update poll until loaded)
                                 │
-CourseData ──► generate_race_path() ──► Catmull-Rom CubicCurve (cyclic, 3 waypoints/gate)
+CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve (editor preview)
+                │
+                └──► generate_drone_race_path() ──► per-drone unique CubicCurve (12x)
+                     (midleg lateral shift + approach scaling from DroneConfig)
                                                                │
                                                     spawn_drones() ──► 12 Drone entities
                                                                │
@@ -171,10 +174,10 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `course::loader` | 9 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
-| `drone::spawning` | 15 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero, adaptive approach offset), start positions (count, behind gate, no overlap), config randomization bounds (incl. cornering/braking/attitude variation), PID variation, return path generation (valid spline, per-drone variation) |
+| `drone::spawning` | 19 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero, adaptive approach offset), per-drone path generation (paths differ, passes near gates, tangent alignment, neutral matches base), start positions (count, behind gate, no overlap), config randomization bounds (incl. cornering/braking/attitude/racing-line variation), PID variation, return path generation (valid spline, per-drone variation) |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
 - `load_course_from_file` / `save_course` / `delete_course` — pure file I/O, no Bevy systems
 - `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability
-- `generate_race_path(course)` / `compute_start_positions(...)` / `generate_return_path(...)` — pure geometry, no ECS
+- `generate_race_path(course)` / `generate_drone_race_path(course, config, index)` / `compute_start_positions(...)` / `generate_return_path(...)` — pure geometry, no ECS

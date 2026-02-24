@@ -25,44 +25,35 @@ pub fn toggle_debug_draw(
     }
 }
 
-/// Draw the full spline path as a polyline, color-coded by segment.
+/// Draw each drone's unique spline path as a polyline, color-coded per drone.
 pub fn draw_spline_path(
     mut gizmos: Gizmos,
     debug: Option<Res<FlightDebugDraw>>,
-    query: Query<&AIController, With<Drone>>,
+    query: Query<(&Drone, &AIController)>,
 ) {
     let Some(debug) = debug else { return };
     if !debug.enabled {
         return;
     }
 
-    // Use the first drone's spline (all drones share the same path)
-    let Some(ai) = query.iter().next() else {
-        return;
-    };
+    for (drone, ai) in &query {
+        let total_t = ai.gate_count as f32 * POINTS_PER_GATE;
+        // ~10 samples per spline unit (reduced from 20 since we draw 12 splines)
+        let samples = (total_t * 10.0) as usize;
+        if samples < 2 {
+            continue;
+        }
 
-    let total_t = ai.gate_count as f32 * POINTS_PER_GATE;
-    let samples = (total_t * 20.0) as usize; // ~20 samples per spline unit
-    if samples < 2 {
-        return;
-    }
+        let hue = (drone.index as f32 / 12.0) * 360.0;
+        let color = Color::hsl(hue, 0.8, 0.6);
 
-    for i in 0..samples {
-        let t0 = (i as f32 / samples as f32) * total_t;
-        let t1 = ((i + 1) as f32 / samples as f32) * total_t;
-        let p0 = ai.spline.position(t0);
-        let p1 = ai.spline.position(t1);
-
-        // Color by which half of the gate segment we're in:
-        // approach half = yellow, departure half = cyan.
-        let local_t = t0 % POINTS_PER_GATE;
-        let color = if local_t < 1.0 {
-            Color::srgb(1.0, 0.9, 0.2) // approach → gate midpoint: yellow
-        } else {
-            Color::srgb(0.2, 0.8, 1.0) // gate midpoint → departure: cyan
-        };
-
-        gizmos.line(p0, p1, color);
+        for i in 0..samples {
+            let t0 = (i as f32 / samples as f32) * total_t;
+            let t1 = ((i + 1) as f32 / samples as f32) * total_t;
+            let p0 = ai.spline.position(t0);
+            let p1 = ai.spline.position(t1);
+            gizmos.line(p0, p1, color);
+        }
     }
 }
 

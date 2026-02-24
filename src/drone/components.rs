@@ -110,6 +110,13 @@ pub struct DroneConfig {
     pub attitude_kp_mult: f32,
     /// Per-drone multiplier on attitude PD kd_roll_pitch.
     pub attitude_kd_mult: f32,
+    /// Lateral shift magnitude (meters) for midleg waypoints in the per-drone spline.
+    /// Positive = right bias. Correlated with cornering_aggression.
+    pub racing_line_bias: f32,
+    /// Multiplier on approach/departure offset distance.
+    /// <1.0 = shorter approach (commits later, sharper near gate).
+    /// >1.0 = longer approach (smoother, more committed).
+    pub approach_offset_scale: f32,
 }
 
 #[derive(Component)]

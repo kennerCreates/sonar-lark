@@ -257,11 +257,11 @@ pub fn compute_racing_line(
                     (ai.spline_t + adaptive_vel_look_ahead * POINTS_PER_GATE).min(finish_t);
                 let tangent = cyclic_vel(&ai.spline, vel_t, cycle_t).normalize_or(Vec3::NEG_Z);
 
-                // Per-drone lateral offset and sine noise
+                // Small organic wobble — main per-drone variation comes from the unique spline
                 let lateral = Vec3::Y.cross(tangent).normalize_or(Vec3::X);
                 let noise = (elapsed * config.noise_frequency + config.line_offset * 3.14).sin()
-                    * config.noise_amplitude;
-                let offset = lateral * (config.line_offset + noise);
+                    * config.noise_amplitude * 0.3;
+                let offset = lateral * noise;
 
                 desired.position = target_pos + offset;
                 desired.velocity_hint = tangent;

@@ -134,11 +134,23 @@ pub fn spawn_drones(
 
     for i in 0..DRONE_COUNT {
         let config = randomize_drone_config(&mut rng);
+
+        // Generate per-drone unique spline path
+        let drone_path = generate_drone_race_path(&course, &library, &config, i)
+            .unwrap_or_else(|| {
+                warn!("Per-drone path failed for drone {}, using shared path", i);
+                RacePath {
+                    spline: race_path.spline.clone(),
+                    gate_positions: race_path.gate_positions.clone(),
+                    gate_forwards: race_path.gate_forwards.clone(),
+                }
+            });
+
         let pid = create_pid_with_variation(&config);
         let position = start_positions[i as usize];
 
         let look_dir =
-            (race_path.gate_positions[0] - position).normalize_or(Vec3::NEG_Z);
+            (drone_path.gate_positions[0] - position).normalize_or(Vec3::NEG_Z);
         let flat_dir =
             Vec3::new(look_dir.x, 0.0, look_dir.z).normalize_or(Vec3::NEG_Z);
         let rotation = Quat::from_rotation_arc(Vec3::NEG_Z, flat_dir);
@@ -154,7 +166,7 @@ pub fn spawn_drones(
         attitude_pd.kp_roll_pitch *= config.attitude_kp_mult;
         attitude_pd.kd_roll_pitch *= config.attitude_kd_mult;
 
-        let gate_count = race_path.gate_positions.len() as u32;
+        let gate_count = drone_path.gate_positions.len() as u32;
         let mut entity_cmd = commands.spawn((
             transform,
             Visibility::default(),
@@ -166,10 +178,10 @@ pub fn spawn_drones(
             AIController {
                 target_gate_index: 0,
                 gate_count,
-                spline: race_path.spline.clone(),
+                spline: drone_path.spline,
                 spline_t: 0.0,
-                gate_positions: race_path.gate_positions.clone(),
-                gate_forwards: race_path.gate_forwards.clone(),
+                gate_positions: drone_path.gate_positions,
+                gate_forwards: drone_path.gate_forwards,
             },
             DesiredPosition {
                 position,
@@ -229,7 +241,11 @@ pub struct RacePath {
     pub gate_forwards: Vec<Vec3>,
 }
 
-pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Option<RacePath> {
+/// Extract gate positions and forwards from course data, sorted by gate_order.
+fn extract_sorted_gates(
+    course: &CourseData,
+    library: &ObstacleLibrary,
+) -> (Vec<Vec3>, Vec<Vec3>) {
     let mut gates: Vec<(u32, Vec3, Vec3)> = course
         .instances
         .iter()
@@ -251,8 +267,13 @@ pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Opt
         })
         .collect();
     gates.sort_by_key(|(order, _, _)| *order);
-    let gate_positions: Vec<Vec3> = gates.iter().map(|(_, pos, _)| *pos).collect();
-    let gate_forwards: Vec<Vec3> = gates.iter().map(|(_, _, fwd)| *fwd).collect();
+    let positions = gates.iter().map(|(_, pos, _)| *pos).collect();
+    let forwards = gates.iter().map(|(_, _, fwd)| *fwd).collect();
+    (positions, forwards)
+}
+
+pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Option<RacePath> {
+    let (gate_positions, gate_forwards) = extract_sorted_gates(course, library);
 
     if gate_positions.len() < 2 {
         return None;
@@ -283,6 +304,69 @@ pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Opt
         let next_offset = adaptive_approach_offset(next_gate_dist);
         let next_approach = gate_positions[next] - gate_forwards[next] * next_offset;
         control_points.push((departure + next_approach) * 0.5);
+    }
+
+    let spline = CubicCardinalSpline::new_catmull_rom(control_points.iter().copied())
+        .to_curve_cyclic()
+        .ok()?;
+
+    Some(RacePath { spline, gate_positions, gate_forwards })
+}
+
+/// Generate a per-drone unique race path by perturbing control points based on
+/// the drone's config and index. Gate positions and forwards remain unchanged
+/// (they represent actual gate centers for validation). Only the spline differs.
+pub fn generate_drone_race_path(
+    course: &CourseData,
+    library: &ObstacleLibrary,
+    config: &DroneConfig,
+    drone_index: u8,
+) -> Option<RacePath> {
+    let (gate_positions, gate_forwards) = extract_sorted_gates(course, library);
+
+    if gate_positions.len() < 2 {
+        return None;
+    }
+
+    let n = gate_positions.len();
+    let mut control_points = Vec::with_capacity(n * 3);
+
+    for i in 0..n {
+        let pos = gate_positions[i];
+        let fwd = gate_forwards[i];
+        let next = (i + 1) % n;
+        let gate_dist = (gate_positions[next] - pos).length();
+
+        // Per-drone approach offset scaling
+        let approach_offset = adaptive_approach_offset(gate_dist) * config.approach_offset_scale;
+
+        let approach = pos - fwd * approach_offset;
+        let departure = pos + fwd * approach_offset;
+        control_points.push(approach);
+        control_points.push(departure);
+
+        // Midleg waypoint with per-drone lateral shift
+        let next_gate_dist = (gate_positions[(next + 1) % n] - gate_positions[next]).length();
+        let next_offset =
+            adaptive_approach_offset(next_gate_dist) * config.approach_offset_scale;
+        let next_approach = gate_positions[next] - gate_forwards[next] * next_offset;
+        let base_midleg = (departure + next_approach) * 0.5;
+
+        // Deterministic per-drone-per-leg hash for shift direction
+        let hash = (drone_index as u32)
+            .wrapping_mul(2654435761)
+            .wrapping_add((i as u32).wrapping_mul(2246822519))
+            >> 16;
+        let hash_f = (hash & 0xFFFF) as f32 / 65536.0;
+        let sign = hash_f * 2.0 - 1.0; // -1.0..1.0
+
+        // Lateral direction perpendicular to the leg and world up
+        let leg_dir = (next_approach - departure).normalize_or(Vec3::Z);
+        let leg_lateral = Vec3::Y.cross(leg_dir).normalize_or(Vec3::X);
+        let shift = config.racing_line_bias * sign;
+        let midleg = base_midleg + leg_lateral * shift;
+
+        control_points.push(midleg);
     }
 
     let spline = CubicCardinalSpline::new_catmull_rom(control_points.iter().copied())
@@ -387,6 +471,16 @@ pub fn compute_start_positions(
 }
 
 fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
+    // Generate cornering_aggression first — path params derive from it
+    let cornering_aggression: f32 = rng.gen_range(0.8..=1.2);
+
+    // Aggressive drones get larger midleg shifts (bolder line choices)
+    let raw_bias: f32 = rng.gen_range(-1.0..=1.0);
+    let racing_line_bias = raw_bias * (2.0 + cornering_aggression * 2.0);
+
+    // Aggressive drones commit later to gate direction (shorter approach)
+    let approach_offset_scale = 1.0 - (cornering_aggression - 1.0) * 0.5;
+
     DroneConfig {
         pid_variation: Vec3::new(
             rng.gen_range(-0.15..=0.15),
@@ -406,10 +500,12 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
             rng.gen_range(0.15..=0.5),
             rng.gen_range(0.1..=0.4),
         ),
-        cornering_aggression: rng.gen_range(0.8..=1.2),
+        cornering_aggression,
         braking_distance: rng.gen_range(0.8..=1.2),
         attitude_kp_mult: rng.gen_range(0.9..=1.1),
         attitude_kd_mult: rng.gen_range(0.9..=1.1),
+        racing_line_bias,
+        approach_offset_scale,
     }
 }
 
@@ -430,6 +526,23 @@ mod tests {
     use crate::obstacle::definition::{ObstacleId, ObstacleDef, TriggerVolumeConfig};
     use crate::obstacle::library::ObstacleLibrary;
     use bevy::math::{Quat, Vec3};
+
+    fn neutral_drone_config() -> DroneConfig {
+        DroneConfig {
+            pid_variation: Vec3::ZERO,
+            line_offset: 0.0,
+            noise_amplitude: 1.0,
+            noise_frequency: 1.0,
+            hover_noise_amp: Vec3::splat(0.1),
+            hover_noise_freq: Vec3::splat(0.3),
+            cornering_aggression: 1.0,
+            braking_distance: 1.0,
+            attitude_kp_mult: 1.0,
+            attitude_kd_mult: 1.0,
+            racing_line_bias: 0.0,
+            approach_offset_scale: 1.0,
+        }
+    }
 
     fn gate_instance(translation: Vec3, order: u32) -> ObstacleInstance {
         ObstacleInstance {
@@ -848,16 +961,8 @@ mod tests {
     #[test]
     fn return_path_produces_valid_spline() {
         let config = DroneConfig {
-            pid_variation: Vec3::ZERO,
             line_offset: 0.5,
-            noise_amplitude: 1.0,
-            noise_frequency: 1.0,
-            hover_noise_amp: Vec3::splat(0.1),
-            hover_noise_freq: Vec3::splat(0.3),
-            cornering_aggression: 1.0,
-            braking_distance: 1.0,
-            attitude_kp_mult: 1.0,
-            attitude_kd_mult: 1.0,
+            ..neutral_drone_config()
         };
 
         let current_pos = Vec3::new(50.0, 5.0, 30.0);
@@ -890,16 +995,8 @@ mod tests {
     #[test]
     fn return_path_varies_by_drone_index() {
         let config = DroneConfig {
-            pid_variation: Vec3::ZERO,
             line_offset: 0.5,
-            noise_amplitude: 1.0,
-            noise_frequency: 1.0,
-            hover_noise_amp: Vec3::splat(0.1),
-            hover_noise_freq: Vec3::splat(0.3),
-            cornering_aggression: 1.0,
-            braking_distance: 1.0,
-            attitude_kp_mult: 1.0,
-            attitude_kd_mult: 1.0,
+            ..neutral_drone_config()
         };
 
         let current_pos = Vec3::new(50.0, 5.0, 30.0);
@@ -942,6 +1039,10 @@ mod tests {
             assert!((0.8..=1.2).contains(&config.braking_distance));
             assert!((0.9..=1.1).contains(&config.attitude_kp_mult));
             assert!((0.9..=1.1).contains(&config.attitude_kd_mult));
+            // racing_line_bias: max magnitude = 1.0 * (2.0 + 1.2 * 2.0) = 4.4
+            assert!(config.racing_line_bias.abs() <= 4.5);
+            // approach_offset_scale: aggression 0.8 → 1.1, aggression 1.2 → 0.9
+            assert!((0.89..=1.11).contains(&config.approach_offset_scale));
         }
     }
 
@@ -949,15 +1050,9 @@ mod tests {
     fn create_pid_with_variation_applies_correctly() {
         let config = DroneConfig {
             pid_variation: Vec3::new(0.1, -0.1, 0.05),
-            line_offset: 0.0,
-            noise_amplitude: 1.0,
-            noise_frequency: 1.0,
             hover_noise_amp: Vec3::splat(0.02),
             hover_noise_freq: Vec3::splat(1.0),
-            cornering_aggression: 1.0,
-            braking_distance: 1.0,
-            attitude_kp_mult: 1.0,
-            attitude_kd_mult: 1.0,
+            ..neutral_drone_config()
         };
         let pid = create_pid_with_variation(&config);
         let base = PositionPid::default();
@@ -965,5 +1060,144 @@ mod tests {
         assert!((pid.kp.x - base.kp.x * 1.1).abs() < 0.001);
         assert!((pid.kp.y - base.kp.y * 0.9).abs() < 0.001);
         assert!((pid.kp.z - base.kp.z * 1.05).abs() < 0.001);
+    }
+
+    #[test]
+    fn drone_race_paths_differ_per_config() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+                gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
+            ],
+        };
+
+        let config_a = DroneConfig {
+            racing_line_bias: 3.0,
+            approach_offset_scale: 0.9,
+            cornering_aggression: 1.2,
+            ..neutral_drone_config()
+        };
+        let config_b = DroneConfig {
+            racing_line_bias: -3.0,
+            approach_offset_scale: 1.1,
+            cornering_aggression: 0.8,
+            ..neutral_drone_config()
+        };
+
+        let path_a = generate_drone_race_path(&course, &lib, &config_a, 0).unwrap();
+        let path_b = generate_drone_race_path(&course, &lib, &config_b, 1).unwrap();
+
+        // Sample at midleg points (between gates) — these should differ most
+        let mut any_differ = false;
+        for i in 0..4 {
+            let midleg_t = i as f32 * POINTS_PER_GATE + 2.5;
+            let pos_a = path_a.spline.position(midleg_t);
+            let pos_b = path_b.spline.position(midleg_t);
+            if (pos_a - pos_b).length() > 1.0 {
+                any_differ = true;
+                break;
+            }
+        }
+        assert!(any_differ, "different drone configs should produce visibly different splines");
+    }
+
+    #[test]
+    fn drone_race_path_passes_near_gates() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+                gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
+            ],
+        };
+
+        let config = DroneConfig {
+            racing_line_bias: 4.0,
+            approach_offset_scale: 0.9,
+            ..neutral_drone_config()
+        };
+
+        let path = generate_drone_race_path(&course, &lib, &config, 7).unwrap();
+
+        for (i, gate_pos) in path.gate_positions.iter().enumerate() {
+            let mid_t = i as f32 * POINTS_PER_GATE + 0.5;
+            let spline_pos = path.spline.position(mid_t);
+            let dist = (spline_pos - *gate_pos).length();
+            assert!(
+                dist < 3.0,
+                "per-drone spline at gate {} should pass near gate center: dist={}",
+                i, dist
+            );
+        }
+    }
+
+    #[test]
+    fn drone_race_path_tangent_aligns_with_gate_forward() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+                gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
+            ],
+        };
+
+        let config = DroneConfig {
+            racing_line_bias: 3.5,
+            approach_offset_scale: 0.9,
+            ..neutral_drone_config()
+        };
+
+        let path = generate_drone_race_path(&course, &lib, &config, 3).unwrap();
+
+        for (i, fwd) in path.gate_forwards.iter().enumerate() {
+            let mid_t = i as f32 * POINTS_PER_GATE + 0.5;
+            let tangent = path.spline.velocity(mid_t).normalize();
+            let dot = tangent.dot(*fwd);
+            assert!(
+                dot > 0.5,
+                "per-drone spline tangent at gate {} should roughly align with forward: dot={}",
+                i, dot
+            );
+        }
+    }
+
+    #[test]
+    fn drone_race_path_neutral_matches_base() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+            ],
+        };
+
+        let base = generate_race_path(&course, &lib).unwrap();
+        let drone = generate_drone_race_path(&course, &lib, &neutral_drone_config(), 0).unwrap();
+
+        // With neutral config (bias=0, scale=1.0), splines should be identical
+        let total_t = 3.0 * POINTS_PER_GATE;
+        for i in 0..30 {
+            let t = (i as f32 / 30.0) * total_t;
+            let base_pos = base.spline.position(t);
+            let drone_pos = drone.spline.position(t);
+            let dist = (base_pos - drone_pos).length();
+            assert!(
+                dist < 0.01,
+                "neutral drone path should match base at t={}: dist={}",
+                t, dist
+            );
+        }
     }
 }
