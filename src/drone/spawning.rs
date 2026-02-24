@@ -241,12 +241,13 @@ pub struct RacePath {
     pub gate_forwards: Vec<Vec3>,
 }
 
-/// Extract gate positions and forwards from course data, sorted by gate_order.
+/// Extract gate positions, forwards, and 2D half-extents from course data, sorted by gate_order.
+/// Half-extents are (width, height) of the trigger volume in world space, scaled by instance scale.
 fn extract_sorted_gates(
     course: &CourseData,
     library: &ObstacleLibrary,
-) -> (Vec<Vec3>, Vec<Vec3>) {
-    let mut gates: Vec<(u32, Vec3, Vec3)> = course
+) -> (Vec<Vec3>, Vec<Vec3>, Vec<Vec2>) {
+    let mut gates: Vec<(u32, Vec3, Vec3, Vec2)> = course
         .instances
         .iter()
         .filter_map(|inst| {
@@ -262,18 +263,22 @@ fn extract_sorted_gates(
                 let local_fwd = tv.map(|tv| tv.forward).unwrap_or(Vec3::NEG_Z);
                 let world_fwd = inst.rotation
                     * if inst.gate_forward_flipped { -local_fwd } else { local_fwd };
-                (order, inst.translation + fly_through_offset, world_fwd)
+                let half_extents_2d = tv
+                    .map(|tv| Vec2::new(tv.half_extents.x * inst.scale.x, tv.half_extents.y * inst.scale.y))
+                    .unwrap_or(Vec2::new(3.0, 3.0));
+                (order, inst.translation + fly_through_offset, world_fwd, half_extents_2d)
             })
         })
         .collect();
-    gates.sort_by_key(|(order, _, _)| *order);
-    let positions = gates.iter().map(|(_, pos, _)| *pos).collect();
-    let forwards = gates.iter().map(|(_, _, fwd)| *fwd).collect();
-    (positions, forwards)
+    gates.sort_by_key(|(order, _, _, _)| *order);
+    let positions = gates.iter().map(|(_, pos, _, _)| *pos).collect();
+    let forwards = gates.iter().map(|(_, _, fwd, _)| *fwd).collect();
+    let extents = gates.iter().map(|(_, _, _, ext)| *ext).collect();
+    (positions, forwards, extents)
 }
 
 pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Option<RacePath> {
-    let (gate_positions, gate_forwards) = extract_sorted_gates(course, library);
+    let (gate_positions, gate_forwards, _gate_extents) = extract_sorted_gates(course, library);
 
     if gate_positions.len() < 2 {
         return None;
@@ -322,7 +327,7 @@ pub fn generate_drone_race_path(
     config: &DroneConfig,
     drone_index: u8,
 ) -> Option<RacePath> {
-    let (gate_positions, gate_forwards) = extract_sorted_gates(course, library);
+    let (gate_positions, gate_forwards, gate_extents) = extract_sorted_gates(course, library);
 
     if gate_positions.len() < 2 {
         return None;
@@ -330,6 +335,29 @@ pub fn generate_drone_race_path(
 
     let n = gate_positions.len();
     let mut control_points = Vec::with_capacity(n * 3);
+    // Per-drone offset gate positions for AI fallback distance checks
+    let mut drone_gate_positions = Vec::with_capacity(n);
+
+    // Helper: compute a deterministic 2D offset within a gate's opening for this drone.
+    // Returns a world-space Vec3 offset from gate center.
+    let gate_2d_offset = |gate_idx: usize, fwd: Vec3, extents: Vec2| -> Vec3 {
+        let gate_right = fwd.cross(Vec3::Y).normalize_or(Vec3::X);
+        // Horizontal hash
+        let h_hash = (drone_index as u32)
+            .wrapping_mul(1640531527)
+            .wrapping_add((gate_idx as u32).wrapping_mul(2891336453))
+            >> 16;
+        let h_sign = (h_hash & 0xFFFF) as f32 / 65536.0 * 2.0 - 1.0;
+        // Vertical hash (different prime seeds)
+        let v_hash = (drone_index as u32)
+            .wrapping_mul(2246822519)
+            .wrapping_add((gate_idx as u32).wrapping_mul(1640531527))
+            >> 16;
+        let v_sign = (v_hash & 0xFFFF) as f32 / 65536.0 * 2.0 - 1.0;
+        let h_offset = h_sign * extents.x * config.gate_pass_offset;
+        let v_offset = v_sign * extents.y * config.gate_pass_offset;
+        gate_right * h_offset + Vec3::Y * v_offset
+    };
 
     for i in 0..n {
         let pos = gate_positions[i];
@@ -337,11 +365,16 @@ pub fn generate_drone_race_path(
         let next = (i + 1) % n;
         let gate_dist = (gate_positions[next] - pos).length();
 
+        // Per-drone 2D offset within the gate opening (width + height)
+        let offset = gate_2d_offset(i, fwd, gate_extents[i]);
+        let offset_pos = pos + offset;
+        drone_gate_positions.push(offset_pos);
+
         // Per-drone approach offset scaling
         let approach_offset = adaptive_approach_offset(gate_dist) * config.approach_offset_scale;
 
-        let approach = pos - fwd * approach_offset;
-        let departure = pos + fwd * approach_offset;
+        let approach = offset_pos - fwd * approach_offset;
+        let departure = offset_pos + fwd * approach_offset;
         control_points.push(approach);
         control_points.push(departure);
 
@@ -349,7 +382,9 @@ pub fn generate_drone_race_path(
         let next_gate_dist = (gate_positions[(next + 1) % n] - gate_positions[next]).length();
         let next_offset =
             adaptive_approach_offset(next_gate_dist) * config.approach_offset_scale;
-        let next_approach = gate_positions[next] - gate_forwards[next] * next_offset;
+        // Next gate's offset position for midleg calculation
+        let next_gate_offset = gate_2d_offset(next, gate_forwards[next], gate_extents[next]);
+        let next_approach = gate_positions[next] + next_gate_offset - gate_forwards[next] * next_offset;
         let base_midleg = (departure + next_approach) * 0.5;
 
         // Deterministic per-drone-per-leg hash for shift direction
@@ -373,7 +408,7 @@ pub fn generate_drone_race_path(
         .to_curve_cyclic()
         .ok()?;
 
-    Some(RacePath { spline, gate_positions, gate_forwards })
+    Some(RacePath { spline, gate_positions: drone_gate_positions, gate_forwards })
 }
 
 /// Generates a non-cyclic Catmull-Rom spline from the drone's finish position
@@ -506,6 +541,9 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
         attitude_kd_mult: rng.gen_range(0.9..=1.1),
         racing_line_bias,
         approach_offset_scale,
+        // Fraction of gate opening used for pass-through offset (0.3–0.6).
+        // Aggressive drones use wider offsets (bolder lines through gates).
+        gate_pass_offset: rng.gen_range(0.2..=0.4) + (cornering_aggression - 0.8) * 0.5,
     }
 }
 
@@ -541,6 +579,7 @@ mod tests {
             attitude_kd_mult: 1.0,
             racing_line_bias: 0.0,
             approach_offset_scale: 1.0,
+            gate_pass_offset: 0.0,
         }
     }
 
@@ -1043,6 +1082,11 @@ mod tests {
             assert!(config.racing_line_bias.abs() <= 4.5);
             // approach_offset_scale: aggression 0.8 → 1.1, aggression 1.2 → 0.9
             assert!((0.89..=1.11).contains(&config.approach_offset_scale));
+            // gate_pass_offset: fraction 0.2..0.6 (0.2+0 to 0.4+0.2)
+            assert!(
+                (0.19..=0.61).contains(&config.gate_pass_offset),
+                "gate_pass_offset {} out of range", config.gate_pass_offset
+            );
         }
     }
 
@@ -1169,6 +1213,54 @@ mod tests {
                 i, dot
             );
         }
+    }
+
+    #[test]
+    fn drone_race_path_gate_offset_spreads_2d() {
+        let lib = library_with_gate();
+        let course = CourseData {
+            name: "Test".to_string(),
+            instances: vec![
+                gate_instance(Vec3::new(0.0, 0.0, 0.0), 0),
+                gate_instance(Vec3::new(20.0, 0.0, 20.0), 1),
+                gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
+                gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
+            ],
+        };
+
+        // Generate paths for several drones with gate offset enabled
+        let config = DroneConfig {
+            gate_pass_offset: 0.5,
+            ..neutral_drone_config()
+        };
+
+        // Collect gate 0 positions across 12 drones
+        let base_path = generate_race_path(&course, &lib).unwrap();
+        let gate0_center = base_path.gate_positions[0];
+        let mut max_horizontal = 0.0_f32;
+        let mut max_vertical = 0.0_f32;
+
+        for idx in 0..12u8 {
+            let path = generate_drone_race_path(&course, &lib, &config, idx).unwrap();
+            let delta = path.gate_positions[0] - gate0_center;
+            // Gate 0 forward is NEG_Z; lateral is X, vertical is Y
+            max_horizontal = max_horizontal.max(delta.x.abs());
+            max_vertical = max_vertical.max(delta.y.abs());
+        }
+
+        // With half_extents (3.0, 3.0) and offset fraction 0.5,
+        // max possible offset is 1.5m. Across 12 drones we should see
+        // meaningful spread in both dimensions.
+        assert!(
+            max_horizontal > 0.3,
+            "drones should spread horizontally at gate: max_h={}",
+            max_horizontal
+        );
+        assert!(
+            max_vertical > 0.3,
+            "drones should spread vertically at gate: max_v={}",
+            max_vertical
+        );
     }
 
     #[test]

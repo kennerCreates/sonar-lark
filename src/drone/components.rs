@@ -117,6 +117,10 @@ pub struct DroneConfig {
     /// <1.0 = shorter approach (commits later, sharper near gate).
     /// >1.0 = longer approach (smoother, more committed).
     pub approach_offset_scale: f32,
+    /// Fraction (0–1) of each gate's half-extents used for per-drone pass-through offset.
+    /// Each gate gets a deterministic 2D offset (width + height) within ±(fraction × half_extent),
+    /// so drones spread across the gate opening instead of all flying through center.
+    pub gate_pass_offset: f32,
 }
 
 #[derive(Component)]
