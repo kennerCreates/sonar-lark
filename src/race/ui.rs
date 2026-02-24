@@ -5,7 +5,10 @@ use crate::drone::components::*;
 use crate::drone::spawning::NoGatesCourse;
 use crate::editor::course_editor::PendingEditorCourse;
 use crate::states::AppState;
-use super::lifecycle::RacePhase;
+
+use super::lifecycle::{CountdownTimer, RacePhase};
+use super::progress::RaceProgress;
+use super::timing::RaceClock;
 
 const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
@@ -17,6 +20,18 @@ pub(crate) struct StartRaceButton;
 
 #[derive(Component)]
 pub(crate) struct StartRaceButtonText;
+
+#[derive(Component)]
+pub(crate) struct CountdownText;
+
+#[derive(Component)]
+pub(crate) struct CountdownTextContent;
+
+#[derive(Component)]
+pub(crate) struct RaceClockText;
+
+#[derive(Component)]
+pub(crate) struct RaceClockTextContent;
 
 pub fn setup_race_ui(mut commands: Commands) {
     commands
@@ -66,7 +81,7 @@ pub fn handle_start_race_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<StartRaceButton>)>,
     mut phase: ResMut<RacePhase>,
-    mut drones: Query<(Entity, &mut DronePhase), With<Drone>>,
+    drones: Query<Entity, With<Drone>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -75,19 +90,19 @@ pub fn handle_start_race_button(
 
         match *phase {
             RacePhase::WaitingToStart => {
-                *phase = RacePhase::Racing;
-                for (_, mut drone_phase) in &mut drones {
-                    *drone_phase = DronePhase::Racing;
-                }
-                info!("Race started!");
+                *phase = RacePhase::Countdown;
+                commands.insert_resource(CountdownTimer::default());
+                info!("Countdown started!");
             }
-            RacePhase::Racing => {}
+            RacePhase::Countdown | RacePhase::Racing => {}
             RacePhase::Finished => {
                 // Despawn all drones so spawn_drones re-runs next frame
                 // with a fresh RaceSeed and new randomized configs/splines.
-                for (entity, ..) in &drones {
+                for entity in &drones {
                     commands.entity(entity).despawn();
                 }
+                commands.remove_resource::<RaceProgress>();
+                commands.remove_resource::<RaceClock>();
                 *phase = RacePhase::WaitingToStart;
                 info!("Race reset — drones will respawn with new randomization");
             }
@@ -108,7 +123,7 @@ pub fn update_start_button_visuals(
     }
     for (interaction, mut bg, mut border) in &mut button_query {
         match *phase {
-            RacePhase::Racing => {
+            RacePhase::Countdown | RacePhase::Racing => {
                 *bg = BackgroundColor(DISABLED_BUTTON);
                 *border = BorderColor::all(Color::srgb(0.2, 0.2, 0.2));
             }
@@ -143,6 +158,10 @@ pub fn update_start_button_text(
                 text.0 = "START RACE".to_string();
                 *color = TextColor(Color::srgb(0.9, 0.9, 0.9));
             }
+            RacePhase::Countdown => {
+                text.0 = "GET READY...".to_string();
+                *color = TextColor(Color::srgb(0.4, 0.4, 0.4));
+            }
             RacePhase::Racing => {
                 text.0 = "RACING...".to_string();
                 *color = TextColor(Color::srgb(0.4, 0.4, 0.4));
@@ -151,6 +170,114 @@ pub fn update_start_button_text(
                 text.0 = "RACE AGAIN".to_string();
                 *color = TextColor(Color::srgb(0.9, 0.9, 0.9));
             }
+        }
+    }
+}
+
+/// Manages the large centered countdown text (3, 2, 1, GO!).
+pub fn manage_countdown_text(
+    mut commands: Commands,
+    phase: Res<RacePhase>,
+    timer: Option<Res<CountdownTimer>>,
+    wrapper_query: Query<Entity, With<CountdownText>>,
+    mut inner_query: Query<&mut Text, With<CountdownTextContent>>,
+) {
+    match *phase {
+        RacePhase::Countdown => {
+            let display = timer
+                .map(|t| {
+                    let secs = t.remaining.ceil() as u32;
+                    if secs > 0 {
+                        format!("{}", secs)
+                    } else {
+                        "GO!".to_string()
+                    }
+                })
+                .unwrap_or_default();
+
+            if let Ok(mut text) = inner_query.single_mut() {
+                text.0 = display;
+            } else if wrapper_query.is_empty() {
+                commands
+                    .spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            position_type: PositionType::Absolute,
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::Center,
+                            ..default()
+                        },
+                        CountdownText,
+                        DespawnOnExit(AppState::Race),
+                    ))
+                    .with_children(|parent| {
+                        parent.spawn((
+                            Text::new(display),
+                            TextFont {
+                                font_size: 120.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgba(1.0, 1.0, 1.0, 0.9)),
+                            CountdownTextContent,
+                        ));
+                    });
+            }
+        }
+        _ => {
+            for entity in &wrapper_query {
+                commands.entity(entity).despawn();
+            }
+        }
+    }
+}
+
+/// Manages the race clock display (top-center, M:SS.ss format).
+pub fn update_race_clock_display(
+    mut commands: Commands,
+    phase: Res<RacePhase>,
+    clock: Option<Res<RaceClock>>,
+    wrapper_query: Query<Entity, With<RaceClockText>>,
+    mut inner_query: Query<&mut Text, With<RaceClockTextContent>>,
+) {
+    let show_clock = matches!(*phase, RacePhase::Racing | RacePhase::Finished);
+
+    if show_clock {
+        let elapsed = clock.map(|c| c.elapsed).unwrap_or(0.0);
+        let mins = (elapsed / 60.0) as u32;
+        let secs = elapsed % 60.0;
+        let display = format!("{:01}:{:05.2}", mins, secs);
+
+        if let Ok(mut text) = inner_query.single_mut() {
+            text.0 = display;
+        } else if wrapper_query.is_empty() {
+            commands
+                .spawn((
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(20.0),
+                        width: Val::Percent(100.0),
+                        justify_content: JustifyContent::Center,
+                        ..default()
+                    },
+                    RaceClockText,
+                    DespawnOnExit(AppState::Race),
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Text::new(display),
+                        TextFont {
+                            font_size: 36.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                        RaceClockTextContent,
+                    ));
+                });
+        }
+    } else {
+        for entity in &wrapper_query {
+            commands.entity(entity).despawn();
         }
     }
 }

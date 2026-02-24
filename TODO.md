@@ -12,16 +12,7 @@
 - [x] **Phase 5**: Editor — Course Editor (PlacementState, palette UI, click-to-place, XZ drag, Q/E height, gate ordering, trigger gizmos, gate sequence lines, save/load)
 - [x] **Phase 6**: Drone Physics + AI (DroneAssets, spawn 12 drones with randomized PID/configs, PID-lite physics in FixedUpdate, AI waypoint tracking + racing line noise, DespawnOnExit cleanup)
 - [x] **Phase 6b**: Drone Realism Audit — motor lag 40→25ms, attitude PD underdamping (kp=7/kd=0.20), per-drone cornering aggression/braking distance/attitude PD variation, adaptive approach offset, dirty air perturbation, prop wash (faked), battery sag, dev dashboard expanded to 11 params
-
-### Phase 7: Race — Gate Validation, Timing, Lifecycle
-- [ ] `RaceProgress` resource: per-drone state (next gate, gates passed, crashed, finished, time)
-- [ ] `RaceClock` resource: elapsed time, running flag
-- [ ] Gate trigger check system: AABB overlap between drones and trigger volumes
-- [ ] Gate ordering enforcement: must pass gates in sequence
-- [ ] Crash detection: drone hits gate geometry or misses next gate
-- [ ] Race countdown sequence on `OnEnter(AppState::Race)`
-- [ ] `check_race_complete`: all drones finished or crashed → `AppState::Results`
-- [ ] Race clock tick system
+- [x] **Phase 7**: Race — Gate Validation, Timing, Lifecycle (RaceProgress per-drone tracking, RaceClock, AABB gate trigger detection, gate ordering enforcement, hard crash on missed gate, 3-second countdown sequence, race completion detection, countdown + clock UI)
 
 ### Phase 8: Results, FPV Camera, Chase Camera
 - [ ] Results UI: display race standings (finish time, crashed status)

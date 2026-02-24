@@ -85,9 +85,10 @@ CourseData ──► spawn obstacles + drones
                       │
               FixedUpdate: AI targets → PID → forces → integration
                       │
-              Update: gate trigger checks → RaceProgress updates
+              Update (chained): tick_countdown → tick_race_clock
+                  → gate_trigger_check → miss_detection → check_race_finished
                       │
-              All finished/crashed → AppState::Results
+              All finished/crashed → RacePhase::Finished
 ```
 
 ## Key Types
@@ -100,7 +101,12 @@ CourseData ──► spawn obstacles + drones
 | `CourseData` | Resource | course/data | All obstacle placements for a course |
 | `TriggerVolume` | Component | obstacle/spawning | AABB hitbox on gate entities |
 | `GateIndex` | Component | race/gate | Gate sequence order |
-| `RaceProgress` | Resource | race/progress | Per-drone gate/finish tracking |
+| `GateForward` | Component | race/gate | World-space forward direction for gate validation |
+| `RaceProgress` | Resource | race/progress | Per-drone gate/finish/crash tracking |
+| `DroneRaceState` | Data | race/progress | Per-drone state: next_gate, gates_passed, finished, finish_time, crashed, dnf_reason |
+| `RacePhase` | Resource | race/lifecycle | WaitingToStart → Countdown → Racing → Finished |
+| `CountdownTimer` | Resource | race/lifecycle | 3-second countdown timer (inserted on Countdown, removed on Racing) |
+| `RaceClock` | Resource | race/timing | Elapsed race time, running flag |
 | `CameraState` | Resource | camera/switching | Current mode + target drone |
 | `SpectatorSettings` | Resource | camera/spectator | Movement speed + mouse sensitivity |
 | `AvailableCourses` | Resource | menu/ui | Discovered course files (Menu state only) |
@@ -176,6 +182,8 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
 | `drone::spawning` | 19 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero, adaptive approach offset), per-drone path generation (paths differ, passes near gates, tangent alignment, neutral matches base), start positions (count, behind gate, no overlap), config randomization bounds (incl. cornering/braking/attitude/racing-line variation), PID variation, return path generation (valid spline, per-drone variation) |
+| `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, is_active, standings sorting (finished by time, finished before crashed, crashed by gates passed) |
+| `race::gate` | 8 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside) |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems

@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::race::progress::RaceProgress;
+
 use super::components::*;
 use super::spawning::generate_return_path;
 
@@ -10,7 +12,7 @@ const MAX_ADVANCE_PER_TICK: f32 = 0.15;
 /// How far past a full cycle the race extends. Drones must fly through
 /// the start/finish gate again (completing a full lap) before transitioning.
 /// 1.5 puts the finish well past gate 0's departure (at cycle + 1.0).
-const FINISH_EXTENSION: f32 = 1.5;
+pub const FINISH_EXTENSION: f32 = 1.5;
 
 /// How many samples ahead to scan for upcoming curvature (for speed limiting).
 const SPEED_CURVATURE_SAMPLES: usize = 5;
@@ -85,6 +87,7 @@ pub fn update_ai_targets(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
     race_seed: Res<RaceSeed>,
+    race_progress: Option<Res<RaceProgress>>,
     mut query: Query<(
         Entity,
         &Transform,
@@ -109,6 +112,18 @@ pub fn update_ai_targets(
                 let finish_t = cycle_t + FINISH_EXTENSION;
 
                 if ai.spline_t >= finish_t {
+                    // Only transition to Returning if RaceProgress confirms the drone finished.
+                    // If not finished, stay Racing so miss_detection (in Update) can crash it.
+                    let can_return = race_progress.as_ref().map_or(true, |p| {
+                        p.drone_states
+                            .get(drone.index as usize)
+                            .is_some_and(|s| s.finished || s.crashed)
+                    });
+
+                    if !can_return {
+                        continue;
+                    }
+
                     // Transition: Racing → Returning
                     *phase = DronePhase::Returning;
                     if let Some(spline) = generate_return_path(
