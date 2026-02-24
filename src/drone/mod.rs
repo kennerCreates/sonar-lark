@@ -37,6 +37,7 @@ impl Plugin for DronePlugin {
                     physics::hover_target.run_if(not(drones_are_active)),
                     physics::position_pid,
                     physics::attitude_controller,
+                    physics::dirty_air_perturbation,
                     physics::motor_lag,
                     physics::apply_forces,
                     physics::integrate_motion,

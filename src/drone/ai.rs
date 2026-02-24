@@ -57,14 +57,20 @@ fn max_curvature_ahead(
 }
 
 /// Convert curvature to a safe speed: v = sqrt(a_lateral / κ).
-pub fn safe_speed_for_curvature(curvature: f32, tuning: &AiTuningParams) -> f32 {
+/// `lateral_accel` allows per-drone override of the global safe_lateral_accel.
+pub fn safe_speed_for_curvature_with(curvature: f32, lateral_accel: f32, tuning: &AiTuningParams) -> f32 {
     if curvature > 0.001 {
-        (tuning.safe_lateral_accel / curvature)
+        (lateral_accel / curvature)
             .sqrt()
             .clamp(tuning.min_curvature_speed, tuning.max_speed)
     } else {
         tuning.max_speed
     }
+}
+
+/// Convert curvature to a safe speed using the global safe_lateral_accel.
+pub fn safe_speed_for_curvature(curvature: f32, tuning: &AiTuningParams) -> f32 {
+    safe_speed_for_curvature_with(curvature, tuning.safe_lateral_accel, tuning)
 }
 
 /// Smoothstep deceleration: 1.0 at start of return → 0.0 at arrival.
@@ -261,13 +267,16 @@ pub fn compute_racing_line(
                 desired.velocity_hint = tangent;
 
                 // Curvature-aware speed limit: scan ahead for the tightest upcoming turn.
+                // Per-drone variation: aggressive drones carry more speed, cautious drones brake earlier.
+                let per_drone_range = tuning.speed_curvature_range * config.braking_distance;
                 let max_k = max_curvature_ahead(
                     &ai.spline,
                     ai.spline_t,
-                    tuning.speed_curvature_range,
+                    per_drone_range,
                     cycle_t,
                 );
-                desired.max_speed = safe_speed_for_curvature(max_k, &tuning);
+                let per_drone_accel = tuning.safe_lateral_accel * config.cornering_aggression;
+                desired.max_speed = safe_speed_for_curvature_with(max_k, per_drone_accel, &tuning);
             }
             DronePhase::Returning => {
                 let Some(rp) = return_path else {

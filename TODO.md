@@ -11,6 +11,7 @@
 - [x] **Bugfix**: Workshop preview placeholder spawn race condition with deferred despawns
 - [x] **Phase 5**: Editor — Course Editor (PlacementState, palette UI, click-to-place, XZ drag, Q/E height, gate ordering, trigger gizmos, gate sequence lines, save/load)
 - [x] **Phase 6**: Drone Physics + AI (DroneAssets, spawn 12 drones with randomized PID/configs, PID-lite physics in FixedUpdate, AI waypoint tracking + racing line noise, DespawnOnExit cleanup)
+- [x] **Phase 6b**: Drone Realism Audit — motor lag 40→25ms, attitude PD underdamping (kp=7/kd=0.20), per-drone cornering aggression/braking distance/attitude PD variation, adaptive approach offset, dirty air perturbation, prop wash (faked), battery sag, dev dashboard expanded to 11 params
 
 ### Phase 7: Race — Gate Validation, Timing, Lifecycle
 - [ ] `RaceProgress` resource: per-drone state (next gate, gates passed, crashed, finished, time)

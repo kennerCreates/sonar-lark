@@ -1,8 +1,11 @@
 use bevy::prelude::*;
 
+use crate::race::timing::RaceClock;
 use super::components::*;
 
 const GRAVITY: f32 = 9.81;
+/// Approximate full-pack race duration for battery sag curve (seconds).
+const RACE_DURATION_ESTIMATE: f32 = 90.0;
 const GROUND_HEIGHT: f32 = 0.3;
 const INTEGRAL_CLAMP: f32 = 10.0;
 
@@ -168,6 +171,81 @@ pub fn attitude_controller(
     }
 }
 
+const DIRTY_AIR_RADIUS: f32 = 5.0;
+const WAKE_CONE_COS: f32 = 0.707; // cos(45°) half-angle
+const PROP_WASH_TORQUE: f32 = 5.0;
+const PROP_WASH_ONSET: f32 = 2.0; // descent speed (m/s) before prop wash kicks in
+
+/// Faked aerodynamic perturbations: dirty air from leading drones and prop wash on descent.
+/// Runs after attitude_controller so perturbations fight against the PD (producing visible wobble)
+/// but before motor_lag so the motors can partially react.
+pub fn dirty_air_perturbation(
+    time: Res<Time>,
+    tuning: Res<AiTuningParams>,
+    mut query: Query<(&Transform, &Drone, &mut DroneDynamics)>,
+) {
+    let dt = time.delta_secs();
+    if dt == 0.0 || tuning.dirty_air_strength == 0.0 {
+        return;
+    }
+    let t = time.elapsed_secs();
+
+    // Collect positions and velocities (12 drones = tiny allocation)
+    let drone_data: Vec<(u8, Vec3, Vec3, f32)> = query
+        .iter()
+        .map(|(tr, drone, dyn_)| (drone.index, tr.translation, dyn_.velocity, dyn_.velocity.length()))
+        .collect();
+
+    for (transform, drone, mut dynamics) in &mut query {
+        let my_pos = transform.translation;
+        let my_idx = drone.index;
+
+        // --- Dirty air: perturbation from flying in another drone's wake ---
+        for &(other_idx, other_pos, other_vel, other_speed) in &drone_data {
+            if other_idx == my_idx || other_speed < 1.0 {
+                continue;
+            }
+            let to_me = my_pos - other_pos;
+            let dist = to_me.length();
+            if dist > DIRTY_AIR_RADIUS || dist < 0.1 {
+                continue;
+            }
+
+            // Am I behind the other drone (in their velocity direction)?
+            let other_vel_dir = other_vel / other_speed;
+            let behind_dot = (-to_me / dist).dot(other_vel_dir);
+            if behind_dot < WAKE_CONE_COS {
+                continue;
+            }
+
+            let strength = (1.0 - dist / DIRTY_AIR_RADIUS) * (other_speed / tuning.max_speed);
+
+            // Deterministic pseudo-random perturbation using layered sin waves
+            let phase = my_idx as f32 * 2.71 + other_idx as f32 * 1.37;
+            let perturbation = Vec3::new(
+                (t * 17.3 + phase).sin() + (t * 31.7 + phase * 2.1).sin() * 0.5,
+                (t * 13.1 + phase * 1.5).sin() * 0.3,
+                (t * 23.7 + phase * 0.8).sin() + (t * 41.3 + phase * 1.7).sin() * 0.5,
+            );
+
+            dynamics.angular_velocity += perturbation * tuning.dirty_air_strength * strength * dt;
+        }
+
+        // --- Prop wash: perturbation when descending through own downwash ---
+        let descent_rate = (-dynamics.velocity.y).max(0.0);
+        if descent_rate > PROP_WASH_ONSET {
+            let wash_strength = ((descent_rate - PROP_WASH_ONSET) / 10.0).min(1.0);
+            let phase = my_idx as f32 * 3.14 + 100.0;
+            let wash_noise = Vec3::new(
+                (t * 19.7 + phase).sin() + (t * 37.3 + phase * 1.3).sin() * 0.6,
+                (t * 11.3 + phase * 2.1).sin() * 0.2,
+                (t * 29.1 + phase * 0.7).sin() + (t * 43.9 + phase * 1.9).sin() * 0.6,
+            );
+            dynamics.angular_velocity += wash_noise * PROP_WASH_TORQUE * wash_strength * dt;
+        }
+    }
+}
+
 /// First-order low-pass filter on thrust, simulating motor spool-up lag.
 pub fn motor_lag(time: Res<Time>, mut query: Query<(&mut DroneDynamics, &DesiredAttitude)>) {
     let dt = time.delta_secs();
@@ -186,9 +264,11 @@ pub fn motor_lag(time: Res<Time>, mut query: Query<(&mut DroneDynamics, &Desired
 /// Applies thrust (along body-up), gravity, and quadratic drag to update velocity.
 /// Uses per-drone curvature-aware speed limit from `DesiredPosition.max_speed`,
 /// capped by the global `AiTuningParams.max_speed`.
+/// Battery sag gradually reduces effective thrust over the race duration.
 pub fn apply_forces(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
+    race_clock: Option<Res<RaceClock>>,
     mut query: Query<(&Transform, &mut DroneDynamics, &DesiredPosition), With<Drone>>,
 ) {
     let dt = time.delta_secs();
@@ -196,10 +276,22 @@ pub fn apply_forces(
         return;
     }
 
+    // Battery sag: linear thrust reduction over race duration
+    let sag_mult = if let Some(ref clock) = race_clock {
+        if clock.running {
+            let progress = (clock.elapsed / RACE_DURATION_ESTIMATE).min(1.0);
+            1.0 - tuning.battery_sag_factor * progress
+        } else {
+            1.0
+        }
+    } else {
+        1.0
+    };
+
     for (transform, mut dynamics, desired) in &mut query {
-        // Thrust always along body-up axis
+        // Thrust always along body-up axis, reduced by battery sag
         let body_up = transform.rotation * Vec3::Y;
-        let thrust_force = body_up * dynamics.thrust;
+        let thrust_force = body_up * dynamics.thrust * sag_mult;
 
         let gravity_force = Vec3::NEG_Y * GRAVITY * dynamics.mass;
 

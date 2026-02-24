@@ -44,11 +44,13 @@ pub struct AttitudePd {
 
 impl Default for AttitudePd {
     fn default() -> Self {
-        // Gains are tuned for discrete stability at ~64 Hz fixed timestep with
-        // moment_of_inertia (0.003, 0.005, 0.003).  Rule of thumb: kd·dt/I < 2.
+        // Gains tuned for slightly underdamped response at ~64 Hz fixed timestep with
+        // moment_of_inertia (0.003, 0.005, 0.003). The lower kd allows a single
+        // overshoot on aggressive attitude changes, producing visible settle wobble
+        // that reads as authentic flight controller behavior.
         Self {
-            kp_roll_pitch: 5.0,
-            kd_roll_pitch: 0.24,
+            kp_roll_pitch: 7.0,
+            kd_roll_pitch: 0.20,
             kp_yaw: 3.0,
             kd_yaw: 0.25,
             max_angular_rate: Vec3::new(20.0, 20.0, 10.0),
@@ -87,7 +89,7 @@ impl Default for DroneDynamics {
             mass: 0.8,
             drag_constant: 0.025,
             moment_of_inertia: Vec3::new(0.003, 0.005, 0.003),
-            motor_time_constant: 0.040,
+            motor_time_constant: 0.025,
         }
     }
 }
@@ -100,6 +102,14 @@ pub struct DroneConfig {
     pub noise_frequency: f32,
     pub hover_noise_amp: Vec3,
     pub hover_noise_freq: Vec3,
+    /// Multiplier on safe_lateral_accel: >1.0 = aggressive cornering, <1.0 = cautious.
+    pub cornering_aggression: f32,
+    /// Multiplier on speed_curvature_range: >1.0 = brakes earlier, <1.0 = brakes later.
+    pub braking_distance: f32,
+    /// Per-drone multiplier on attitude PD kp_roll_pitch.
+    pub attitude_kp_mult: f32,
+    /// Per-drone multiplier on attitude PD kd_roll_pitch.
+    pub attitude_kd_mult: f32,
 }
 
 #[derive(Component)]
@@ -165,6 +175,8 @@ pub struct AiTuningParams {
     pub look_ahead_t: f32,
     pub max_speed: f32,
     pub max_tilt_angle: f32,
+    pub battery_sag_factor: f32,
+    pub dirty_air_strength: f32,
 }
 
 impl Default for AiTuningParams {
@@ -179,6 +191,8 @@ impl Default for AiTuningParams {
             look_ahead_t: 0.3,
             max_speed: 55.0,
             max_tilt_angle: 1.45,
+            battery_sag_factor: 0.15,
+            dirty_air_strength: 8.0,
         }
     }
 }
@@ -192,7 +206,7 @@ pub struct ParamMeta {
 }
 
 /// Ordered list of parameter metadata matching `AiTuningParams` field order.
-pub const PARAM_META: [ParamMeta; 9] = [
+pub const PARAM_META: [ParamMeta; 11] = [
     ParamMeta { name: "Lateral Accel",   step: 2.0,  min: 5.0,   max: 100.0 },
     ParamMeta { name: "Curv Look Scale", step: 2.0,  min: 5.0,   max: 80.0 },
     ParamMeta { name: "Min Look Frac",   step: 0.05, min: 0.1,   max: 1.0 },
@@ -202,6 +216,8 @@ pub const PARAM_META: [ParamMeta; 9] = [
     ParamMeta { name: "Look Ahead T",    step: 0.05, min: 0.05,  max: 1.0 },
     ParamMeta { name: "Max Speed",       step: 1.0,  min: 10.0,  max: 100.0 },
     ParamMeta { name: "Max Tilt Angle",  step: 0.05, min: 0.5,   max: 1.57 },
+    ParamMeta { name: "Battery Sag",     step: 0.05, min: 0.0,   max: 0.4 },
+    ParamMeta { name: "Dirty Air Str",   step: 1.0,  min: 0.0,   max: 20.0 },
 ];
 
 impl AiTuningParams {
@@ -217,6 +233,8 @@ impl AiTuningParams {
             6 => self.look_ahead_t,
             7 => self.max_speed,
             8 => self.max_tilt_angle,
+            9 => self.battery_sag_factor,
+            10 => self.dirty_air_strength,
             _ => 0.0,
         }
     }
@@ -235,6 +253,8 @@ impl AiTuningParams {
             6 => self.look_ahead_t = clamped,
             7 => self.max_speed = clamped,
             8 => self.max_tilt_angle = clamped,
+            9 => self.battery_sag_factor = clamped,
+            10 => self.dirty_air_strength = clamped,
             _ => {}
         }
     }

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use super::components::*;
+use super::spawning::adaptive_approach_offset;
 
 /// Toggle resource for flight debug visualization. Press F3 during race to toggle.
 #[derive(Resource)]
@@ -80,7 +81,7 @@ pub fn draw_gate_markers(
         return;
     };
 
-    const APPROACH_OFFSET: f32 = 12.0;
+    let n = ai.gate_positions.len();
 
     for (i, (pos, fwd)) in ai
         .gate_positions
@@ -88,8 +89,11 @@ pub fn draw_gate_markers(
         .zip(ai.gate_forwards.iter())
         .enumerate()
     {
-        let approach = *pos - *fwd * APPROACH_OFFSET;
-        let departure = *pos + *fwd * APPROACH_OFFSET;
+        let next = (i + 1) % n;
+        let gate_dist = (ai.gate_positions[next] - *pos).length();
+        let offset = adaptive_approach_offset(gate_dist);
+        let approach = *pos - *fwd * offset;
+        let departure = *pos + *fwd * offset;
 
         // Gate center (physical position, not a control point): green sphere
         gizmos.sphere(Isometry3d::from_translation(*pos), 0.6, Color::srgb(0.1, 1.0, 0.1));

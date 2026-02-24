@@ -114,7 +114,7 @@ CourseData ──► spawn obstacles + drones
 | `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint + curvature-aware speed limit |
 | `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning |
 | `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
-| `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (speed, curvature, look-ahead, tilt). Persists across race restarts. Exposed via dev dashboard (F4) |
+| `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (11 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength). Persists across race restarts. Exposed via dev dashboard (F4) |
 
 ## Assets
 
@@ -131,6 +131,7 @@ assets/
 - All drone physics in `FixedUpdate` (64Hz default), `.chain()`-ed for correctness
 - Gate trigger checks: O(drones × gates) = O(12 × ~20) = O(240) AABB tests per frame
 - AI spline sampling: O(12) per fixed tick (polynomial eval per drone, 5 curvature samples for speed limiting)
+- Dirty air perturbation: O(12²) = O(144) distance/dot-product checks per fixed tick (negligible)
 - No system ordering constraints between unrelated plugins — maximum parallelism
 - `DespawnOnExit` for automatic entity cleanup on state transitions
 
@@ -144,10 +145,11 @@ CourseData ──► generate_race_path() ──► Catmull-Rom CubicCurve (cycl
                                                                │
                                                     spawn_drones() ──► 12 Drone entities
                                                                │
-                                                    FixedUpdate chain (9-system, thrust-through-body):
+                                                    FixedUpdate chain (10-system, thrust-through-body):
                                                     AI targets (spline projection) → racing line (spline sampling)
                                                     → hover_target → position_pid → attitude_controller
-                                                    → motor_lag → apply_forces → integration → clamp
+                                                    → dirty_air_perturbation → motor_lag → apply_forces
+                                                    → integration → clamp
 
                                                     Post-race: Racing → Returning (per-drone)
                                                     → generate_return_path() → non-cyclic spline
@@ -155,7 +157,7 @@ CourseData ──► generate_race_path() ──► Catmull-Rom CubicCurve (cycl
                                                     → Returning → Idle (hover)
 ```
 
-The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior.
+The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior. Aerodynamic perturbations (dirty air from leading drones, prop wash on descent) add angular wobble that the PD must fight, producing visible instability in dirty air. Battery sag linearly reduces max thrust over the race duration.
 
 Drone spawning uses an async polling pattern: `setup_drone_assets` and `spawn_drones` run every `Update` frame, returning early until the glTF asset and `CourseData` are both available. Once drones spawn, the early-return guards make them no-ops.
 
@@ -169,7 +171,7 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `course::loader` | 9 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
-| `drone::spawning` | 15 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero), start positions (count, behind gate, no overlap), config randomization bounds, PID variation, return path generation (valid spline, per-drone variation) |
+| `drone::spawning` | 15 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero, adaptive approach offset), start positions (count, behind gate, no overlap), config randomization bounds (incl. cornering/braking/attitude variation), PID variation, return path generation (valid spline, per-drone variation) |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems

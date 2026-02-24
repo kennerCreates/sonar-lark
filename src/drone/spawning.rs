@@ -150,13 +150,17 @@ pub fn spawn_drones(
         dynamics.thrust = hover_thrust;
         dynamics.commanded_thrust = hover_thrust;
 
+        let mut attitude_pd = AttitudePd::default();
+        attitude_pd.kp_roll_pitch *= config.attitude_kp_mult;
+        attitude_pd.kd_roll_pitch *= config.attitude_kd_mult;
+
         let gate_count = race_path.gate_positions.len() as u32;
         let mut entity_cmd = commands.spawn((
             transform,
             Visibility::default(),
             Drone { index: i },
             pid,
-            AttitudePd::default(),
+            attitude_pd,
             dynamics,
             config,
             AIController {
@@ -210,6 +214,15 @@ pub fn cleanup_drone_resources(mut commands: Commands) {
 
 // --- Pure helper functions (testable) ---
 
+const MAX_APPROACH_OFFSET: f32 = 12.0;
+const APPROACH_FRACTION: f32 = 0.3;
+
+/// Compute the approach/departure offset for a gate based on distance to the next gate.
+/// Scales linearly with inter-gate distance, capped at MAX_APPROACH_OFFSET.
+pub fn adaptive_approach_offset(gate_distance: f32) -> f32 {
+    (gate_distance * APPROACH_FRACTION).min(MAX_APPROACH_OFFSET)
+}
+
 pub struct RacePath {
     pub spline: CubicCurve<Vec3>,
     pub gate_positions: Vec<Vec3>,
@@ -250,20 +263,25 @@ pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Opt
     // into two spline segments, distributing the turn across a longer arc and
     // significantly reducing peak curvature (= higher cornering speed).
     // 3 control points per gate: approach, departure, midleg-to-next.
-    const APPROACH_OFFSET: f32 = 12.0;
+    // Approach offset scales with inter-gate distance so tight courses don't
+    // waste all their space on straight committed-direction segments.
     let n = gate_positions.len();
     let mut control_points = Vec::with_capacity(n * 3);
     for i in 0..n {
         let pos = gate_positions[i];
         let fwd = gate_forwards[i];
-        let approach = pos - fwd * APPROACH_OFFSET;
-        let departure = pos + fwd * APPROACH_OFFSET;
+        let next = (i + 1) % n;
+        let gate_dist = (gate_positions[next] - pos).length();
+        let approach_offset = adaptive_approach_offset(gate_dist);
+        let approach = pos - fwd * approach_offset;
+        let departure = pos + fwd * approach_offset;
         control_points.push(approach);
         control_points.push(departure);
 
         // Midleg: halfway between this gate's departure and next gate's approach.
-        let next = (i + 1) % n;
-        let next_approach = gate_positions[next] - gate_forwards[next] * APPROACH_OFFSET;
+        let next_gate_dist = (gate_positions[(next + 1) % n] - gate_positions[next]).length();
+        let next_offset = adaptive_approach_offset(next_gate_dist);
+        let next_approach = gate_positions[next] - gate_forwards[next] * next_offset;
         control_points.push((departure + next_approach) * 0.5);
     }
 
@@ -388,6 +406,10 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
             rng.gen_range(0.15..=0.5),
             rng.gen_range(0.1..=0.4),
         ),
+        cornering_aggression: rng.gen_range(0.8..=1.2),
+        braking_distance: rng.gen_range(0.8..=1.2),
+        attitude_kp_mult: rng.gen_range(0.9..=1.1),
+        attitude_kd_mult: rng.gen_range(0.9..=1.1),
     }
 }
 
@@ -832,6 +854,10 @@ mod tests {
             noise_frequency: 1.0,
             hover_noise_amp: Vec3::splat(0.1),
             hover_noise_freq: Vec3::splat(0.3),
+            cornering_aggression: 1.0,
+            braking_distance: 1.0,
+            attitude_kp_mult: 1.0,
+            attitude_kd_mult: 1.0,
         };
 
         let current_pos = Vec3::new(50.0, 5.0, 30.0);
@@ -870,6 +896,10 @@ mod tests {
             noise_frequency: 1.0,
             hover_noise_amp: Vec3::splat(0.1),
             hover_noise_freq: Vec3::splat(0.3),
+            cornering_aggression: 1.0,
+            braking_distance: 1.0,
+            attitude_kp_mult: 1.0,
+            attitude_kd_mult: 1.0,
         };
 
         let current_pos = Vec3::new(50.0, 5.0, 30.0);
@@ -908,6 +938,10 @@ mod tests {
             assert!((0.1..=0.5).contains(&config.hover_noise_freq.x));
             assert!((0.15..=0.5).contains(&config.hover_noise_freq.y));
             assert!((0.1..=0.4).contains(&config.hover_noise_freq.z));
+            assert!((0.8..=1.2).contains(&config.cornering_aggression));
+            assert!((0.8..=1.2).contains(&config.braking_distance));
+            assert!((0.9..=1.1).contains(&config.attitude_kp_mult));
+            assert!((0.9..=1.1).contains(&config.attitude_kd_mult));
         }
     }
 
@@ -920,6 +954,10 @@ mod tests {
             noise_frequency: 1.0,
             hover_noise_amp: Vec3::splat(0.02),
             hover_noise_freq: Vec3::splat(1.0),
+            cornering_aggression: 1.0,
+            braking_distance: 1.0,
+            attitude_kp_mult: 1.0,
+            attitude_kd_mult: 1.0,
         };
         let pid = create_pid_with_variation(&config);
         let base = PositionPid::default();
