@@ -14,21 +14,21 @@ const GRAVITY: f32 = 9.81;
 /// Fraction of gate width used for the start line (leaves margin at edges).
 const GATE_WIDTH_USAGE: f32 = 0.8;
 
-/// Per-drone colors from the Jehkoba32 palette (assets/color/color_scheme.hex).
-/// 12 colors chosen for visual contrast against typical environments.
+/// Per-drone colors from the 64-color palette (assets/color/color_palette_64.hex).
+/// 12 colors chosen for maximum hue spread and visual contrast.
 const DRONE_COLORS: [[f32; 3]; 12] = [
-    [0.851, 0.298, 0.529], // Kirby     #d94c87
-    [0.043, 0.686, 0.902], // Cerulean  #0bafe6
-    [0.404, 0.702, 0.106], // Pear      #67b31b
-    [0.969, 0.788, 0.243], // Dandelion #f7c93e
-    [0.851, 0.129, 0.310], // Red       #d9214f
-    [0.106, 0.651, 0.514], // Teal      #1ba683
-    [0.949, 0.475, 0.380], // Rose      #f27961
-    [0.141, 0.412, 0.702], // Blue      #2469b3
-    [0.588, 0.890, 0.788], // Beach Glass #96e3c9
-    [0.702, 0.561, 0.141], // Apricot   #b38f24
-    [0.651, 0.129, 0.431], // Magenta   #a6216e
-    [0.941, 0.929, 0.847], // Warm White #f0edd8
+    [0.961, 0.192, 0.255], // Neon Red    #f53141
+    [0.961, 0.506, 0.133], // Sunflower   #f58122
+    [0.980, 0.851, 0.216], // Limon       #fad937
+    [0.580, 0.749, 0.188], // Grass       #94bf30
+    [0.090, 0.612, 0.263], // Frog        #179c43
+    [0.239, 0.631, 0.494], // Jade        #3da17e
+    [0.286, 0.761, 0.949], // Sky         #49c2f2
+    [0.110, 0.459, 0.741], // Homeworld   #1c75bd
+    [0.494, 0.494, 0.949], // Periwinkle  #7e7ef2
+    [0.639, 0.365, 0.851], // Amethyst    #a35dd9
+    [0.851, 0.298, 0.557], // Pink        #d94c8e
+    [0.949, 0.949, 0.855], // Vanilla     #f2f2da
 ];
 
 /// Marker resource inserted when `spawn_drones` detects the course has no gates.
