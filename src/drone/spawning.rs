@@ -1,6 +1,7 @@
 use bevy::math::cubic_splines::{CubicCardinalSpline, CubicCurve, CubicGenerator, CyclicCubicGenerator};
 use bevy::prelude::*;
 use rand::Rng;
+use rand::seq::SliceRandom;
 
 use crate::course::data::CourseData;
 use crate::obstacle::library::ObstacleLibrary;
@@ -146,6 +147,10 @@ pub fn spawn_drones(
     let race_seed = rng.gen_range(0u32..=u32::MAX);
     commands.insert_resource(RaceSeed(race_seed));
 
+    // Shuffle grid slot order so drones don't always line up the same way
+    let mut grid_slots: Vec<u8> = (0..DRONE_COUNT).collect();
+    grid_slots.shuffle(&mut rng);
+
     for i in 0..DRONE_COUNT {
         let config = randomize_drone_config(&mut rng);
 
@@ -161,7 +166,7 @@ pub fn spawn_drones(
             });
 
         let pid = create_pid_with_variation(&config);
-        let position = start_positions[i as usize];
+        let position = start_positions[grid_slots[i as usize] as usize];
 
         let look_dir =
             (drone_path.gate_positions[0] - position).normalize_or(Vec3::NEG_Z);
