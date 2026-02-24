@@ -31,7 +31,7 @@ fn cyclic_accel(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cy
 }
 
 /// Compute curvature κ = |v × a| / |v|³ at parameter t on the cyclic spline.
-fn cyclic_curvature(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> f32 {
+pub fn cyclic_curvature(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> f32 {
     let vel = cyclic_vel(spline, t, cycle_t);
     let acc = cyclic_accel(spline, t, cycle_t);
     let vel_mag = vel.length();
@@ -57,7 +57,7 @@ fn max_curvature_ahead(
 }
 
 /// Convert curvature to a safe speed: v = sqrt(a_lateral / κ).
-fn safe_speed_for_curvature(curvature: f32, tuning: &AiTuningParams) -> f32 {
+pub fn safe_speed_for_curvature(curvature: f32, tuning: &AiTuningParams) -> f32 {
     if curvature > 0.001 {
         (tuning.safe_lateral_accel / curvature)
             .sqrt()

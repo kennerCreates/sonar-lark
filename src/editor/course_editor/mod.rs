@@ -8,6 +8,10 @@ use bevy::{
     prelude::*,
 };
 
+use crate::course::data::{CourseData, ObstacleInstance};
+use crate::drone::ai::{cyclic_curvature, safe_speed_for_curvature};
+use crate::drone::components::{AiTuningParams, POINTS_PER_GATE};
+use crate::drone::spawning::generate_race_path;
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, TriggerVolume};
@@ -191,6 +195,7 @@ impl Plugin for CourseEditorPlugin {
                     draw_gate_sequence_lines,
                     draw_gate_forward_arrows,
                     draw_selection_highlight,
+                    draw_flight_spline_preview,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -829,6 +834,69 @@ fn draw_selection_highlight(
     let center = transform.translation + Vec3::Y * 1.5;
     let hl_transform = Transform::from_translation(center).with_scale(Vec3::splat(3.5));
     gizmos.cube(hl_transform, Color::srgb(1.0, 1.0, 0.0));
+}
+
+/// Sample step size in spline parameter space for the flight preview.
+const SPLINE_PREVIEW_STEP: f32 = 0.1;
+
+fn draw_flight_spline_preview(
+    mut gizmos: Gizmos<CourseGizmoGroup>,
+    placed_query: Query<(&PlacedObstacle, &Transform)>,
+    library: Res<ObstacleLibrary>,
+    tuning: Res<AiTuningParams>,
+) {
+    let instances: Vec<ObstacleInstance> = placed_query
+        .iter()
+        .map(|(placed, transform)| ObstacleInstance {
+            obstacle_id: placed.obstacle_id.clone(),
+            translation: transform.translation,
+            rotation: transform.rotation,
+            scale: transform.scale,
+            gate_order: placed.gate_order,
+            gate_forward_flipped: placed.gate_forward_flipped,
+        })
+        .collect();
+
+    let course = CourseData {
+        name: String::new(),
+        instances,
+    };
+
+    let Some(race_path) = generate_race_path(&course, &library) else {
+        return;
+    };
+
+    let gate_count = race_path.gate_positions.len() as f32;
+    let cycle_t = gate_count * POINTS_PER_GATE;
+    let spline = &race_path.spline;
+
+    let speed_range = (tuning.max_speed - tuning.min_curvature_speed).max(0.001);
+
+    let mut t = 0.0f32;
+    let mut prev_pos = spline.position(0.0);
+    t += SPLINE_PREVIEW_STEP;
+
+    while t <= cycle_t {
+        let pos = spline.position(t.rem_euclid(cycle_t));
+        let k = cyclic_curvature(spline, t, cycle_t);
+        let v_safe = safe_speed_for_curvature(k, &tuning);
+        let ratio = ((v_safe - tuning.min_curvature_speed) / speed_range).clamp(0.0, 1.0);
+
+        // Green (safe) → Red (too tight)
+        let color = Color::srgb(1.0 - ratio * 0.8, 0.2 + ratio * 0.8, 0.2);
+        gizmos.line(prev_pos, pos, color);
+
+        prev_pos = pos;
+        t += SPLINE_PREVIEW_STEP;
+    }
+
+    // Close the loop back to the start
+    let start_pos = spline.position(0.0);
+    let k = cyclic_curvature(spline, 0.0, cycle_t);
+    let v_safe = safe_speed_for_curvature(k, &tuning);
+    let ratio = ((v_safe - tuning.min_curvature_speed) / speed_range).clamp(0.0, 1.0);
+    let color = Color::srgb(1.0 - ratio * 0.8, 0.2 + ratio * 0.8, 0.2);
+    gizmos.line(prev_pos, start_pos, color);
 }
 
 // --- Helpers ---
