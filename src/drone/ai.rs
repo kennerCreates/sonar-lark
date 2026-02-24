@@ -8,6 +8,21 @@ const LOOK_AHEAD_T: f32 = 0.3;
 const VELOCITY_LOOK_AHEAD_T: f32 = 0.5;
 const MAX_ADVANCE_PER_TICK: f32 = 0.15;
 
+/// How far past a full cycle the race extends. Drones must fly through
+/// the start/finish gate again (completing a full lap) before transitioning.
+/// 1.5 puts the finish well past gate 0's departure (at cycle + 1.0).
+const FINISH_EXTENSION: f32 = 1.5;
+
+/// Sample position from the cyclic race spline, wrapping t into [0, cycle_t).
+fn cyclic_pos(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> Vec3 {
+    spline.position(t.rem_euclid(cycle_t))
+}
+
+/// Sample velocity/tangent from the cyclic race spline, wrapping t into [0, cycle_t).
+fn cyclic_vel(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> Vec3 {
+    spline.velocity(t.rem_euclid(cycle_t))
+}
+
 /// Smoothstep deceleration: 1.0 at start of return → 0.0 at arrival.
 fn return_speed_fraction(spline_t: f32, total_t: f32) -> f32 {
     let progress = (spline_t / total_t).clamp(0.0, 1.0);
@@ -35,8 +50,10 @@ pub fn update_ai_targets(
         match *phase {
             DronePhase::Idle => continue,
             DronePhase::Racing => {
-                let total_t = ai.gate_count as f32 * POINTS_PER_GATE;
-                if ai.spline_t >= total_t {
+                let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
+                let finish_t = cycle_t + FINISH_EXTENSION;
+
+                if ai.spline_t >= finish_t {
                     // Transition: Racing → Returning
                     *phase = DronePhase::Returning;
                     if let Some(spline) = generate_return_path(
@@ -53,16 +70,14 @@ pub fn update_ai_targets(
                             total_t: seg_count,
                         });
                     } else {
-                        // Fallback: skip directly to Idle if path generation fails
                         *phase = DronePhase::Idle;
                     }
                     continue;
                 }
 
-                // Local projection: advance spline_t based on how far the drone has
-                // moved along the spline tangent direction.
-                let curve_pos = ai.spline.position(ai.spline_t);
-                let tangent = ai.spline.velocity(ai.spline_t);
+                // Local projection: advance spline_t along the cyclic spline tangent.
+                let curve_pos = cyclic_pos(&ai.spline, ai.spline_t, cycle_t);
+                let tangent = cyclic_vel(&ai.spline, ai.spline_t, cycle_t);
                 let tangent_len = tangent.length();
                 if tangent_len > 0.001 {
                     let tangent_dir = tangent / tangent_len;
@@ -82,6 +97,14 @@ pub fn update_ai_targets(
                         (transform.translation - ai.gate_positions[next_gate_idx]).length();
                     if dist_to_next < WAYPOINT_REACH_DISTANCE {
                         ai.spline_t = ai.spline_t.max(next_center_t);
+                    }
+                } else if next_gate_idx == ai.gate_positions.len() {
+                    // Wrap-around: snap past gate 0 when completing the lap
+                    let finish_gate_t = cycle_t + 0.5;
+                    let dist_to_finish =
+                        (transform.translation - ai.gate_positions[0]).length();
+                    if dist_to_finish < WAYPOINT_REACH_DISTANCE {
+                        ai.spline_t = ai.spline_t.max(finish_gate_t);
                     }
                 }
 
@@ -134,19 +157,22 @@ pub fn compute_racing_line(
         match *phase {
             DronePhase::Idle => continue,
             DronePhase::Racing => {
-                let total_t = ai.gate_count as f32 * POINTS_PER_GATE;
-                if ai.spline_t >= total_t {
+                let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
+                let finish_t = cycle_t + FINISH_EXTENSION;
+
+                if ai.spline_t >= finish_t {
                     desired.position = transform.translation;
                     desired.velocity_hint = Vec3::ZERO;
                     continue;
                 }
 
-                // Sample position and tangent ahead on the spline
-                let target_t = (ai.spline_t + LOOK_AHEAD_T * POINTS_PER_GATE).min(total_t);
-                let target_pos = ai.spline.position(target_t);
+                // Sample ahead on the cyclic spline, clamped to the finish line.
+                // Wrapping ensures the look-ahead stays on the spline even past one cycle.
+                let target_t = (ai.spline_t + LOOK_AHEAD_T * POINTS_PER_GATE).min(finish_t);
+                let target_pos = cyclic_pos(&ai.spline, target_t, cycle_t);
 
-                let vel_t = (ai.spline_t + VELOCITY_LOOK_AHEAD_T * POINTS_PER_GATE).min(total_t);
-                let tangent = ai.spline.velocity(vel_t).normalize_or(Vec3::NEG_Z);
+                let vel_t = (ai.spline_t + VELOCITY_LOOK_AHEAD_T * POINTS_PER_GATE).min(finish_t);
+                let tangent = cyclic_vel(&ai.spline, vel_t, cycle_t).normalize_or(Vec3::NEG_Z);
 
                 // Per-drone lateral offset and sine noise
                 let lateral = Vec3::Y.cross(tangent).normalize_or(Vec3::X);
