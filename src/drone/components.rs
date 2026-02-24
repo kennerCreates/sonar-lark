@@ -1,9 +1,10 @@
 use bevy::math::cubic_splines::CubicCurve;
 use bevy::prelude::*;
 
-/// Spline control points per gate: approach + departure (no center).
-/// The spline naturally curves through the gate region between them.
-pub const POINTS_PER_GATE: f32 = 2.0;
+/// Spline control points per gate: approach, departure, midleg-to-next.
+/// The midleg waypoint between consecutive gates spreads the turn across
+/// two segments, reducing peak curvature for higher cornering speed.
+pub const POINTS_PER_GATE: f32 = 3.0;
 
 #[derive(Component)]
 pub struct Drone {
@@ -83,7 +84,7 @@ impl Default for DroneDynamics {
             angular_velocity: Vec3::ZERO,
             thrust: 0.0,
             commanded_thrust: 0.0,
-            max_thrust: 55.0,
+            max_thrust: 75.0,
             mass: 0.8,
             drag_constant: 0.025,
             moment_of_inertia: Vec3::new(0.003, 0.005, 0.003),
@@ -169,15 +170,15 @@ pub struct AiTuningParams {
 impl Default for AiTuningParams {
     fn default() -> Self {
         Self {
-            safe_lateral_accel: 25.0,
+            safe_lateral_accel: 50.0,
             curvature_look_ahead_scale: 30.0,
             min_look_ahead_fraction: 0.33,
-            min_curvature_speed: 8.0,
+            min_curvature_speed: 14.0,
             min_advance_speed_fraction: 0.25,
-            speed_curvature_range: 2.0,
+            speed_curvature_range: 1.25,
             look_ahead_t: 0.3,
-            max_speed: 45.0,
-            max_tilt_angle: 1.3,
+            max_speed: 55.0,
+            max_tilt_angle: 1.45,
         }
     }
 }
@@ -192,14 +193,14 @@ pub struct ParamMeta {
 
 /// Ordered list of parameter metadata matching `AiTuningParams` field order.
 pub const PARAM_META: [ParamMeta; 9] = [
-    ParamMeta { name: "Lateral Accel",   step: 1.0,  min: 5.0,   max: 60.0 },
+    ParamMeta { name: "Lateral Accel",   step: 2.0,  min: 5.0,   max: 100.0 },
     ParamMeta { name: "Curv Look Scale", step: 2.0,  min: 5.0,   max: 80.0 },
     ParamMeta { name: "Min Look Frac",   step: 0.05, min: 0.1,   max: 1.0 },
-    ParamMeta { name: "Min Curv Speed",  step: 1.0,  min: 2.0,   max: 30.0 },
+    ParamMeta { name: "Min Curv Speed",  step: 1.0,  min: 2.0,   max: 40.0 },
     ParamMeta { name: "Min Advance",     step: 0.05, min: 0.05,  max: 1.0 },
-    ParamMeta { name: "Speed Curv Range",step: 0.25, min: 0.5,   max: 5.0 },
+    ParamMeta { name: "Speed Curv Range",step: 0.25, min: 0.25,  max: 5.0 },
     ParamMeta { name: "Look Ahead T",    step: 0.05, min: 0.05,  max: 1.0 },
-    ParamMeta { name: "Max Speed",       step: 1.0,  min: 10.0,  max: 80.0 },
+    ParamMeta { name: "Max Speed",       step: 1.0,  min: 10.0,  max: 100.0 },
     ParamMeta { name: "Max Tilt Angle",  step: 0.05, min: 0.5,   max: 1.57 },
 ];
 
