@@ -131,3 +131,20 @@ pub struct DroneStartPosition {
     pub translation: Vec3,
     pub rotation: Quat,
 }
+
+/// Per-drone lifecycle phase, tracking whether the drone is idle, racing, or returning to start.
+#[derive(Component, Default, PartialEq, Eq, Clone, Copy, Debug)]
+pub enum DronePhase {
+    #[default]
+    Idle,
+    Racing,
+    Returning,
+}
+
+/// A one-way spline path for a drone flying back to its start position after finishing the race.
+#[derive(Component)]
+pub struct ReturnPath {
+    pub spline: CubicCurve<Vec3>,
+    pub spline_t: f32,
+    pub total_t: f32,
+}

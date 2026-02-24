@@ -111,6 +111,8 @@ CourseData ──► spawn obstacles + drones
 | `DroneAssets` | Resource | drone/spawning | Shared mesh/material handles for all drone entities (from glTF or placeholder) |
 | `DroneGltfHandle` | Resource | drone/spawning | Handle to the loaded drone glTF asset |
 | `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint |
+| `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning |
+| `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
 
 ## Assets
 
@@ -144,6 +146,11 @@ CourseData ──► generate_race_path() ──► Catmull-Rom CubicCurve (cycl
                                                     AI targets (spline projection) → racing line (spline sampling)
                                                     → hover_target → position_pid → attitude_controller
                                                     → motor_lag → apply_forces → integration → clamp
+
+                                                    Post-race: Racing → Returning (per-drone)
+                                                    → generate_return_path() → non-cyclic spline
+                                                    → smoothstep deceleration → return to start
+                                                    → Returning → Idle (hover)
 ```
 
 The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior.
@@ -160,10 +167,10 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `course::loader` | 9 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
-| `drone::spawning` | 13 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero), start positions (count, behind gate, no overlap), config randomization bounds, PID variation |
+| `drone::spawning` | 15 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero), start positions (count, behind gate, no overlap), config randomization bounds, PID variation, return path generation (valid spline, per-drone variation) |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
 - `load_course_from_file` / `save_course` / `delete_course` — pure file I/O, no Bevy systems
 - `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability
-- `generate_race_path(course)` / `compute_start_positions(...)` — pure geometry, no ECS
+- `generate_race_path(course)` / `compute_start_positions(...)` / `generate_return_path(...)` — pure geometry, no ECS

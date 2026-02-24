@@ -6,7 +6,7 @@ pub mod spawning;
 
 use bevy::prelude::*;
 
-use crate::race::lifecycle::race_is_running;
+use crate::race::lifecycle::drones_are_active;
 use crate::states::AppState;
 
 pub struct DronePlugin;
@@ -28,9 +28,9 @@ impl Plugin for DronePlugin {
             .add_systems(
                 FixedUpdate,
                 (
-                    ai::update_ai_targets.run_if(race_is_running),
-                    ai::compute_racing_line.run_if(race_is_running),
-                    physics::hover_target.run_if(not(race_is_running)),
+                    ai::update_ai_targets.run_if(drones_are_active),
+                    ai::compute_racing_line.run_if(drones_are_active),
+                    physics::hover_target.run_if(not(drones_are_active)),
                     physics::position_pid,
                     physics::attitude_controller,
                     physics::motor_lag,

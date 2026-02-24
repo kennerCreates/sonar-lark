@@ -15,12 +15,16 @@ pub fn hover_target(
         &Drone,
         &DroneStartPosition,
         &DroneConfig,
+        &DronePhase,
         &mut DesiredPosition,
     )>,
 ) {
     let t = time.elapsed_secs();
 
-    for (drone, start, config, mut desired) in &mut query {
+    for (drone, start, config, phase, mut desired) in &mut query {
+        if *phase != DronePhase::Idle {
+            continue;
+        }
         let phase = drone.index as f32 * 1.7;
 
         let noise = Vec3::new(
