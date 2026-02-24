@@ -166,12 +166,7 @@ pub fn setup_menu(mut commands: Commands) {
                                 ))
                                 .with_children(|btn| {
                                     btn.spawn((
-                                        Text::new(format!(
-                                            "{}  ({} gate{})",
-                                            course.name,
-                                            course.gate_count,
-                                            if course.gate_count == 1 { "" } else { "s" }
-                                        )),
+                                        Text::new(&course.name),
                                         TextFont {
                                             font_size: 18.0,
                                             ..default()
