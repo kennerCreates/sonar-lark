@@ -105,7 +105,6 @@ pub fn handle_start_race_button(
                     dynamics.commanded_thrust = 0.0;
 
                     pid.integral = Vec3::ZERO;
-                    pid.prev_error = Vec3::ZERO;
 
                     transform.translation = start_pos.translation;
                     transform.rotation = start_pos.rotation;

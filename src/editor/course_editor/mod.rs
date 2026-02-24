@@ -781,7 +781,7 @@ fn draw_gate_forward_arrows(
         let Some(tv) = &def.trigger_volume else {
             continue;
         };
-        let center = transform.translation + transform.rotation * tv.offset;
+        let center = transform.translation + transform.rotation * (tv.offset * transform.scale);
         let local_fwd = if placed.gate_forward_flipped {
             -tv.forward
         } else {

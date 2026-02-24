@@ -80,7 +80,7 @@ pub fn draw_gate_markers(
         return;
     };
 
-    const APPROACH_OFFSET: f32 = 8.0;
+    const APPROACH_OFFSET: f32 = 12.0;
 
     for (i, (pos, fwd)) in ai
         .gate_positions

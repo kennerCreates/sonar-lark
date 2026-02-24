@@ -12,13 +12,13 @@ pub struct Drone {
 }
 
 /// Outer-loop position PID: position error → desired acceleration.
+/// Uses derivative-on-measurement (-velocity) instead of d(error)/dt to avoid derivative kick.
 #[derive(Component)]
 pub struct PositionPid {
     pub kp: Vec3,
     pub ki: Vec3,
     pub kd: Vec3,
     pub integral: Vec3,
-    pub prev_error: Vec3,
 }
 
 impl Default for PositionPid {
@@ -28,7 +28,6 @@ impl Default for PositionPid {
             ki: Vec3::new(0.1, 0.2, 0.1),
             kd: Vec3::new(4.0, 5.0, 4.0),
             integral: Vec3::ZERO,
-            prev_error: Vec3::ZERO,
         }
     }
 }
@@ -109,9 +108,10 @@ pub struct AIController {
     pub target_gate_index: u32,
     /// Total number of gates in the course.
     pub gate_count: u32,
-    /// Catmull-Rom spline through gate centers (cyclic). Parameter t in [0, gate_count].
+    /// Cyclic Catmull-Rom spline with 3 control points per gate (approach, departure, midleg).
+    /// Parameter t in [0, gate_count * POINTS_PER_GATE].
     pub spline: CubicCurve<Vec3>,
-    /// Continuous progress along the spline. Race complete when >= gate_count.
+    /// Continuous progress along the spline. Race complete when >= gate_count * POINTS_PER_GATE + FINISH_EXTENSION.
     pub spline_t: f32,
     /// Gate centers in order, for fallback distance checks.
     pub gate_positions: Vec<Vec3>,

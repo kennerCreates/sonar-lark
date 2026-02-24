@@ -73,6 +73,7 @@ pub fn spawn_obstacle(
         ObstacleMarker {
             id: obstacle_id.clone(),
         },
+        DespawnOnExit(crate::states::AppState::Race),
     ));
 
     if let Some(order) = gate_index {

@@ -228,7 +228,7 @@ pub fn generate_race_path(course: &CourseData, library: &ObstacleLibrary) -> Opt
                 // Use the trigger volume center as the fly-through target,
                 // not the obstacle origin (which is at ground level).
                 let fly_through_offset = tv
-                    .map(|tv| inst.rotation * tv.offset)
+                    .map(|tv| inst.rotation * (tv.offset * inst.scale))
                     .unwrap_or(Vec3::ZERO);
                 let local_fwd = tv.map(|tv| tv.forward).unwrap_or(Vec3::NEG_Z);
                 let world_fwd = inst.rotation
@@ -398,7 +398,6 @@ fn create_pid_with_variation(config: &DroneConfig) -> PositionPid {
         ki: base.ki * (Vec3::ONE + config.pid_variation),
         kd: base.kd * (Vec3::ONE + config.pid_variation),
         integral: Vec3::ZERO,
-        prev_error: Vec3::ZERO,
     }
 }
 
