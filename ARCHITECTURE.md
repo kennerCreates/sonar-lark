@@ -114,7 +114,7 @@ CourseData ──► spawn obstacles + drones
 | `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint + curvature-aware speed limit |
 | `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning |
 | `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
-| `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (13 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength, proximity avoidance radius/strength). Persists across race restarts. Exposed via dev dashboard (F4) |
+| `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (14 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength, proximity avoidance radius/strength, velocity feedforward blend). Persists across race restarts. Exposed via dev dashboard (F4) |
 
 ## Assets
 

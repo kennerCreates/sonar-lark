@@ -73,9 +73,12 @@ pub fn position_pid(
             Vec3::splat(INTEGRAL_CLAMP),
         );
 
-        // Derivative-on-measurement: use -velocity instead of d(error)/dt.
-        // Avoids derivative kick when the desired position changes abruptly.
-        let derivative = -dynamics.velocity;
+        // Blended derivative: mix absolute damping with velocity feedforward.
+        // At ff_blend=0: pure damping (-velocity), for position hold.
+        // At ff_blend=1: velocity-error damping (desired_vel - velocity),
+        // which stops fighting motion when the drone is at target speed.
+        let desired_velocity = desired.velocity_hint * desired.max_speed;
+        let derivative = -dynamics.velocity + desired_velocity * tuning.feedforward_blend;
 
         let pid_output = pid.kp * error + pid.ki * pid.integral + pid.kd * derivative;
 
@@ -309,10 +312,15 @@ pub fn apply_forces(
         dynamics.velocity += acceleration * dt;
 
         // Per-drone speed limit (curvature-aware), capped by global max_speed.
+        // Soft clamping: exponential decay toward the limit instead of instant snap.
+        // At rate 10.0, ~14.5% of overspeed removed per tick (64Hz), 99.5% within 0.5s.
+        const SPEED_CLAMP_RATE: f32 = 10.0;
         let effective_max = desired.max_speed.min(tuning.max_speed);
         let new_speed = dynamics.velocity.length();
         if new_speed > effective_max {
-            dynamics.velocity = dynamics.velocity.normalize() * effective_max;
+            let alpha = (1.0 - (-SPEED_CLAMP_RATE * dt).exp()).min(1.0);
+            let target_speed = new_speed * (1.0 - alpha) + effective_max * alpha;
+            dynamics.velocity *= target_speed / new_speed;
         }
     }
 }

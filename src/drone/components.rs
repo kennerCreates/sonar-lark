@@ -190,6 +190,7 @@ pub struct AiTuningParams {
     pub dirty_air_strength: f32,
     pub avoidance_radius: f32,
     pub avoidance_strength: f32,
+    pub feedforward_blend: f32,
 }
 
 impl Default for AiTuningParams {
@@ -208,6 +209,7 @@ impl Default for AiTuningParams {
             dirty_air_strength: 0.0,
             avoidance_radius: 8.0,
             avoidance_strength: 0.0,
+            feedforward_blend: 0.85,
         }
     }
 }
@@ -221,7 +223,7 @@ pub struct ParamMeta {
 }
 
 /// Ordered list of parameter metadata matching `AiTuningParams` field order.
-pub const PARAM_META: [ParamMeta; 13] = [
+pub const PARAM_META: [ParamMeta; 14] = [
     ParamMeta { name: "Lateral Accel",   step: 2.0,  min: 5.0,   max: 100.0 },
     ParamMeta { name: "Curv Look Scale", step: 2.0,  min: 5.0,   max: 80.0 },
     ParamMeta { name: "Min Look Frac",   step: 0.05, min: 0.1,   max: 1.0 },
@@ -235,6 +237,7 @@ pub const PARAM_META: [ParamMeta; 13] = [
     ParamMeta { name: "Dirty Air Str",   step: 1.0,  min: 0.0,   max: 20.0 },
     ParamMeta { name: "Avoid Radius",    step: 1.0,  min: 2.0,   max: 15.0 },
     ParamMeta { name: "Avoid Strength",  step: 1.0,  min: 0.0,   max: 30.0 },
+    ParamMeta { name: "FF Blend",        step: 0.05, min: 0.0,   max: 1.0 },
 ];
 
 impl AiTuningParams {
@@ -254,6 +257,7 @@ impl AiTuningParams {
             10 => self.dirty_air_strength,
             11 => self.avoidance_radius,
             12 => self.avoidance_strength,
+            13 => self.feedforward_blend,
             _ => 0.0,
         }
     }
@@ -276,6 +280,7 @@ impl AiTuningParams {
             10 => self.dirty_air_strength = clamped,
             11 => self.avoidance_radius = clamped,
             12 => self.avoidance_strength = clamped,
+            13 => self.feedforward_blend = clamped,
             _ => {}
         }
     }
