@@ -34,6 +34,7 @@ impl Plugin for DronePlugin {
                 (
                     ai::update_ai_targets.run_if(drones_are_active),
                     ai::compute_racing_line.run_if(drones_are_active),
+                    ai::proximity_avoidance.run_if(drones_are_active),
                     physics::hover_target.run_if(not(drones_are_active)),
                     physics::position_pid,
                     physics::attitude_controller,

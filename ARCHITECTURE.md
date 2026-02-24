@@ -41,7 +41,7 @@ src/
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
-│   ├── ai.rs            update_ai_targets, compute_racing_line (FixedUpdate, spline-based)
+│   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance (FixedUpdate, spline-based)
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, RacePath/spline generation
 ├── race/                Race mechanics
@@ -114,7 +114,7 @@ CourseData ──► spawn obstacles + drones
 | `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint + curvature-aware speed limit |
 | `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning |
 | `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
-| `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (11 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength). Persists across race restarts. Exposed via dev dashboard (F4) |
+| `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (13 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength, proximity avoidance radius/strength). Persists across race restarts. Exposed via dev dashboard (F4) |
 
 ## Assets
 
@@ -132,6 +132,7 @@ assets/
 - Gate trigger checks: O(drones × gates) = O(12 × ~20) = O(240) AABB tests per frame
 - AI spline sampling: O(12) per fixed tick (polynomial eval per drone, 5 curvature samples for speed limiting)
 - Dirty air perturbation: O(12²) = O(144) distance/dot-product checks per fixed tick (negligible)
+- Proximity avoidance: O(12²) = O(144) distance checks per fixed tick (negligible)
 - No system ordering constraints between unrelated plugins — maximum parallelism
 - `DespawnOnExit` for automatic entity cleanup on state transitions
 
@@ -148,11 +149,11 @@ CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve 
                                                                │
                                                     spawn_drones() ──► 12 Drone entities
                                                                │
-                                                    FixedUpdate chain (10-system, thrust-through-body):
+                                                    FixedUpdate chain (11-system, thrust-through-body):
                                                     AI targets (spline projection) → racing line (spline sampling)
-                                                    → hover_target → position_pid → attitude_controller
-                                                    → dirty_air_perturbation → motor_lag → apply_forces
-                                                    → integration → clamp
+                                                    → proximity_avoidance → hover_target → position_pid
+                                                    → attitude_controller → dirty_air_perturbation → motor_lag
+                                                    → apply_forces → integration → clamp
 
                                                     Post-race: Racing → Returning (per-drone)
                                                     → generate_return_path() → non-cyclic spline

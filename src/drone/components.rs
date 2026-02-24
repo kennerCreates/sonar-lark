@@ -188,6 +188,8 @@ pub struct AiTuningParams {
     pub max_tilt_angle: f32,
     pub battery_sag_factor: f32,
     pub dirty_air_strength: f32,
+    pub avoidance_radius: f32,
+    pub avoidance_strength: f32,
 }
 
 impl Default for AiTuningParams {
@@ -203,7 +205,9 @@ impl Default for AiTuningParams {
             max_speed: 55.0,
             max_tilt_angle: 1.45,
             battery_sag_factor: 0.15,
-            dirty_air_strength: 8.0,
+            dirty_air_strength: 0.0,
+            avoidance_radius: 8.0,
+            avoidance_strength: 0.0,
         }
     }
 }
@@ -217,7 +221,7 @@ pub struct ParamMeta {
 }
 
 /// Ordered list of parameter metadata matching `AiTuningParams` field order.
-pub const PARAM_META: [ParamMeta; 11] = [
+pub const PARAM_META: [ParamMeta; 13] = [
     ParamMeta { name: "Lateral Accel",   step: 2.0,  min: 5.0,   max: 100.0 },
     ParamMeta { name: "Curv Look Scale", step: 2.0,  min: 5.0,   max: 80.0 },
     ParamMeta { name: "Min Look Frac",   step: 0.05, min: 0.1,   max: 1.0 },
@@ -229,6 +233,8 @@ pub const PARAM_META: [ParamMeta; 11] = [
     ParamMeta { name: "Max Tilt Angle",  step: 0.05, min: 0.5,   max: 1.57 },
     ParamMeta { name: "Battery Sag",     step: 0.05, min: 0.0,   max: 0.4 },
     ParamMeta { name: "Dirty Air Str",   step: 1.0,  min: 0.0,   max: 20.0 },
+    ParamMeta { name: "Avoid Radius",    step: 1.0,  min: 2.0,   max: 15.0 },
+    ParamMeta { name: "Avoid Strength",  step: 1.0,  min: 0.0,   max: 30.0 },
 ];
 
 impl AiTuningParams {
@@ -246,6 +252,8 @@ impl AiTuningParams {
             8 => self.max_tilt_angle,
             9 => self.battery_sag_factor,
             10 => self.dirty_air_strength,
+            11 => self.avoidance_radius,
+            12 => self.avoidance_strength,
             _ => 0.0,
         }
     }
@@ -266,6 +274,8 @@ impl AiTuningParams {
             8 => self.max_tilt_angle = clamped,
             9 => self.battery_sag_factor = clamped,
             10 => self.dirty_air_strength = clamped,
+            11 => self.avoidance_radius = clamped,
+            12 => self.avoidance_strength = clamped,
             _ => {}
         }
     }

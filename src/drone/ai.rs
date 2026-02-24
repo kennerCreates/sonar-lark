@@ -211,6 +211,9 @@ pub fn update_ai_targets(
     }
 }
 
+/// Maximum lateral offset a drone can be pushed by avoidance (meters).
+const MAX_AVOIDANCE_OFFSET: f32 = 3.0;
+
 pub fn compute_racing_line(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
@@ -313,6 +316,88 @@ pub fn compute_racing_line(
                 desired.velocity_hint = tangent * speed_frac;
                 desired.max_speed = tuning.max_speed * speed_frac.max(0.2);
             }
+        }
+    }
+}
+
+/// Proximity avoidance: offsets DesiredPosition laterally when drones are nearby.
+/// Drones veer around each other at full speed instead of slowing down.
+/// Runs after compute_racing_line, before position_pid.
+pub fn proximity_avoidance(
+    tuning: Res<AiTuningParams>,
+    mut query: Query<(&Transform, &Drone, &DroneDynamics, &DronePhase, &mut DesiredPosition)>,
+) {
+    if tuning.avoidance_strength == 0.0 {
+        return;
+    }
+
+    let radius = tuning.avoidance_radius;
+    let radius_sq = radius * radius;
+
+    // Snapshot positions, velocities, and indices (12 drones = tiny allocation)
+    let drone_data: Vec<(u8, Vec3, Vec3)> = query
+        .iter()
+        .filter(|(_, _, _, phase, _)| **phase != DronePhase::Idle)
+        .map(|(tr, drone, dyn_, _, _)| (drone.index, tr.translation, dyn_.velocity))
+        .collect();
+
+    for (transform, drone, dynamics, phase, mut desired) in &mut query {
+        if *phase == DronePhase::Idle {
+            continue;
+        }
+
+        let my_pos = transform.translation;
+        let my_idx = drone.index;
+        let my_vel = dynamics.velocity;
+        let my_speed = my_vel.length();
+
+        let mut total_offset = Vec3::ZERO;
+
+        for &(other_idx, other_pos, _) in &drone_data {
+            if other_idx == my_idx {
+                continue;
+            }
+
+            let separation = my_pos - other_pos;
+            let dist_sq = separation.length_squared();
+            if dist_sq > radius_sq || dist_sq < 0.01 {
+                continue;
+            }
+
+            let dist = dist_sq.sqrt();
+
+            // Compute lateral dodge direction (perpendicular to own velocity)
+            let lateral = if my_speed > 1.0 {
+                let vel_dir = my_vel / my_speed;
+                let proj = separation - vel_dir * separation.dot(vel_dir);
+
+                // Head-on tiebreaker: if lateral separation is tiny, use deterministic perpendicular
+                if proj.length_squared() < 0.25 {
+                    let perp = Vec3::new(vel_dir.z, 0.0, -vel_dir.x);
+                    let sign = if my_idx > other_idx { 1.0 } else { -1.0 };
+                    perp * sign
+                } else {
+                    proj
+                }
+            } else {
+                separation
+            };
+
+            let lateral_dir = lateral.normalize_or(Vec3::X);
+
+            // Smooth quadratic falloff: strongest when closest
+            let t = 1.0 - dist / radius;
+            let weight = t * t;
+
+            total_offset += lateral_dir * weight;
+        }
+
+        let offset = total_offset * tuning.avoidance_strength;
+        let mag = offset.length();
+        if mag > MAX_AVOIDANCE_OFFSET {
+            desired.position += offset * (MAX_AVOIDANCE_OFFSET / mag);
+        } else {
+            desired.position += offset;
         }
     }
 }
