@@ -3,7 +3,7 @@ use std::path::Path;
 
 use bevy::prelude::*;
 
-use crate::course::loader::SelectedCourse;
+use crate::course::loader::{load_course_from_file, SelectedCourse};
 use crate::editor::course_editor::{LastEditedCourse, PendingEditorCourse};
 use crate::states::AppState;
 
@@ -14,9 +14,12 @@ const SELECTED_COURSE: Color = Color::srgb(0.2, 0.4, 0.6);
 const NORMAL_COURSE: Color = Color::srgb(0.1, 0.1, 0.1);
 const HOVERED_COURSE: Color = Color::srgb(0.2, 0.2, 0.2);
 
+const MIN_RACEABLE_GATES: usize = 3;
+
 pub struct CourseEntry {
     pub name: String,
     pub path: String,
+    pub gate_count: usize,
 }
 
 #[derive(Resource, Default)]
@@ -37,6 +40,9 @@ pub(crate) struct CourseItem(usize);
 #[derive(Component)]
 pub(crate) struct RaceButtonText;
 
+#[derive(Component)]
+pub(crate) struct HintText;
+
 fn discover_courses() -> Vec<CourseEntry> {
     discover_courses_in(Path::new("assets/courses"))
 }
@@ -50,9 +56,18 @@ fn discover_courses_in(courses_dir: &Path) -> Vec<CourseEntry> {
             if path.extension().and_then(|e| e.to_str()) == Some("ron") {
                 if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
                     let display_name = name.trim_end_matches(".course").to_string();
+                    let gate_count = load_course_from_file(&path)
+                        .map(|c| {
+                            c.instances
+                                .iter()
+                                .filter(|i| i.gate_order.is_some())
+                                .count()
+                        })
+                        .unwrap_or(0);
                     courses.push(CourseEntry {
                         name: display_name,
                         path: path.to_string_lossy().to_string(),
+                        gate_count,
                     });
                 }
             }
@@ -151,7 +166,12 @@ pub fn setup_menu(mut commands: Commands) {
                                 ))
                                 .with_children(|btn| {
                                     btn.spawn((
-                                        Text::new(&course.name),
+                                        Text::new(format!(
+                                            "{}  ({} gate{})",
+                                            course.name,
+                                            course.gate_count,
+                                            if course.gate_count == 1 { "" } else { "s" }
+                                        )),
                                         TextFont {
                                             font_size: 18.0,
                                             ..default()
@@ -207,6 +227,7 @@ pub fn setup_menu(mut commands: Commands) {
                     ..default()
                 },
                 TextColor(Color::srgb(0.4, 0.4, 0.4)),
+                HintText,
             ));
         });
 
@@ -272,7 +293,8 @@ pub fn handle_course_selection(
 pub fn update_course_highlights(
     available: Res<AvailableCourses>,
     mut course_query: Query<(&CourseItem, &mut BackgroundColor, &mut BorderColor)>,
-    mut race_text_query: Query<&mut TextColor, With<RaceButtonText>>,
+    mut race_text_query: Query<&mut TextColor, (With<RaceButtonText>, Without<HintText>)>,
+    mut hint_query: Query<(&mut Text, &mut TextColor), (With<HintText>, Without<RaceButtonText>)>,
 ) {
     if !available.is_changed() {
         return;
@@ -288,13 +310,39 @@ pub fn update_course_highlights(
         }
     }
 
-    let has_selection = available.selected_index.is_some();
+    let selected_course = available
+        .selected_index
+        .and_then(|idx| available.courses.get(idx));
+    let raceable = selected_course.is_some_and(|c| c.gate_count >= MIN_RACEABLE_GATES);
+
     for mut text_color in &mut race_text_query {
-        *text_color = if has_selection {
+        *text_color = if raceable {
             TextColor(Color::srgb(0.9, 0.9, 0.9))
         } else {
             TextColor(Color::srgb(0.5, 0.5, 0.5))
         };
+    }
+
+    for (mut text, mut color) in &mut hint_query {
+        match selected_course {
+            Some(course) if course.gate_count < MIN_RACEABLE_GATES => {
+                **text = format!(
+                    "Course has {} gate{} — needs at least {} to race",
+                    course.gate_count,
+                    if course.gate_count == 1 { "" } else { "s" },
+                    MIN_RACEABLE_GATES,
+                );
+                *color = TextColor(Color::srgb(0.8, 0.5, 0.2));
+            }
+            Some(_) => {
+                **text = "Ready to race!".to_string();
+                *color = TextColor(Color::srgb(0.4, 0.8, 0.4));
+            }
+            None => {
+                **text = "Select a course to enable racing".to_string();
+                *color = TextColor(Color::srgb(0.4, 0.4, 0.4));
+            }
+        }
     }
 }
 
@@ -303,10 +351,18 @@ pub fn handle_editor_button(
     query: Query<&Interaction, (Changed<Interaction>, With<EditorButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
     last_edited: Option<Res<LastEditedCourse>>,
+    available: Res<AvailableCourses>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            if let Some(ref last) = last_edited {
+            if let Some(course) = available
+                .selected_index
+                .and_then(|idx| available.courses.get(idx))
+            {
+                commands.insert_resource(PendingEditorCourse {
+                    path: course.path.clone(),
+                });
+            } else if let Some(ref last) = last_edited {
                 commands.insert_resource(PendingEditorCourse {
                     path: last.path.clone(),
                 });
@@ -326,10 +382,12 @@ pub fn handle_race_button(
         if *interaction == Interaction::Pressed {
             if let Some(idx) = available.selected_index {
                 if let Some(course) = available.courses.get(idx) {
-                    commands.insert_resource(SelectedCourse {
-                        path: course.path.clone(),
-                    });
-                    next_state.set(AppState::Race);
+                    if course.gate_count >= MIN_RACEABLE_GATES {
+                        commands.insert_resource(SelectedCourse {
+                            path: course.path.clone(),
+                        });
+                        next_state.set(AppState::Race);
+                    }
                 }
             }
         }
@@ -368,6 +426,25 @@ pub fn cleanup_menu(mut commands: Commands) {
 mod tests {
     use super::*;
 
+    fn empty_course_ron() -> &'static str {
+        r#"(name: "empty", instances: [])"#
+    }
+
+    fn course_ron_with_gates(gate_count: usize) -> String {
+        let mut instances = String::new();
+        for i in 0..gate_count {
+            if i > 0 {
+                instances.push_str(", ");
+            }
+            instances.push_str(&format!(
+                r#"(obstacle_id: ("gate"), translation: (0.0, 0.0, {z}.0), rotation: (0.0, 0.0, 0.0, 1.0), scale: (1.0, 1.0, 1.0), gate_order: Some({i}), gate_forward_flipped: false)"#,
+                z = -(i as i32) * 20,
+                i = i,
+            ));
+        }
+        format!(r#"(name: "test", instances: [{instances}])"#)
+    }
+
     #[test]
     fn discover_empty_directory() {
         let dir = tempfile::tempdir().unwrap();
@@ -384,7 +461,7 @@ mod tests {
     #[test]
     fn discover_filters_ron_only() {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("track.course.ron"), "()").unwrap();
+        fs::write(dir.path().join("track.course.ron"), empty_course_ron()).unwrap();
         fs::write(dir.path().join("readme.txt"), "ignore me").unwrap();
         fs::write(dir.path().join("notes.md"), "ignore me too").unwrap();
 
@@ -396,12 +473,11 @@ mod tests {
     #[test]
     fn discover_strips_course_suffix() {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("mountain.course.ron"), "()").unwrap();
-        fs::write(dir.path().join("simple.ron"), "()").unwrap();
+        fs::write(dir.path().join("mountain.course.ron"), empty_course_ron()).unwrap();
+        fs::write(dir.path().join("simple.ron"), empty_course_ron()).unwrap();
 
         let courses = discover_courses_in(dir.path());
         assert_eq!(courses.len(), 2);
-        // Sorted alphabetically
         assert_eq!(courses[0].name, "mountain");
         assert_eq!(courses[1].name, "simple");
     }
@@ -409,9 +485,9 @@ mod tests {
     #[test]
     fn discover_results_sorted_alphabetically() {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("zebra.course.ron"), "()").unwrap();
-        fs::write(dir.path().join("alpha.course.ron"), "()").unwrap();
-        fs::write(dir.path().join("middle.course.ron"), "()").unwrap();
+        fs::write(dir.path().join("zebra.course.ron"), empty_course_ron()).unwrap();
+        fs::write(dir.path().join("alpha.course.ron"), empty_course_ron()).unwrap();
+        fs::write(dir.path().join("middle.course.ron"), empty_course_ron()).unwrap();
 
         let courses = discover_courses_in(dir.path());
         let names: Vec<&str> = courses.iter().map(|c| c.name.as_str()).collect();
@@ -422,10 +498,47 @@ mod tests {
     fn discover_stores_full_path() {
         let dir = tempfile::tempdir().unwrap();
         let file_path = dir.path().join("test.course.ron");
-        fs::write(&file_path, "()").unwrap();
+        fs::write(&file_path, empty_course_ron()).unwrap();
 
         let courses = discover_courses_in(dir.path());
         assert_eq!(courses.len(), 1);
         assert!(courses[0].path.contains("test.course.ron"));
+    }
+
+    #[test]
+    fn discover_counts_gates() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("no_gates.course.ron"), empty_course_ron()).unwrap();
+        fs::write(
+            dir.path().join("two_gates.course.ron"),
+            course_ron_with_gates(2),
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("five_gates.course.ron"),
+            course_ron_with_gates(5),
+        )
+        .unwrap();
+
+        let courses = discover_courses_in(dir.path());
+        assert_eq!(courses.len(), 3);
+        // Sorted: five_gates, no_gates, two_gates
+        assert_eq!(courses[0].name, "five_gates");
+        assert_eq!(courses[0].gate_count, 5);
+        assert_eq!(courses[1].name, "no_gates");
+        assert_eq!(courses[1].gate_count, 0);
+        assert_eq!(courses[2].name, "two_gates");
+        assert_eq!(courses[2].gate_count, 2);
+    }
+
+    #[test]
+    fn discover_invalid_ron_gets_zero_gates() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("bad.course.ron"), "not valid ron").unwrap();
+
+        let courses = discover_courses_in(dir.path());
+        assert_eq!(courses.len(), 1);
+        assert_eq!(courses[0].name, "bad");
+        assert_eq!(courses[0].gate_count, 0);
     }
 }
