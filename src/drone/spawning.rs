@@ -14,6 +14,23 @@ const GRAVITY: f32 = 9.81;
 /// Fraction of gate width used for the start line (leaves margin at edges).
 const GATE_WIDTH_USAGE: f32 = 0.8;
 
+/// Per-drone colors from the Jehkoba32 palette (assets/color/color_scheme.hex).
+/// 12 colors chosen for visual contrast against typical environments.
+const DRONE_COLORS: [[f32; 3]; 12] = [
+    [0.851, 0.298, 0.529], // Kirby     #d94c87
+    [0.043, 0.686, 0.902], // Cerulean  #0bafe6
+    [0.404, 0.702, 0.106], // Pear      #67b31b
+    [0.969, 0.788, 0.243], // Dandelion #f7c93e
+    [0.851, 0.129, 0.310], // Red       #d9214f
+    [0.106, 0.651, 0.514], // Teal      #1ba683
+    [0.949, 0.475, 0.380], // Rose      #f27961
+    [0.141, 0.412, 0.702], // Blue      #2469b3
+    [0.588, 0.890, 0.788], // Beach Glass #96e3c9
+    [0.702, 0.561, 0.141], // Apricot   #b38f24
+    [0.651, 0.129, 0.431], // Magenta   #a6216e
+    [0.941, 0.929, 0.847], // Warm White #f0edd8
+];
+
 /// Marker resource inserted when `spawn_drones` detects the course has no gates.
 /// Prevents the warning from repeating every frame and signals the UI to show a banner.
 #[derive(Resource)]
@@ -24,7 +41,7 @@ pub struct DroneGltfHandle(pub Handle<bevy::gltf::Gltf>);
 
 #[derive(Resource)]
 pub struct DroneAssets {
-    pub mesh_primitives: Vec<(Handle<Mesh>, Handle<StandardMaterial>)>,
+    pub mesh_primitives: Vec<Handle<Mesh>>,
     pub mesh_transform: Transform,
 }
 
@@ -39,7 +56,6 @@ pub fn setup_drone_assets(
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     existing: Option<Res<DroneAssets>>,
 ) {
@@ -51,20 +67,15 @@ pub fn setup_drone_assets(
         return;
     };
 
-    let red_mat = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.8, 0.2, 0.2),
-        ..default()
-    });
-
     let node_name: Box<str> = "Drone".into();
     if let Some(node_handle) = gltf.named_nodes.get(&node_name) {
         if let Some(node) = node_assets.get(node_handle) {
             if let Some(gltf_mesh_handle) = node.mesh.as_ref() {
                 if let Some(gltf_mesh) = mesh_assets.get(gltf_mesh_handle) {
-                    let primitives: Vec<(Handle<Mesh>, Handle<StandardMaterial>)> = gltf_mesh
+                    let primitives: Vec<Handle<Mesh>> = gltf_mesh
                         .primitives
                         .iter()
-                        .map(|p| (p.mesh.clone(), red_mat.clone()))
+                        .map(|p| p.mesh.clone())
                         .collect();
 
                     if !primitives.is_empty() {
@@ -79,10 +90,10 @@ pub fn setup_drone_assets(
         }
     }
 
-    // Fallback: placeholder red cube if glTF node is missing or empty
+    // Fallback: placeholder cube if glTF node is missing or empty
     let mesh = meshes.add(Cuboid::new(0.5, 0.3, 0.5));
     commands.insert_resource(DroneAssets {
-        mesh_primitives: vec![(mesh, red_mat)],
+        mesh_primitives: vec![mesh],
         mesh_transform: Transform::IDENTITY,
     });
 }
@@ -94,6 +105,7 @@ pub fn spawn_drones(
     library: Res<ObstacleLibrary>,
     existing_drones: Query<(), With<Drone>>,
     no_gates: Option<Res<NoGatesCourse>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     if !existing_drones.is_empty() || no_gates.is_some() {
         return;
@@ -200,11 +212,16 @@ pub fn spawn_drones(
             DespawnOnExit(AppState::Race),
         ));
 
+        let [r, g, b] = DRONE_COLORS[i as usize];
+        let drone_mat = materials.add(StandardMaterial {
+            base_color: Color::srgb(r, g, b),
+            ..default()
+        });
         entity_cmd.with_children(|children| {
-            for (mesh, material) in &assets.mesh_primitives {
+            for mesh in &assets.mesh_primitives {
                 children.spawn((
                     Mesh3d(mesh.clone()),
-                    MeshMaterial3d(material.clone()),
+                    MeshMaterial3d(drone_mat.clone()),
                     assets.mesh_transform,
                 ));
             }

@@ -62,7 +62,7 @@ pub fn safe_speed_for_curvature_with(curvature: f32, lateral_accel: f32, tuning:
     if curvature > 0.001 {
         (lateral_accel / curvature)
             .sqrt()
-            .clamp(tuning.min_curvature_speed, tuning.max_speed)
+            .clamp(tuning.min_curvature_speed.min(tuning.max_speed), tuning.max_speed)
     } else {
         tuning.max_speed
     }
