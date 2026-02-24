@@ -156,6 +156,11 @@ pub struct DroneStartPosition {
     pub rotation: Quat,
 }
 
+/// Random seed generated fresh each race, mixed into deterministic hashes so that
+/// race outcomes vary between runs.
+#[derive(Resource)]
+pub struct RaceSeed(pub u32);
+
 /// Per-drone lifecycle phase, tracking whether the drone is idle, racing, or returning to start.
 #[derive(Component, Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum DronePhase {

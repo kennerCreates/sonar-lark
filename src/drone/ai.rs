@@ -84,6 +84,7 @@ pub fn update_ai_targets(
     mut commands: Commands,
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
+    race_seed: Res<RaceSeed>,
     mut query: Query<(
         Entity,
         &Transform,
@@ -116,6 +117,7 @@ pub fn update_ai_targets(
                         start_pos.translation,
                         config,
                         drone.index,
+                        race_seed.0,
                     ) {
                         let seg_count = spline.segments().len() as f32;
                         commands.entity(entity).insert(ReturnPath {

@@ -185,6 +185,7 @@ const PROP_WASH_ONSET: f32 = 2.0; // descent speed (m/s) before prop wash kicks 
 pub fn dirty_air_perturbation(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
+    race_seed: Option<Res<RaceSeed>>,
     mut query: Query<(&Transform, &Drone, &mut DroneDynamics)>,
 ) {
     let dt = time.delta_secs();
@@ -192,6 +193,7 @@ pub fn dirty_air_perturbation(
         return;
     }
     let t = time.elapsed_secs();
+    let seed_phase = race_seed.map_or(0.0, |s| (s.0 & 0xFFFF) as f32 / 65536.0 * 100.0);
 
     // Collect positions and velocities (12 drones = tiny allocation)
     let drone_data: Vec<(u8, Vec3, Vec3, f32)> = query
@@ -224,7 +226,7 @@ pub fn dirty_air_perturbation(
             let strength = (1.0 - dist / DIRTY_AIR_RADIUS) * (other_speed / tuning.max_speed);
 
             // Deterministic pseudo-random perturbation using layered sin waves
-            let phase = my_idx as f32 * 2.71 + other_idx as f32 * 1.37;
+            let phase = my_idx as f32 * 2.71 + other_idx as f32 * 1.37 + seed_phase;
             let perturbation = Vec3::new(
                 (t * 17.3 + phase).sin() + (t * 31.7 + phase * 2.1).sin() * 0.5,
                 (t * 13.1 + phase * 1.5).sin() * 0.3,
@@ -238,7 +240,7 @@ pub fn dirty_air_perturbation(
         let descent_rate = (-dynamics.velocity.y).max(0.0);
         if descent_rate > PROP_WASH_ONSET {
             let wash_strength = ((descent_rate - PROP_WASH_ONSET) / 10.0).min(1.0);
-            let phase = my_idx as f32 * 3.14 + 100.0;
+            let phase = my_idx as f32 * 3.14 + 100.0 + seed_phase;
             let wash_noise = Vec3::new(
                 (t * 19.7 + phase).sin() + (t * 37.3 + phase * 1.3).sin() * 0.6,
                 (t * 11.3 + phase * 2.1).sin() * 0.2,

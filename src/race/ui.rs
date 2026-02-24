@@ -66,17 +66,7 @@ pub fn handle_start_race_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<StartRaceButton>)>,
     mut phase: ResMut<RacePhase>,
-    mut drones: Query<(
-        Entity,
-        &mut AIController,
-        &mut DroneDynamics,
-        &mut PositionPid,
-        &mut DesiredPosition,
-        &mut DesiredAttitude,
-        &mut Transform,
-        &DroneStartPosition,
-        &mut DronePhase,
-    )>,
+    mut drones: Query<(Entity, &mut DronePhase), With<Drone>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -86,40 +76,20 @@ pub fn handle_start_race_button(
         match *phase {
             RacePhase::WaitingToStart => {
                 *phase = RacePhase::Racing;
-                for (_, _, _, _, _, _, _, _, mut drone_phase) in &mut drones {
+                for (_, mut drone_phase) in &mut drones {
                     *drone_phase = DronePhase::Racing;
                 }
                 info!("Race started!");
             }
             RacePhase::Racing => {}
             RacePhase::Finished => {
-                for (entity, mut ai, mut dynamics, mut pid, mut desired, mut attitude, mut transform, start_pos, mut drone_phase) in
-                    &mut drones
-                {
-                    ai.spline_t = 0.0;
-                    ai.target_gate_index = 0;
-
-                    dynamics.velocity = Vec3::ZERO;
-                    dynamics.angular_velocity = Vec3::ZERO;
-                    dynamics.thrust = 0.0;
-                    dynamics.commanded_thrust = 0.0;
-
-                    pid.integral = Vec3::ZERO;
-
-                    transform.translation = start_pos.translation;
-                    transform.rotation = start_pos.rotation;
-
-                    desired.position = start_pos.translation;
-                    desired.velocity_hint = Vec3::ZERO;
-
-                    attitude.orientation = start_pos.rotation;
-                    attitude.thrust_magnitude = 9.81 * dynamics.mass;
-
-                    *drone_phase = DronePhase::Idle;
-                    commands.entity(entity).remove::<ReturnPath>();
+                // Despawn all drones so spawn_drones re-runs next frame
+                // with a fresh RaceSeed and new randomized configs/splines.
+                for (entity, ..) in &drones {
+                    commands.entity(entity).despawn();
                 }
                 *phase = RacePhase::WaitingToStart;
-                info!("Race reset!");
+                info!("Race reset — drones will respawn with new randomization");
             }
         }
     }

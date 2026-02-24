@@ -143,12 +143,14 @@ pub fn spawn_drones(
         DRONE_COUNT,
     );
     let mut rng = rand::thread_rng();
+    let race_seed = rng.gen_range(0u32..=u32::MAX);
+    commands.insert_resource(RaceSeed(race_seed));
 
     for i in 0..DRONE_COUNT {
         let config = randomize_drone_config(&mut rng);
 
         // Generate per-drone unique spline path
-        let drone_path = generate_drone_race_path(&course, &library, &config, i)
+        let drone_path = generate_drone_race_path(&course, &library, &config, i, race_seed)
             .unwrap_or_else(|| {
                 warn!("Per-drone path failed for drone {}, using shared path", i);
                 RacePath {
@@ -239,6 +241,7 @@ pub fn cleanup_drone_resources(mut commands: Commands) {
     commands.remove_resource::<DroneAssets>();
     commands.remove_resource::<DroneGltfHandle>();
     commands.remove_resource::<NoGatesCourse>();
+    commands.remove_resource::<RaceSeed>();
 }
 
 // --- Pure helper functions (testable) ---
@@ -343,6 +346,7 @@ pub fn generate_drone_race_path(
     library: &ObstacleLibrary,
     config: &DroneConfig,
     drone_index: u8,
+    race_seed: u32,
 ) -> Option<RacePath> {
     let (gate_positions, gate_forwards, gate_extents) = extract_sorted_gates(course, library);
 
@@ -359,16 +363,18 @@ pub fn generate_drone_race_path(
     // Returns a world-space Vec3 offset from gate center.
     let gate_2d_offset = |gate_idx: usize, fwd: Vec3, extents: Vec2| -> Vec3 {
         let gate_right = fwd.cross(Vec3::Y).normalize_or(Vec3::X);
-        // Horizontal hash
+        // Horizontal hash (race_seed mixed in so directions change each race)
         let h_hash = (drone_index as u32)
             .wrapping_mul(1640531527)
             .wrapping_add((gate_idx as u32).wrapping_mul(2891336453))
+            .wrapping_add(race_seed.wrapping_mul(2654435761))
             >> 16;
         let h_sign = (h_hash & 0xFFFF) as f32 / 65536.0 * 2.0 - 1.0;
         // Vertical hash (different prime seeds)
         let v_hash = (drone_index as u32)
             .wrapping_mul(2246822519)
             .wrapping_add((gate_idx as u32).wrapping_mul(1640531527))
+            .wrapping_add(race_seed.wrapping_mul(1503267967))
             >> 16;
         let v_sign = (v_hash & 0xFFFF) as f32 / 65536.0 * 2.0 - 1.0;
         let h_offset = h_sign * extents.x * config.gate_pass_offset;
@@ -404,10 +410,11 @@ pub fn generate_drone_race_path(
         let next_approach = gate_positions[next] + next_gate_offset - gate_forwards[next] * next_offset;
         let base_midleg = (departure + next_approach) * 0.5;
 
-        // Deterministic per-drone-per-leg hash for shift direction
+        // Deterministic per-drone-per-leg hash for shift direction (seed mixed in)
         let hash = (drone_index as u32)
             .wrapping_mul(2654435761)
             .wrapping_add((i as u32).wrapping_mul(2246822519))
+            .wrapping_add(race_seed.wrapping_mul(3266489917))
             >> 16;
         let hash_f = (hash & 0xFFFF) as f32 / 65536.0;
         let sign = hash_f * 2.0 - 1.0; // -1.0..1.0
@@ -437,6 +444,7 @@ pub fn generate_return_path(
     start_pos: Vec3,
     config: &DroneConfig,
     drone_index: u8,
+    race_seed: u32,
 ) -> Option<CubicCurve<Vec3>> {
     let speed = velocity.length();
     let vel_dir = if speed > 0.1 {
@@ -445,8 +453,10 @@ pub fn generate_return_path(
         Vec3::NEG_Z
     };
 
-    // Deterministic per-drone hash for variation (no RNG needed)
-    let hash = ((drone_index as u32).wrapping_mul(2654435761)) >> 16;
+    // Deterministic per-drone hash for variation (seed mixed in)
+    let hash = ((drone_index as u32).wrapping_mul(2654435761))
+        .wrapping_add(race_seed.wrapping_mul(1503267967))
+        >> 16;
     let hash_f = (hash & 0xFFFF) as f32 / 65536.0; // 0.0..1.0
 
     // W0: current position
@@ -1026,7 +1036,7 @@ mod tests {
         let start_pos = Vec3::new(0.0, 1.5, 5.0);
 
         let spline =
-            generate_return_path(current_pos, velocity, start_pos, &config, 0)
+            generate_return_path(current_pos, velocity, start_pos, &config, 0, 0)
                 .expect("should produce a return path");
 
         // Spline starts near current_pos and ends near start_pos
@@ -1060,9 +1070,9 @@ mod tests {
         let start_pos = Vec3::new(0.0, 1.5, 5.0);
 
         let spline0 =
-            generate_return_path(current_pos, velocity, start_pos, &config, 0).unwrap();
+            generate_return_path(current_pos, velocity, start_pos, &config, 0, 0).unwrap();
         let spline5 =
-            generate_return_path(current_pos, velocity, start_pos, &config, 5).unwrap();
+            generate_return_path(current_pos, velocity, start_pos, &config, 5, 0).unwrap();
 
         // Sample at midpoint — different drones should take different paths
         let mid_t = spline0.segments().len() as f32 / 2.0;
@@ -1149,8 +1159,8 @@ mod tests {
             ..neutral_drone_config()
         };
 
-        let path_a = generate_drone_race_path(&course, &lib, &config_a, 0).unwrap();
-        let path_b = generate_drone_race_path(&course, &lib, &config_b, 1).unwrap();
+        let path_a = generate_drone_race_path(&course, &lib, &config_a, 0, 0).unwrap();
+        let path_b = generate_drone_race_path(&course, &lib, &config_b, 1, 0).unwrap();
 
         // Sample at midleg points (between gates) — these should differ most
         let mut any_differ = false;
@@ -1185,7 +1195,7 @@ mod tests {
             ..neutral_drone_config()
         };
 
-        let path = generate_drone_race_path(&course, &lib, &config, 7).unwrap();
+        let path = generate_drone_race_path(&course, &lib, &config, 7, 0).unwrap();
 
         for (i, gate_pos) in path.gate_positions.iter().enumerate() {
             let mid_t = i as f32 * POINTS_PER_GATE + 0.5;
@@ -1218,7 +1228,7 @@ mod tests {
             ..neutral_drone_config()
         };
 
-        let path = generate_drone_race_path(&course, &lib, &config, 3).unwrap();
+        let path = generate_drone_race_path(&course, &lib, &config, 3, 0).unwrap();
 
         for (i, fwd) in path.gate_forwards.iter().enumerate() {
             let mid_t = i as f32 * POINTS_PER_GATE + 0.5;
@@ -1258,7 +1268,7 @@ mod tests {
         let mut max_vertical = 0.0_f32;
 
         for idx in 0..12u8 {
-            let path = generate_drone_race_path(&course, &lib, &config, idx).unwrap();
+            let path = generate_drone_race_path(&course, &lib, &config, idx, 0).unwrap();
             let delta = path.gate_positions[0] - gate0_center;
             // Gate 0 forward is NEG_Z; lateral is X, vertical is Y
             max_horizontal = max_horizontal.max(delta.x.abs());
@@ -1293,7 +1303,7 @@ mod tests {
         };
 
         let base = generate_race_path(&course, &lib).unwrap();
-        let drone = generate_drone_race_path(&course, &lib, &neutral_drone_config(), 0).unwrap();
+        let drone = generate_drone_race_path(&course, &lib, &neutral_drone_config(), 0, 0).unwrap();
 
         // With neutral config (bias=0, scale=1.0), splines should be identical
         let total_t = 3.0 * POINTS_PER_GATE;
