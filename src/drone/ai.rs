@@ -106,7 +106,7 @@ pub fn update_ai_targets(
         &mut query
     {
         match *phase {
-            DronePhase::Idle => continue,
+            DronePhase::Idle | DronePhase::Crashed => continue,
             DronePhase::Racing => {
                 let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
                 let finish_t = cycle_t + FINISH_EXTENSION;
@@ -247,7 +247,7 @@ pub fn compute_racing_line(
 
     for (transform, ai, config, phase, return_path, mut desired) in &mut query {
         match *phase {
-            DronePhase::Idle => continue,
+            DronePhase::Idle | DronePhase::Crashed => continue,
             DronePhase::Racing => {
                 let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
                 let finish_t = cycle_t + FINISH_EXTENSION;
@@ -354,12 +354,12 @@ pub fn proximity_avoidance(
     // Snapshot positions, velocities, and indices (12 drones = tiny allocation)
     let drone_data: Vec<(u8, Vec3, Vec3)> = query
         .iter()
-        .filter(|(_, _, _, phase, _)| **phase != DronePhase::Idle)
+        .filter(|(_, _, _, phase, _)| !matches!(**phase, DronePhase::Idle | DronePhase::Crashed))
         .map(|(tr, drone, dyn_, _, _)| (drone.index, tr.translation, dyn_.velocity))
         .collect();
 
     for (transform, drone, dynamics, phase, mut desired) in &mut query {
-        if *phase == DronePhase::Idle {
+        if matches!(*phase, DronePhase::Idle | DronePhase::Crashed) {
             continue;
         }
 

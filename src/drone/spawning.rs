@@ -17,7 +17,7 @@ const GATE_WIDTH_USAGE: f32 = 0.8;
 
 /// Per-drone colors from the 64-color palette (assets/color/color_palette_64.hex).
 /// 12 colors chosen for maximum hue spread and visual contrast.
-const DRONE_COLORS: [[f32; 3]; 12] = [
+pub const DRONE_COLORS: [[f32; 3]; 12] = [
     [0.961, 0.192, 0.255], // Neon Red    #f53141
     [0.961, 0.506, 0.133], // Sunflower   #f58122
     [0.980, 0.851, 0.216], // Limon       #fad937

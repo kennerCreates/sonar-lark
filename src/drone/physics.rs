@@ -58,6 +58,7 @@ pub fn position_pid(
         &mut PositionPid,
         &DroneDynamics,
         &mut DesiredAttitude,
+        &DronePhase,
     )>,
 ) {
     let dt = time.delta_secs();
@@ -65,7 +66,10 @@ pub fn position_pid(
         return;
     }
 
-    for (transform, desired, mut pid, dynamics, mut attitude) in &mut query {
+    for (transform, desired, mut pid, dynamics, mut attitude, phase) in &mut query {
+        if *phase == DronePhase::Crashed {
+            continue;
+        }
         let error = desired.position - transform.translation;
 
         pid.integral = (pid.integral + error * dt).clamp(
@@ -126,14 +130,17 @@ pub fn position_pid(
 /// and integrates angular velocity and orientation.
 pub fn attitude_controller(
     time: Res<Time>,
-    mut query: Query<(&mut Transform, &mut DroneDynamics, &DesiredAttitude, &AttitudePd)>,
+    mut query: Query<(&mut Transform, &mut DroneDynamics, &DesiredAttitude, &AttitudePd, &DronePhase)>,
 ) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    for (mut transform, mut dynamics, attitude, pd) in &mut query {
+    for (mut transform, mut dynamics, attitude, pd, phase) in &mut query {
+        if *phase == DronePhase::Crashed {
+            continue;
+        }
         // Orientation error: rotation from current to desired
         let error_quat = attitude.orientation * transform.rotation.inverse();
 
@@ -186,7 +193,7 @@ pub fn dirty_air_perturbation(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
     race_seed: Option<Res<RaceSeed>>,
-    mut query: Query<(&Transform, &Drone, &mut DroneDynamics)>,
+    mut query: Query<(&Transform, &Drone, &mut DroneDynamics, &DronePhase)>,
 ) {
     let dt = time.delta_secs();
     if dt == 0.0 || tuning.dirty_air_strength == 0.0 {
@@ -195,13 +202,16 @@ pub fn dirty_air_perturbation(
     let t = time.elapsed_secs();
     let seed_phase = race_seed.map_or(0.0, |s| (s.0 & 0xFFFF) as f32 / 65536.0 * 100.0);
 
-    // Collect positions and velocities (12 drones = tiny allocation)
     let drone_data: Vec<(u8, Vec3, Vec3, f32)> = query
         .iter()
-        .map(|(tr, drone, dyn_)| (drone.index, tr.translation, dyn_.velocity, dyn_.velocity.length()))
+        .filter(|(_, _, _, phase)| **phase != DronePhase::Crashed)
+        .map(|(tr, drone, dyn_, _)| (drone.index, tr.translation, dyn_.velocity, dyn_.velocity.length()))
         .collect();
 
-    for (transform, drone, mut dynamics) in &mut query {
+    for (transform, drone, mut dynamics, phase) in &mut query {
+        if *phase == DronePhase::Crashed {
+            continue;
+        }
         let my_pos = transform.translation;
         let my_idx = drone.index;
 
@@ -252,13 +262,16 @@ pub fn dirty_air_perturbation(
 }
 
 /// First-order low-pass filter on thrust, simulating motor spool-up lag.
-pub fn motor_lag(time: Res<Time>, mut query: Query<(&mut DroneDynamics, &DesiredAttitude)>) {
+pub fn motor_lag(time: Res<Time>, mut query: Query<(&mut DroneDynamics, &DesiredAttitude, &DronePhase)>) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    for (mut dynamics, attitude) in &mut query {
+    for (mut dynamics, attitude, phase) in &mut query {
+        if *phase == DronePhase::Crashed {
+            continue;
+        }
         dynamics.commanded_thrust = attitude.thrust_magnitude;
         let alpha = (dt / dynamics.motor_time_constant).min(1.0);
         dynamics.thrust += (dynamics.commanded_thrust - dynamics.thrust) * alpha;
@@ -274,14 +287,13 @@ pub fn apply_forces(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
     race_clock: Option<Res<RaceClock>>,
-    mut query: Query<(&Transform, &mut DroneDynamics, &DesiredPosition), With<Drone>>,
+    mut query: Query<(&Transform, &mut DroneDynamics, &DesiredPosition, &DronePhase), With<Drone>>,
 ) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    // Battery sag: linear thrust reduction over race duration
     let sag_mult = if let Some(ref clock) = race_clock {
         if clock.running {
             let progress = (clock.elapsed / RACE_DURATION_ESTIMATE).min(1.0);
@@ -293,7 +305,10 @@ pub fn apply_forces(
         1.0
     };
 
-    for (transform, mut dynamics, desired) in &mut query {
+    for (transform, mut dynamics, desired, phase) in &mut query {
+        if *phase == DronePhase::Crashed {
+            continue;
+        }
         // Thrust always along body-up axis, reduced by battery sag
         let body_up = transform.rotation * Vec3::Y;
         let thrust_force = body_up * dynamics.thrust * sag_mult;
@@ -330,21 +345,27 @@ pub fn apply_forces(
 /// Position integration from velocity.
 pub fn integrate_motion(
     time: Res<Time>,
-    mut query: Query<(&mut Transform, &DroneDynamics), With<Drone>>,
+    mut query: Query<(&mut Transform, &DroneDynamics, &DronePhase), With<Drone>>,
 ) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    for (mut transform, dynamics) in &mut query {
+    for (mut transform, dynamics, phase) in &mut query {
+        if *phase == DronePhase::Crashed {
+            continue;
+        }
         transform.translation += dynamics.velocity * dt;
     }
 }
 
 /// Prevents drones from going below ground.
-pub fn clamp_transform(mut query: Query<(&mut Transform, &mut DroneDynamics), With<Drone>>) {
-    for (mut transform, mut dynamics) in &mut query {
+pub fn clamp_transform(mut query: Query<(&mut Transform, &mut DroneDynamics, &DronePhase), With<Drone>>) {
+    for (mut transform, mut dynamics, phase) in &mut query {
+        if *phase == DronePhase::Crashed {
+            continue;
+        }
         if transform.translation.y < GROUND_HEIGHT {
             transform.translation.y = GROUND_HEIGHT;
             if dynamics.velocity.y < 0.0 {

@@ -43,6 +43,7 @@ src/
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
 │   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance (FixedUpdate, spline-based)
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
+│   ├── explosion.rs     Crash explosion particles + audio (ExplosionParticle, ExplosionSounds, spawn/update systems)
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, RacePath/spline generation
 ├── race/                Race mechanics
 │   ├── gate.rs          GateIndex, trigger volume overlap detection
@@ -118,7 +119,9 @@ CourseData ──► spawn obstacles + drones
 | `DroneAssets` | Resource | drone/spawning | Shared mesh/material handles for all drone entities (from glTF or placeholder) |
 | `DroneGltfHandle` | Resource | drone/spawning | Handle to the loaded drone glTF asset |
 | `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint + curvature-aware speed limit |
-| `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning |
+| `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning, Crashed |
+| `ExplosionParticle` | Component | drone/explosion | Velocity, lifetime, remaining time for crash particles |
+| `ExplosionSounds` | Resource | drone/explosion | 4 handles to explosion audio variants (assets/sounds/explosion_{1..4}.wav) |
 | `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
 | `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (14 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength, proximity avoidance radius/strength, velocity feedforward blend). Persists across race restarts. Exposed via dev dashboard (F4) |
 

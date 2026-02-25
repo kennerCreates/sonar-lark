@@ -206,7 +206,7 @@ pub fn draw_drone_state(
                     }
                 }
             }
-            DronePhase::Idle => {}
+            DronePhase::Idle | DronePhase::Crashed => {}
         }
     }
 }

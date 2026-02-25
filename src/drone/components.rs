@@ -168,6 +168,7 @@ pub enum DronePhase {
     Idle,
     Racing,
     Returning,
+    Crashed,
 }
 
 /// A one-way spline path for a drone flying back to its start position after finishing the race.

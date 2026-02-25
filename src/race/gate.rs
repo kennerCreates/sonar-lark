@@ -2,6 +2,8 @@ use bevy::prelude::*;
 
 use crate::drone::ai::FINISH_EXTENSION;
 use crate::drone::components::{AIController, Drone, DroneDynamics, DronePhase, POINTS_PER_GATE};
+use crate::drone::explosion::{self, ExplosionSounds};
+use crate::drone::spawning::DRONE_COLORS;
 use crate::obstacle::spawning::TriggerVolume;
 
 use super::progress::{DnfReason, RaceProgress};
@@ -88,21 +90,27 @@ pub fn gate_trigger_check(
 }
 
 /// Detects when a drone has advanced past its expected gate without triggering it.
-/// On miss: hard crash (Idle + zero velocity + DNF).
+/// On miss: crash with explosion effect (hidden + particles + sound).
 pub fn miss_detection(
+    mut commands: Commands,
     mut progress: Option<ResMut<RaceProgress>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    explosion_sounds: Option<Res<ExplosionSounds>>,
     mut drone_query: Query<(
         &Drone,
+        &Transform,
         &AIController,
         &mut DronePhase,
         &mut DroneDynamics,
+        &mut Visibility,
     )>,
 ) {
     let Some(ref mut progress) = progress else {
         return;
     };
 
-    for (drone, ai, mut phase, mut dynamics) in &mut drone_query {
+    for (drone, transform, ai, mut phase, mut dynamics, mut visibility) in &mut drone_query {
         if *phase != DronePhase::Racing {
             continue;
         }
@@ -116,18 +124,28 @@ pub fn miss_detection(
         let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
 
         let miss_threshold = if expected < progress.total_gates {
-            // Normal gate: missed if drone is past the departure zone of the expected gate
-            // and into the approach zone of the next gate
             (expected as f32 + 1.0) * POINTS_PER_GATE
         } else {
-            // Finish pass (gate 0 second time): missed if at the end of race extension
             cycle_t + FINISH_EXTENSION
         };
 
         if ai.spline_t > miss_threshold {
             progress.record_crash(drone_idx, DnfReason::MissedGate(expected));
-            *phase = DronePhase::Idle;
+            *phase = DronePhase::Crashed;
             dynamics.velocity = Vec3::ZERO;
+            dynamics.angular_velocity = Vec3::ZERO;
+            *visibility = Visibility::Hidden;
+
+            let [r, g, b] = DRONE_COLORS[drone_idx];
+            explosion::spawn_explosion(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                transform.translation,
+                Color::srgb(r, g, b),
+                explosion_sounds.as_deref(),
+            );
+
             warn!(
                 "Drone {} CRASHED — missed gate {} (spline_t={:.1}, threshold={:.1})",
                 drone.index, expected, ai.spline_t, miss_threshold
