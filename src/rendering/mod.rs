@@ -3,7 +3,7 @@ pub mod skybox;
 
 use bevy::prelude::*;
 
-pub use cel_material::{CelMaterial, cel_material_from_color};
+pub use cel_material::{CelMaterial, cel_material_flat, cel_material_from_color};
 pub use skybox::SkyboxMaterial;
 
 /// World-space light direction for cel materials (toward the light source).

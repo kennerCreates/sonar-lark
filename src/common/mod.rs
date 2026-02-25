@@ -2,7 +2,7 @@ use bevy::picking::Pickable;
 use bevy::prelude::*;
 
 use crate::rendering::{
-    CelLightDir, CelMaterial, cel_material_from_color,
+    CelLightDir, CelMaterial, cel_material_flat,
     skybox::{self, SkyboxMaterial},
     light_direction_from_transform,
 };
@@ -36,9 +36,11 @@ fn setup_environment(
     ));
 
     // Ground plane: dark TRON ground (not pickable — clicks pass through to obstacles)
+    // Uses flat material (no cel-shading) since the uniform normal would place the
+    // entire plane in one lighting band, distorting the intended color.
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(6000.0, 6000.0))),
-        MeshMaterial3d(cel_materials.add(cel_material_from_color(
+        MeshMaterial3d(cel_materials.add(cel_material_flat(
             Color::srgb(0.020, 0.055, 0.102), // Smoky Black #050e1a
             light_dir,
         ))),
