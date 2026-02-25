@@ -33,8 +33,8 @@ pub struct ResultsTransitionTimer {
     pub remaining: f32,
 }
 
-/// Run condition: returns true when any drone is actively racing or returning.
-/// Used to keep AI systems running during the post-race return flight.
+/// Run condition: returns true when any drone is actively racing, victory-lapping, or returning.
+/// Used to keep AI systems running during and after the race.
 pub fn drones_are_active(
     phase: Option<Res<RacePhase>>,
     drones: Query<&DronePhase, With<Drone>>,
@@ -42,7 +42,9 @@ pub fn drones_are_active(
     if phase.is_some_and(|p| *p == RacePhase::Racing) {
         return true;
     }
-    drones.iter().any(|dp| *dp == DronePhase::Returning)
+    drones
+        .iter()
+        .any(|dp| matches!(*dp, DronePhase::Returning | DronePhase::VictoryLap))
 }
 
 /// Ticks the countdown timer each frame, then transitions to Racing when it expires.

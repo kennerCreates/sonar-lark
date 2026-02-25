@@ -167,6 +167,8 @@ pub enum DronePhase {
     Idle,
     Racing,
     Returning,
+    /// Drone has finished the race and is continuing to lap the course.
+    VictoryLap,
     Crashed,
 }
 

@@ -164,7 +164,7 @@ pub fn draw_drone_state(
         gizmos.arrow(pos, vel_end, Color::srgb(1.0, 0.3, 0.3));
 
         match phase {
-            DronePhase::Racing => {
+            DronePhase::Racing | DronePhase::VictoryLap => {
                 // Where the drone is on the race spline (orange sphere)
                 if ai.spline_t < total_t {
                     let curve_pos = ai.spline.position(ai.spline_t);

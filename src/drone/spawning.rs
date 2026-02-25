@@ -226,7 +226,7 @@ pub fn spawn_drones(
             DronePhase::default(),
             PreviousTranslation(position),
             PreviousRotation(rotation),
-            DespawnOnExit(AppState::Race),
+            DespawnOnExit(AppState::Results),
         ));
 
         let drone_color = DRONE_COLORS[i as usize];

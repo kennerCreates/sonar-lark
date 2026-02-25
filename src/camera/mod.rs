@@ -18,6 +18,11 @@ use settings::CameraSettings;
 use spectator::SpectatorOrbitState;
 use switching::{CameraMode, CameraState};
 
+/// Run condition: true during Race or Results (camera follows drones in both).
+fn in_race_or_results(state: Res<State<AppState>>) -> bool {
+    matches!(state.get(), AppState::Race | AppState::Results)
+}
+
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
@@ -30,29 +35,29 @@ impl Plugin for CameraPlugin {
             .add_systems(Startup, spawn_camera)
             // Race camera lifecycle
             .add_systems(OnEnter(AppState::Race), switching::reset_camera_for_race)
-            .add_systems(OnExit(AppState::Race), switching::reset_camera_on_exit)
-            // Race camera mode switching (always active during race)
+            .add_systems(OnExit(AppState::Results), switching::reset_camera_on_exit)
+            // Race camera mode switching (active during Race and Results)
             .add_systems(
                 Update,
-                switching::handle_camera_keys.run_if(in_state(AppState::Race)),
+                switching::handle_camera_keys.run_if(in_race_or_results),
             )
-            // Mode-specific camera systems during Race
+            // Mode-specific camera systems during Race and Results
             .add_systems(
                 Update,
                 spectator::spectator_movement
-                    .run_if(in_state(AppState::Race))
+                    .run_if(in_race_or_results)
                     .run_if(camera_mode_is(CameraMode::Spectator)),
             )
             .add_systems(
                 Update,
                 chase::chase_camera_update
-                    .run_if(in_state(AppState::Race))
+                    .run_if(in_race_or_results)
                     .run_if(camera_mode_is(CameraMode::Chase)),
             )
             .add_systems(
                 Update,
                 fpv::fpv_camera_update
-                    .run_if(in_state(AppState::Race))
+                    .run_if(in_race_or_results)
                     .run_if(camera_mode_is(CameraMode::Fpv)),
             )
             // Editor camera rig lifecycle

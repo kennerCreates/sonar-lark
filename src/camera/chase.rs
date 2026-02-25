@@ -80,19 +80,19 @@ pub fn chase_camera_update(
     let dt = time.delta_secs();
     let alpha = fixed_time.overstep_fraction();
 
-    // Find the best drone to follow: prefer highest-ranked still-Racing drone.
-    // If no drones are racing, freeze the camera at its current position
-    // (keeps framing the finish area instead of following returning drones).
+    // Find the best drone to follow: prefer highest-ranked actively-flying drone.
+    // If no drones are flying, smoothly transition to framing the finish gate.
     let target_data = progress
         .as_ref()
         .and_then(|p| {
             let standings = p.standings();
-            // First: highest-ranked drone that's still Racing
+            // First: highest-ranked drone that's actively flying (Racing or VictoryLap)
             standings
                 .iter()
                 .find_map(|&(idx, _)| {
                     drones.iter().find(|(_, d, _, phase, _)| {
-                        d.index as usize == idx && **phase == DronePhase::Racing
+                        d.index as usize == idx
+                            && matches!(**phase, DronePhase::Racing | DronePhase::VictoryLap)
                     })
                 })
                 // Fallback: highest-ranked non-crashed drone (pre-race / idle)

@@ -14,6 +14,11 @@ use crate::race::lifecycle::drones_are_active;
 use crate::states::AppState;
 use components::AiTuningParams;
 
+/// Run condition: true during Race or Results (drones fly in both states).
+fn in_race_or_results(state: Res<State<AppState>>) -> bool {
+    matches!(state.get(), AppState::Race | AppState::Results)
+}
+
 pub struct DronePlugin;
 
 impl Plugin for DronePlugin {
@@ -30,7 +35,7 @@ impl Plugin for DronePlugin {
             .add_systems(
                 FixedPreUpdate,
                 interpolation::save_previous_transforms
-                    .run_if(in_state(AppState::Race)),
+                    .run_if(in_race_or_results),
             )
             // Poll for asset readiness and spawn drones once ready
             .add_systems(
@@ -57,7 +62,7 @@ impl Plugin for DronePlugin {
                     physics::clamp_transform,
                 )
                     .chain()
-                    .run_if(in_state(AppState::Race)),
+                    .run_if(in_race_or_results),
             )
             // Flight debug visualization (F3 to toggle)
             .add_systems(
@@ -87,10 +92,10 @@ impl Plugin for DronePlugin {
             .add_systems(
                 Update,
                 explosion::update_explosion_particles
-                    .run_if(in_state(AppState::Race)),
+                    .run_if(in_race_or_results),
             )
-            // Cleanup resources on exit
-            .add_systems(OnExit(AppState::Race), (
+            // Cleanup resources when leaving Results (drones persist Race → Results)
+            .add_systems(OnExit(AppState::Results), (
                 spawning::cleanup_drone_resources,
                 explosion::cleanup_explosion_assets,
             ));

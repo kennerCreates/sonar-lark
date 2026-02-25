@@ -139,7 +139,7 @@ pub fn spawn_explosion(
                 remaining: DEBRIS_LIFETIME,
                 kind: ParticleKind::Debris,
             },
-            DespawnOnExit(AppState::Race),
+            DespawnOnExit(AppState::Results),
         ));
     }
 
@@ -172,7 +172,7 @@ pub fn spawn_explosion(
                 remaining: HOT_SMOKE_LIFETIME,
                 kind: ParticleKind::HotSmoke,
             },
-            DespawnOnExit(AppState::Race),
+            DespawnOnExit(AppState::Results),
         ));
     }
 
@@ -204,7 +204,7 @@ pub fn spawn_explosion(
                 remaining: DARK_SMOKE_LIFETIME,
                 kind: ParticleKind::DarkSmoke,
             },
-            DespawnOnExit(AppState::Race),
+            DespawnOnExit(AppState::Results),
         ));
     }
 
@@ -215,7 +215,7 @@ pub fn spawn_explosion(
             commands.spawn((
                 AudioPlayer::new(sounds.0[idx].clone()),
                 PlaybackSettings::DESPAWN,
-                DespawnOnExit(AppState::Race),
+                DespawnOnExit(AppState::Results),
             ));
         }
     }

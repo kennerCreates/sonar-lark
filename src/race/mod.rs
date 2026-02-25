@@ -52,7 +52,9 @@ impl Plugin for RacePlugin {
                 )
                     .run_if(in_state(AppState::Race)),
             )
-            .add_systems(OnExit(AppState::Race), cleanup_race);
+            .add_systems(OnExit(AppState::Race), cleanup_race)
+            // RaceProgress persists into Results for camera drone-finding; clean up on exit
+            .add_systems(OnExit(AppState::Results), cleanup_race_progress);
     }
 }
 
@@ -62,8 +64,11 @@ fn setup_race(mut commands: Commands) {
 
 fn cleanup_race(mut commands: Commands) {
     commands.remove_resource::<lifecycle::RacePhase>();
-    commands.remove_resource::<progress::RaceProgress>();
     commands.remove_resource::<timing::RaceClock>();
     commands.remove_resource::<lifecycle::CountdownTimer>();
     commands.remove_resource::<lifecycle::ResultsTransitionTimer>();
+}
+
+fn cleanup_race_progress(mut commands: Commands) {
+    commands.remove_resource::<progress::RaceProgress>();
 }

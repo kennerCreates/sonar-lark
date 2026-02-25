@@ -102,7 +102,7 @@ pub fn fpv_camera_update(
         return;
     }
 
-    // For returning drones, freeze the camera so it stays at the finish area
+    // For returning/idle drones, freeze the camera
     if *phase == DronePhase::Returning || *phase == DronePhase::Idle {
         return;
     }
@@ -147,8 +147,10 @@ pub fn fpv_camera_update(
     follow.position.update(target_pos, POSITION_HALF_LIFE, dt);
     cam_tf.translation = follow.position.value;
 
-    // Compute look target: spline-based during Racing, velocity-based otherwise
-    let raw_look_target = if *phase == DronePhase::Racing && ai.spline_t > 0.0 {
+    // Compute look target: spline-based during Racing/VictoryLap, velocity-based otherwise
+    let raw_look_target = if matches!(*phase, DronePhase::Racing | DronePhase::VictoryLap)
+        && ai.spline_t > 0.0
+    {
         let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
         let sample_t = ai.spline_t + LOOK_AHEAD_SPLINE_T;
         let spline_ahead = ai.spline.position(sample_t.rem_euclid(cycle_t));
