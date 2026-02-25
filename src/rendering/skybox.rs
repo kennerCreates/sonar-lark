@@ -54,7 +54,7 @@ pub fn spawn_skybox(
     // Palette colors for TRON night sky
     let sky_dark = Color::srgb(0.020, 0.055, 0.102);     // Smoky Black #050e1a
     let sky_mid = Color::srgb(0.051, 0.129, 0.251);       // Indigo #0d2140
-    let sky_bright = Color::srgb(0.075, 0.160, 0.300);    // Slightly lighter indigo
+    let sky_bright = Color::srgb(0.110, 0.157, 0.302);    // Space Cadet #1c284d
     let moon_color = Color::srgb(0.949, 0.949, 0.855);    // Vanilla #f2f2da
     let neon_glow = Color::srgb(0.286, 0.761, 0.949);     // Sky #49c2f2
 
