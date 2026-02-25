@@ -48,6 +48,7 @@ src/
 │   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance (FixedUpdate, spline-based)
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
 │   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio (ExplosionParticle, ParticleKind, ExplosionSounds, ExplosionMeshes)
+│   ├── fireworks.rs     Victory fireworks on first finish: gate confetti + 3 staggered overhead shell bursts (FireworkParticle, FireworkMeshes, FireworkSounds, PendingShell)
 │   ├── paths.rs         RacePath, spline generation (race/drone/return), compute_start_positions, adaptive_approach_offset
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, DRONE_COLORS/DRONE_NAMES
 ├── race/                Race mechanics
@@ -141,6 +142,11 @@ CourseData ──► spawn obstacles + drones
 | `ExplosionParticle` | Component | drone/explosion | Velocity, lifetime, remaining time, and `ParticleKind` (Debris/HotSmoke/DarkSmoke) for crash particles |
 | `ExplosionSounds` | Resource | drone/explosion | 4 handles to explosion audio variants (assets/sounds/explosion_{1..4}.wav) |
 | `ExplosionMeshes` | Resource | drone/explosion | Pre-allocated mesh handles for debris (3 sizes), hot smoke, dark smoke — shared across all explosions |
+| `FireworkParticle` | Component | drone/fireworks | Velocity, lifetime, remaining time, and `FireworkKind` (Spark/Willow/Confetti) for victory firework particles |
+| `FireworkMeshes` | Resource | drone/fireworks | Pre-allocated mesh handles for spark, willow, confetti particle sizes |
+| `FireworkSounds` | Resource | drone/fireworks | Handle to firework burst audio (assets/sounds/firework.wav) |
+| `FireworksTriggered` | Resource | drone/fireworks | Marker preventing re-triggering of fireworks after first drone finishes |
+| `PendingShell` | Component | drone/fireworks | Staggered detonation timer for overhead shell bursts (position, delay, colors) |
 | `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
 | `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (14 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength, proximity avoidance radius/strength, velocity feedforward blend). Persists across race restarts. Exposed via dev dashboard (F4) |
 | `LeaderboardRoot` | Component | race/ui | Marker on the race leaderboard panel (top-left standings display, 12 rows with color bars, names, times) |
@@ -153,6 +159,8 @@ assets/
 ├── models/drone.glb                  Drone model (named node "Drone"), materials from glb
 ├── shaders/cel_halftone.wgsl         Cel-shading fragment shader (halftone dots, hue shifting)
 ├── shaders/tron_skybox.wgsl          Procedural TRON night skybox shader
+├── sounds/explosion_{1..4}.wav       Crash explosion audio variants
+├── sounds/firework.wav               Victory firework burst audio
 ├── library/default.obstacles.ron     Obstacle type definitions
 └── courses/*.course.ron              Saved race courses
 ```
@@ -164,6 +172,7 @@ assets/
 - AI spline sampling: O(12) per fixed tick (polynomial eval per drone, 5 curvature samples for speed limiting)
 - Dirty air perturbation: O(12²) = O(144) distance/dot-product checks per fixed tick (negligible)
 - Proximity avoidance: O(12²) = O(144) distance checks per fixed tick (negligible)
+- Firework particles: ~180 total (one-shot on first finish), peak ~80 alive at once, O(n) update
 - No system ordering constraints between unrelated plugins — maximum parallelism
 - `DespawnOnExit` for automatic entity cleanup on state transitions
 

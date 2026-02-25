@@ -3,6 +3,7 @@ pub mod components;
 pub mod debug_draw;
 pub mod dev_dashboard;
 pub mod explosion;
+pub mod fireworks;
 pub mod interpolation;
 pub mod paths;
 pub mod physics;
@@ -26,10 +27,11 @@ impl Plugin for DronePlugin {
         app
             // AI tuning params persist across race restarts
             .init_resource::<AiTuningParams>()
-            // Start loading drone glTF and explosion sound when entering Race
+            // Start loading drone glTF, explosion, and firework assets when entering Race
             .add_systems(OnEnter(AppState::Race), (
                 spawning::load_drone_gltf,
                 explosion::load_explosion_assets,
+                fireworks::load_firework_assets,
             ))
             // Snapshot transforms before physics for camera interpolation
             .add_systems(
@@ -94,10 +96,22 @@ impl Plugin for DronePlugin {
                 explosion::update_explosion_particles
                     .run_if(in_race_or_results),
             )
+            // Fireworks: detect first finish, tick pending shells, update particles
+            .add_systems(
+                Update,
+                fireworks::detect_first_finish
+                    .run_if(in_state(AppState::Race)),
+            )
+            .add_systems(
+                Update,
+                (fireworks::tick_firework_shells, fireworks::update_firework_particles)
+                    .run_if(in_race_or_results),
+            )
             // Cleanup resources when leaving Results (drones persist Race → Results)
             .add_systems(OnExit(AppState::Results), (
                 spawning::cleanup_drone_resources,
                 explosion::cleanup_explosion_assets,
+                fireworks::cleanup_firework_assets,
             ));
     }
 }
