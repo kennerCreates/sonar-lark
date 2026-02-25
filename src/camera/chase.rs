@@ -3,6 +3,7 @@ use bevy::time::Fixed;
 
 use crate::drone::components::{Drone, DroneDynamics, DronePhase};
 use crate::drone::interpolation::PreviousTranslation;
+use crate::race::gate::{GateForward, GateIndex};
 use crate::race::progress::RaceProgress;
 
 use super::orbit::MainCamera;
@@ -48,6 +49,11 @@ const CHASE_FOV_INCREASE_DEG: f32 = 10.0;
 const CHASE_FOV_HALF_LIFE: f32 = 0.30;
 const MAX_DRONE_SPEED: f32 = 55.0;
 
+// Finish camera: wider establishing shot of the finish gate
+const FINISH_BEHIND: f32 = 25.0;
+const FINISH_HEIGHT: f32 = 10.0;
+const FINISH_HALF_LIFE: f32 = 0.5;
+
 /// Leader-focused chase camera. Follows the P1 drone closely,
 /// blending in nearby drones for natural pack-racing framing.
 pub fn chase_camera_update(
@@ -62,6 +68,7 @@ pub fn chase_camera_update(
         &DronePhase,
         &PreviousTranslation,
     )>,
+    gates: Query<(&GlobalTransform, &GateIndex, &GateForward)>,
     mut camera: Query<(&mut Transform, &mut Projection), (With<MainCamera>, Without<Drone>)>,
     mut chase: ResMut<ChaseState>,
 ) {
@@ -73,40 +80,73 @@ pub fn chase_camera_update(
     let dt = time.delta_secs();
     let alpha = fixed_time.overstep_fraction();
 
-    // Find the leader drone via standings
-    let leader_idx = progress
+    // Find the best drone to follow: prefer highest-ranked still-Racing drone.
+    // If no drones are racing, freeze the camera at its current position
+    // (keeps framing the finish area instead of following returning drones).
+    let target_data = progress
         .as_ref()
         .and_then(|p| {
             let standings = p.standings();
-            standings.first().map(|&(idx, _)| idx)
+            // First: highest-ranked drone that's still Racing
+            standings
+                .iter()
+                .find_map(|&(idx, _)| {
+                    drones.iter().find(|(_, d, _, phase, _)| {
+                        d.index as usize == idx && **phase == DronePhase::Racing
+                    })
+                })
+                // Fallback: highest-ranked non-crashed drone (pre-race / idle)
+                .or_else(|| {
+                    standings.iter().find_map(|&(idx, _)| {
+                        drones.iter().find(|(_, d, _, phase, _)| {
+                            d.index as usize == idx && **phase != DronePhase::Crashed
+                                && **phase != DronePhase::Returning
+                        })
+                    })
+                })
         });
 
-    // Find leader entity
-    let leader_data = leader_idx.and_then(|idx| {
-        drones
-            .iter()
-            .find(|(_, d, _, _, _)| d.index as usize == idx)
-    });
-
-    // Fall back to first non-crashed drone if no standings yet
-    let (leader_pos, leader_vel) = if let Some((tf, _, dynamics, _, prev)) = leader_data {
+    // If all drones are returning/crashed, smoothly pull back to frame the finish gate
+    let (leader_pos, leader_vel) = if let Some((tf, _, dynamics, _, prev)) = target_data {
         let interp_pos = prev.0.lerp(tf.translation, alpha);
         (interp_pos, dynamics.velocity)
-    } else {
-        let mut center = Vec3::ZERO;
-        let mut avg_vel = Vec3::ZERO;
-        let mut count = 0u32;
-        for (tf, _, dynamics, phase, prev) in &drones {
-            if *phase != DronePhase::Crashed {
-                center += prev.0.lerp(tf.translation, alpha);
-                avg_vel += dynamics.velocity;
-                count += 1;
-            }
-        }
-        if count == 0 {
+    } else if chase.initialized {
+        // Find the finish gate (gate 0) and spring-smooth toward it
+        let finish_gate = gates.iter().find(|(_, idx, _)| idx.0 == 0);
+        let Ok((mut cam_transform, mut projection)) = camera.single_mut() else {
             return;
+        };
+
+        if let Some((gate_tf, _, gate_fwd)) = finish_gate {
+            let gate_pos = gate_tf.translation();
+            let gate_forward = gate_fwd.0.normalize_or(Vec3::NEG_Z);
+
+            // Spring-smooth center toward gate position
+            chase.center.update(gate_pos, FINISH_HALF_LIFE, dt);
+            // Spring-smooth velocity_dir toward gate forward (camera looks from approach side)
+            chase.velocity_dir.update(gate_forward, FINISH_HALF_LIFE, dt);
         }
-        (center / count as f32, avg_vel / count as f32)
+        // If no gate found, springs just hold their last values
+
+        let forward = Vec3::new(
+            chase.velocity_dir.value.x,
+            0.0,
+            chase.velocity_dir.value.z,
+        )
+        .normalize_or(Vec3::NEG_Z);
+        cam_transform.translation =
+            chase.center.value - forward * FINISH_BEHIND + Vec3::Y * FINISH_HEIGHT;
+        let look_target = chase.center.value;
+        chase.look_target.update(look_target, FINISH_HALF_LIFE, dt);
+        cam_transform.look_at(chase.look_target.value, Vec3::Y);
+
+        chase.fov.update(CHASE_BASE_FOV_DEG.to_radians(), CHASE_FOV_HALF_LIFE, dt);
+        if let Projection::Perspective(ref mut persp) = *projection {
+            persp.fov = chase.fov.value;
+        }
+        return;
+    } else {
+        return;
     };
 
     // Find nearby non-crashed drones within proximity radius of leader

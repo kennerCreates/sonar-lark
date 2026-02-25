@@ -4,7 +4,7 @@ use std::path::Path;
 use bevy::prelude::*;
 
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::{spawn_obstacle, ObstaclesGltfHandle};
+use crate::obstacle::spawning::{spawn_obstacle, ObstacleMarker, ObstaclesGltfHandle};
 use crate::rendering::{CelLightDir, CelMaterial};
 use super::data::CourseData;
 
@@ -104,6 +104,18 @@ pub fn spawn_course(
 
 pub fn cleanup_course_spawned(mut commands: Commands) {
     commands.remove_resource::<CourseSpawned>();
+}
+
+/// Despawns all course obstacle entities. Used when leaving Race for a non-Results
+/// state (e.g. Editor), since obstacles use `DespawnOnExit(Results)` and would
+/// otherwise leak.
+pub fn despawn_course_obstacles(
+    mut commands: Commands,
+    obstacles: Query<Entity, With<ObstacleMarker>>,
+) {
+    for entity in &obstacles {
+        commands.entity(entity).despawn();
+    }
 }
 
 pub fn load_course_from_file(path: &Path) -> Result<CourseData, String> {

@@ -102,6 +102,11 @@ pub fn fpv_camera_update(
         return;
     }
 
+    // For returning drones, freeze the camera so it stays at the finish area
+    if *phase == DronePhase::Returning || *phase == DronePhase::Idle {
+        return;
+    }
+
     let dt = time.delta_secs();
 
     // Extract heading from velocity (horizontal only) for stability.

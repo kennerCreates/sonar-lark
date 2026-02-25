@@ -19,6 +19,10 @@ impl Plugin for CoursePlugin {
             Update,
             loader::spawn_course.run_if(in_state(AppState::Race)),
         )
-        .add_systems(OnExit(AppState::Race), loader::cleanup_course_spawned);
+        // Reset spawn guard so obstacles can be re-spawned on next Race entry
+        .add_systems(OnExit(AppState::Race), loader::cleanup_course_spawned)
+        // Obstacles use DespawnOnExit(Results) to stay visible as a backdrop.
+        // For the Race → Editor path (bypasses Results), manually despawn them.
+        .add_systems(OnEnter(AppState::Editor), loader::despawn_course_obstacles);
     }
 }

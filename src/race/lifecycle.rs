@@ -120,7 +120,7 @@ pub fn check_race_finished(
         if let Some(ref mut clock) = clock {
             clock.running = false;
         }
-        commands.insert_resource(ResultsTransitionTimer { remaining: 0.5 });
+        commands.insert_resource(ResultsTransitionTimer { remaining: 3.0 });
         info!("Race finished! All drones completed or crashed.");
     }
 }
