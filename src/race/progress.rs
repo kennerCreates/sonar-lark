@@ -123,6 +123,7 @@ pub struct RaceResultEntry {
     pub finished: bool,
     pub finish_time: Option<f32>,
     pub crashed: bool,
+    #[allow(dead_code)]
     pub gates_passed: u32,
 }
 

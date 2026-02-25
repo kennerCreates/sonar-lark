@@ -16,12 +16,17 @@
 - [x] **Rendering Overhaul**: Cel-shaded materials with halftone gradient effect and hue shifting (warm highlights, cool shadows). Procedural TRON night skybox (stars, moon, neon horizon glow). Custom WGSL shaders. All spawn points (ground, obstacles, drones) refactored from StandardMaterial to CelMaterial. Explosions unchanged (unlit emissive).
 - [x] **Phase 8**: Results, FPV Camera, Chase Camera — Race results screen with standings/times/DNF, auto-transition Race→Results, RACE AGAIN/MAIN MENU buttons, pack-follow chase camera (default), FPV drone-mounted camera with standings-order cycling, camera mode switching (C key), camera HUD indicator, full gameplay loop (Menu→Race→Results→Menu)
 
+## Backlog (Quality / Polish)
+- [ ] Display `gates_passed` in Results UI (data already in `RaceResultEntry.gates_passed`)
+- [ ] Directional gate validation — penalize or DNF drones that pass through gates backwards (using `GateForward` component, already stored)
+- [ ] Deferred `RaceProgress` insertion timing — currently created at countdown end; if a drone could somehow reach gate 0 during countdown, the gate pass would be missed. Low risk (drones start behind gates) but could be tightened by inserting `RaceProgress` earlier.
+
 ## Future (Post-MVP)
 - [ ] Player-controlled drone (same throttle/pitch/roll/yaw interface as AI)
 - [ ] Per-drone customization (motor thrust, weight, drag, frame size)
 - [ ] Multiple obstacle types beyond gates
 - [ ] Multi-lap races
-- [ ] Crash behavior decision: instant DNF vs. respawn with time penalty
+- [x] Crash behavior decision: instant DNF vs. respawn with time penalty
 - [ ] Terrain elevation
 - [ ] Gamepad support
-- [ ] Drone visual models from Blender (replace placeholders)
+- [x] Drone visual models from Blender (replace placeholders)

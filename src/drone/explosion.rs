@@ -53,16 +53,37 @@ pub struct ExplosionParticle {
 #[derive(Resource)]
 pub struct ExplosionSounds(pub Vec<Handle<bevy::audio::AudioSource>>);
 
-pub fn load_explosion_sound(mut commands: Commands, asset_server: Res<AssetServer>) {
+/// Pre-allocated meshes for explosion particles, shared across all explosions.
+#[derive(Resource)]
+pub struct ExplosionMeshes {
+    pub debris_small: Handle<Mesh>,
+    pub debris_med: Handle<Mesh>,
+    pub debris_large: Handle<Mesh>,
+    pub hot_smoke: Handle<Mesh>,
+    pub dark_smoke: Handle<Mesh>,
+}
+
+pub fn load_explosion_assets(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
     let handles: Vec<Handle<bevy::audio::AudioSource>> = (1..=EXPLOSION_SOUND_COUNT)
         .map(|i| asset_server.load(format!("sounds/explosion_{i}.wav")))
         .collect();
     commands.insert_resource(ExplosionSounds(handles));
+    commands.insert_resource(ExplosionMeshes {
+        debris_small: meshes.add(Cuboid::new(DEBRIS_SIZE_SMALL, DEBRIS_SIZE_SMALL, DEBRIS_SIZE_SMALL)),
+        debris_med: meshes.add(Cuboid::new(DEBRIS_SIZE_MED, DEBRIS_SIZE_MED, DEBRIS_SIZE_MED)),
+        debris_large: meshes.add(Cuboid::new(DEBRIS_SIZE_LARGE, DEBRIS_SIZE_LARGE, DEBRIS_SIZE_LARGE)),
+        hot_smoke: meshes.add(Cuboid::new(HOT_SMOKE_SIZE, HOT_SMOKE_SIZE, HOT_SMOKE_SIZE)),
+        dark_smoke: meshes.add(Cuboid::new(DARK_SMOKE_SIZE, DARK_SMOKE_SIZE, DARK_SMOKE_SIZE)),
+    });
 }
 
 pub fn spawn_explosion(
     commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
+    explosion_meshes: &ExplosionMeshes,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     position: Vec3,
     drone_velocity: Vec3,
@@ -71,10 +92,10 @@ pub fn spawn_explosion(
 ) {
     let mut rng = rand::thread_rng();
 
-    // --- Debris ---
-    let mesh_small = meshes.add(Cuboid::new(DEBRIS_SIZE_SMALL, DEBRIS_SIZE_SMALL, DEBRIS_SIZE_SMALL));
-    let mesh_med = meshes.add(Cuboid::new(DEBRIS_SIZE_MED, DEBRIS_SIZE_MED, DEBRIS_SIZE_MED));
-    let mesh_large = meshes.add(Cuboid::new(DEBRIS_SIZE_LARGE, DEBRIS_SIZE_LARGE, DEBRIS_SIZE_LARGE));
+    // --- Debris (reuse pre-allocated meshes) ---
+    let mesh_small = &explosion_meshes.debris_small;
+    let mesh_med = &explosion_meshes.debris_med;
+    let mesh_large = &explosion_meshes.debris_large;
 
     let linear = color.to_linear();
     let debris_material = materials.add(StandardMaterial {
@@ -122,8 +143,8 @@ pub fn spawn_explosion(
         ));
     }
 
-    // --- Hot smoke (bright orange/red core) ---
-    let hot_smoke_mesh = meshes.add(Cuboid::new(HOT_SMOKE_SIZE, HOT_SMOKE_SIZE, HOT_SMOKE_SIZE));
+    // --- Hot smoke (bright orange/red core, reuse pre-allocated mesh) ---
+    let hot_smoke_mesh = &explosion_meshes.hot_smoke;
     let hot_smoke_material = materials.add(StandardMaterial {
         base_color: palette::TANGERINE,
         emissive: LinearRgba::new(2.8, 1.15, 0.37, 1.0),
@@ -155,8 +176,8 @@ pub fn spawn_explosion(
         ));
     }
 
-    // --- Dark smoke (black/charcoal halo) ---
-    let dark_smoke_mesh = meshes.add(Cuboid::new(DARK_SMOKE_SIZE, DARK_SMOKE_SIZE, DARK_SMOKE_SIZE));
+    // --- Dark smoke (black/charcoal halo, reuse pre-allocated mesh) ---
+    let dark_smoke_mesh = &explosion_meshes.dark_smoke;
     let dark_smoke_material = materials.add(StandardMaterial {
         base_color: palette::SMOKY_BLACK,
         unlit: true,
@@ -264,6 +285,7 @@ pub fn update_explosion_particles(
     }
 }
 
-pub fn cleanup_explosion_sound(mut commands: Commands) {
+pub fn cleanup_explosion_assets(mut commands: Commands) {
     commands.remove_resource::<ExplosionSounds>();
+    commands.remove_resource::<ExplosionMeshes>();
 }

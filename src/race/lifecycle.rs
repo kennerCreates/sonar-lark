@@ -33,11 +33,6 @@ pub struct ResultsTransitionTimer {
     pub remaining: f32,
 }
 
-/// Run condition: returns true only when `RacePhase::Racing` is active.
-pub fn race_is_running(phase: Option<Res<RacePhase>>) -> bool {
-    phase.is_some_and(|p| *p == RacePhase::Racing)
-}
-
 /// Run condition: returns true when any drone is actively racing or returning.
 /// Used to keep AI systems running during the post-race return flight.
 pub fn drones_are_active(

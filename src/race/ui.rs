@@ -537,35 +537,44 @@ pub fn update_leaderboard(
     let elapsed = clock.map(|c| c.elapsed).unwrap_or(0.0);
     let standings = progress.standings();
 
+    // Build position→data lookup (avoids O(n²) nested query iteration)
+    let mut row_data = [(0usize, false, false, false, 0.0f32); 12];
     for (pos, &(drone_idx, ref state)) in standings.iter().enumerate() {
-        for (bar, mut bg) in &mut color_bars {
-            if bar.0 == pos {
-                *bg = BackgroundColor(DRONE_COLORS[drone_idx]);
-            }
+        if pos >= 12 { break; }
+        row_data[pos] = (drone_idx, true, state.finished, state.crashed, state.finish_time.unwrap_or(0.0));
+    }
+
+    for (bar, mut bg) in &mut color_bars {
+        let pos = bar.0;
+        if pos < 12 && row_data[pos].1 {
+            *bg = BackgroundColor(DRONE_COLORS[row_data[pos].0]);
         }
-        for (nt, mut text, mut tc) in &mut name_texts {
-            if nt.0 == pos {
-                text.0 = format!("{:>2}  {}", pos + 1, DRONE_NAMES[drone_idx]);
-                *tc = if state.crashed {
-                    TextColor(palette::STONE)
-                } else {
-                    TextColor(palette::VANILLA)
-                };
-            }
+    }
+    for (nt, mut text, mut tc) in &mut name_texts {
+        let pos = nt.0;
+        if pos < 12 && row_data[pos].1 {
+            let (drone_idx, _, _, crashed, _) = row_data[pos];
+            text.0 = format!("{:>2}  {}", pos + 1, DRONE_NAMES[drone_idx]);
+            *tc = if crashed {
+                TextColor(palette::STONE)
+            } else {
+                TextColor(palette::VANILLA)
+            };
         }
-        for (tt, mut text, mut tc) in &mut time_texts {
-            if tt.0 == pos {
-                if state.finished {
-                    let t = state.finish_time.unwrap_or(0.0);
-                    text.0 = fmt_time(t);
-                    *tc = TextColor(palette::SEA_FOAM);
-                } else if state.crashed {
-                    text.0 = "DNF".into();
-                    *tc = TextColor(palette::NEON_RED);
-                } else {
-                    text.0 = fmt_time(elapsed);
-                    *tc = TextColor(palette::SIDEWALK);
-                }
+    }
+    for (tt, mut text, mut tc) in &mut time_texts {
+        let pos = tt.0;
+        if pos < 12 && row_data[pos].1 {
+            let (_, _, finished, crashed, finish_time) = row_data[pos];
+            if finished {
+                text.0 = fmt_time(finish_time);
+                *tc = TextColor(palette::SEA_FOAM);
+            } else if crashed {
+                text.0 = "DNF".into();
+                *tc = TextColor(palette::NEON_RED);
+            } else {
+                text.0 = fmt_time(elapsed);
+                *tc = TextColor(palette::SIDEWALK);
             }
         }
     }

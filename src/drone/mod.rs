@@ -3,6 +3,7 @@ pub mod components;
 pub mod debug_draw;
 pub mod dev_dashboard;
 pub mod explosion;
+pub mod paths;
 pub mod physics;
 pub mod spawning;
 
@@ -22,7 +23,7 @@ impl Plugin for DronePlugin {
             // Start loading drone glTF and explosion sound when entering Race
             .add_systems(OnEnter(AppState::Race), (
                 spawning::load_drone_gltf,
-                explosion::load_explosion_sound,
+                explosion::load_explosion_assets,
             ))
             // Poll for asset readiness and spawn drones once ready
             .add_systems(
@@ -84,7 +85,7 @@ impl Plugin for DronePlugin {
             // Cleanup resources on exit
             .add_systems(OnExit(AppState::Race), (
                 spawning::cleanup_drone_resources,
-                explosion::cleanup_explosion_sound,
+                explosion::cleanup_explosion_assets,
             ));
     }
 }

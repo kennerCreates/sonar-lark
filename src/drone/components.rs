@@ -153,7 +153,6 @@ pub struct DesiredPosition {
 #[derive(Component)]
 pub struct DroneStartPosition {
     pub translation: Vec3,
-    pub rotation: Quat,
 }
 
 /// Random seed generated fresh each race, mixed into deterministic hashes so that

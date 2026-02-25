@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use super::components::*;
-use super::spawning::adaptive_approach_offset;
+use super::paths::adaptive_approach_offset;
 
 /// Toggle resource for flight debug visualization. Press F3 during race to toggle.
 #[derive(Resource)]

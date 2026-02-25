@@ -6,14 +6,13 @@ use crate::rendering::{CelMaterial, cel_material_from_color};
 
 #[derive(Component)]
 pub struct ObstacleMarker {
+    #[allow(dead_code)]
     pub id: ObstacleId,
 }
 
 #[derive(Component)]
 pub struct TriggerVolume {
     pub half_extents: Vec3,
-    /// Local-space forward direction of the gate (for gizmo drawing).
-    pub forward: Vec3,
 }
 
 /// Handle to the loaded obstacles glTF asset.
@@ -120,7 +119,6 @@ pub fn spawn_obstacle(
                 Transform::from_translation(trigger.offset),
                 TriggerVolume {
                     half_extents: trigger.half_extents,
-                    forward: trigger.forward,
                 },
             ));
         }

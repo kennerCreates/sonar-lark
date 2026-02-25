@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::drone::ai::FINISH_EXTENSION;
 use crate::drone::components::{AIController, Drone, DroneDynamics, DronePhase, POINTS_PER_GATE};
-use crate::drone::explosion::{self, ExplosionSounds};
+use crate::drone::explosion::{self, ExplosionMeshes, ExplosionSounds};
 use crate::drone::spawning::DRONE_COLORS;
 use crate::obstacle::spawning::TriggerVolume;
 
@@ -13,7 +13,9 @@ use super::timing::RaceClock;
 pub struct GateIndex(pub u32);
 
 /// World-space forward direction of the gate (the expected approach direction).
+/// Stored for future directional gate validation (penalizing backwards passes).
 #[derive(Component)]
+#[allow(dead_code)]
 pub struct GateForward(pub Vec3);
 
 /// Pure function: test if a point is inside a trigger volume defined by its
@@ -94,7 +96,7 @@ pub fn gate_trigger_check(
 pub fn miss_detection(
     mut commands: Commands,
     mut progress: Option<ResMut<RaceProgress>>,
-    mut meshes: ResMut<Assets<Mesh>>,
+    explosion_meshes: Option<Res<ExplosionMeshes>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     explosion_sounds: Option<Res<ExplosionSounds>>,
     mut drone_query: Query<(
@@ -137,15 +139,17 @@ pub fn miss_detection(
             dynamics.angular_velocity = Vec3::ZERO;
             *visibility = Visibility::Hidden;
 
-            explosion::spawn_explosion(
-                &mut commands,
-                &mut meshes,
-                &mut materials,
-                transform.translation,
-                crash_velocity,
-                DRONE_COLORS[drone_idx],
-                explosion_sounds.as_deref(),
-            );
+            if let Some(ref meshes) = explosion_meshes {
+                explosion::spawn_explosion(
+                    &mut commands,
+                    meshes,
+                    &mut materials,
+                    transform.translation,
+                    crash_velocity,
+                    DRONE_COLORS[drone_idx],
+                    explosion_sounds.as_deref(),
+                );
+            }
 
             warn!(
                 "Drone {} CRASHED — missed gate {} (spline_t={:.1}, threshold={:.1})",

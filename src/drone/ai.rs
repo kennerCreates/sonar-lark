@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::race::progress::RaceProgress;
 
 use super::components::*;
-use super::spawning::generate_return_path;
+use super::paths::generate_return_path;
 
 const WAYPOINT_REACH_DISTANCE: f32 = 5.0;
 const VELOCITY_LOOK_AHEAD_T: f32 = 0.5;
@@ -351,12 +351,17 @@ pub fn proximity_avoidance(
     let radius = tuning.avoidance_radius;
     let radius_sq = radius * radius;
 
-    // Snapshot positions, velocities, and indices (12 drones = tiny allocation)
-    let drone_data: Vec<(u8, Vec3, Vec3)> = query
-        .iter()
-        .filter(|(_, _, _, phase, _)| !matches!(**phase, DronePhase::Idle | DronePhase::Crashed))
-        .map(|(tr, drone, dyn_, _, _)| (drone.index, tr.translation, dyn_.velocity))
-        .collect();
+    // Snapshot positions, velocities, and indices (stack-allocated, 12 drones max)
+    let mut drone_data = [(0u8, Vec3::ZERO, Vec3::ZERO); 12];
+    let mut drone_count = 0;
+    for (tr, drone, dyn_, phase, _) in query.iter() {
+        if matches!(*phase, DronePhase::Idle | DronePhase::Crashed) { continue; }
+        if drone_count < 12 {
+            drone_data[drone_count] = (drone.index, tr.translation, dyn_.velocity);
+            drone_count += 1;
+        }
+    }
+    let drone_data = &drone_data[..drone_count];
 
     for (transform, drone, dynamics, phase, mut desired) in &mut query {
         if matches!(*phase, DronePhase::Idle | DronePhase::Crashed) {
@@ -370,7 +375,7 @@ pub fn proximity_avoidance(
 
         let mut total_offset = Vec3::ZERO;
 
-        for &(other_idx, other_pos, _) in &drone_data {
+        for &(other_idx, other_pos, _) in drone_data {
             if other_idx == my_idx {
                 continue;
             }
@@ -416,5 +421,165 @@ pub fn proximity_avoidance(
         } else {
             desired.position += offset;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::math::cubic_splines::CubicCardinalSpline;
+
+    fn default_tuning() -> AiTuningParams {
+        AiTuningParams::default()
+    }
+
+    // --- safe_speed_for_curvature_with ---
+
+    #[test]
+    fn zero_curvature_returns_max_speed() {
+        let tuning = default_tuning();
+        let speed = safe_speed_for_curvature_with(0.0, tuning.safe_lateral_accel, &tuning);
+        assert_eq!(speed, tuning.max_speed);
+    }
+
+    #[test]
+    fn tiny_curvature_returns_max_speed() {
+        let tuning = default_tuning();
+        let speed = safe_speed_for_curvature_with(0.0005, tuning.safe_lateral_accel, &tuning);
+        assert_eq!(speed, tuning.max_speed);
+    }
+
+    #[test]
+    fn high_curvature_returns_min_speed() {
+        let tuning = default_tuning();
+        // κ = 100 → v = sqrt(50/100) = 0.707, clamped to min_curvature_speed
+        let speed = safe_speed_for_curvature_with(100.0, tuning.safe_lateral_accel, &tuning);
+        assert_eq!(speed, tuning.min_curvature_speed);
+    }
+
+    #[test]
+    fn moderate_curvature_between_limits() {
+        let tuning = default_tuning();
+        // κ = 0.05 → v = sqrt(50/0.05) = sqrt(1000) ≈ 31.6
+        let speed = safe_speed_for_curvature_with(0.05, tuning.safe_lateral_accel, &tuning);
+        assert!(speed > tuning.min_curvature_speed);
+        assert!(speed < tuning.max_speed);
+        assert!((speed - (50.0f32 / 0.05).sqrt()).abs() < 0.01);
+    }
+
+    #[test]
+    fn higher_lateral_accel_gives_faster_speed() {
+        let tuning = default_tuning();
+        let k = 0.1;
+        let slow = safe_speed_for_curvature_with(k, 30.0, &tuning);
+        let fast = safe_speed_for_curvature_with(k, 80.0, &tuning);
+        assert!(fast > slow);
+    }
+
+    // --- safe_speed_for_curvature (delegates to _with) ---
+
+    #[test]
+    fn safe_speed_uses_global_lateral_accel() {
+        let tuning = default_tuning();
+        let k = 0.05;
+        let a = safe_speed_for_curvature(k, &tuning);
+        let b = safe_speed_for_curvature_with(k, tuning.safe_lateral_accel, &tuning);
+        assert_eq!(a, b);
+    }
+
+    // --- return_speed_fraction ---
+
+    #[test]
+    fn return_speed_start_is_one() {
+        let f = return_speed_fraction(0.0, 10.0);
+        assert!((f - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn return_speed_end_is_zero() {
+        let f = return_speed_fraction(10.0, 10.0);
+        assert!(f.abs() < 1e-6);
+    }
+
+    #[test]
+    fn return_speed_midpoint_is_half() {
+        // Smoothstep at t=0.5: inv=0.5, 0.5*0.5*(3-1) = 0.5
+        let f = return_speed_fraction(5.0, 10.0);
+        assert!((f - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn return_speed_monotonically_decreasing() {
+        let total = 10.0;
+        let mut prev = return_speed_fraction(0.0, total);
+        for i in 1..=100 {
+            let t = i as f32 / 100.0 * total;
+            let cur = return_speed_fraction(t, total);
+            assert!(cur <= prev + 1e-6, "Not monotonically decreasing at t={t}");
+            prev = cur;
+        }
+    }
+
+    #[test]
+    fn return_speed_clamps_beyond_range() {
+        assert!((return_speed_fraction(-1.0, 10.0) - 1.0).abs() < 1e-6);
+        assert!(return_speed_fraction(11.0, 10.0).abs() < 1e-6);
+    }
+
+    // --- cyclic_curvature ---
+
+    fn make_circle_spline() -> (bevy::math::cubic_splines::CubicCurve<Vec3>, f32) {
+        // Approximate a circle with Catmull-Rom through 8 evenly spaced points
+        let n = 8;
+        let r = 10.0;
+        let points: Vec<Vec3> = (0..n)
+            .map(|i| {
+                let angle = i as f32 * std::f32::consts::TAU / n as f32;
+                Vec3::new(r * angle.cos(), 0.0, r * angle.sin())
+            })
+            .collect();
+        let spline = CubicCardinalSpline::new_catmull_rom(points)
+            .to_curve_cyclic()
+            .expect("spline creation failed");
+        let cycle_t = n as f32;
+        (spline, cycle_t)
+    }
+
+    #[test]
+    fn circle_curvature_is_roughly_constant() {
+        let (spline, cycle_t) = make_circle_spline();
+        let mut curvatures = Vec::new();
+        for i in 0..16 {
+            let t = i as f32 / 16.0 * cycle_t;
+            curvatures.push(cyclic_curvature(&spline, t, cycle_t));
+        }
+        let mean = curvatures.iter().sum::<f32>() / curvatures.len() as f32;
+        // All samples should be within 50% of mean (Catmull-Rom isn't a perfect circle)
+        for (i, &k) in curvatures.iter().enumerate() {
+            assert!(
+                (k - mean).abs() / mean < 0.5,
+                "Curvature at sample {i} ({k:.4}) too far from mean ({mean:.4})"
+            );
+        }
+        // Expected curvature for radius 10: κ = 1/r = 0.1
+        assert!(mean > 0.05 && mean < 0.2, "Mean curvature {mean} not near 1/r=0.1");
+    }
+
+    #[test]
+    fn straight_line_has_low_curvature() {
+        // Nearly straight: 4 collinear-ish points with slight offset to avoid degenerate tangents
+        let points = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(10.0, 0.0, 0.001),
+            Vec3::new(20.0, 0.0, 0.0),
+            Vec3::new(30.0, 0.0, 0.001),
+        ];
+        let spline = CubicCardinalSpline::new_catmull_rom(points)
+            .to_curve_cyclic()
+            .expect("spline creation failed");
+        let cycle_t = 4.0;
+        // Sample near the middle of the first segment
+        let k = cyclic_curvature(&spline, 0.5, cycle_t);
+        assert!(k < 0.05, "Straight-ish spline curvature {k} should be near zero");
     }
 }

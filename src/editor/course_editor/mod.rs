@@ -11,7 +11,7 @@ use bevy::{
 use crate::course::data::{CourseData, ObstacleInstance};
 use crate::drone::ai::{cyclic_curvature, safe_speed_for_curvature};
 use crate::drone::components::{AiTuningParams, POINTS_PER_GATE};
-use crate::drone::spawning::generate_race_path;
+use crate::drone::paths::generate_race_path;
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, TriggerVolume};
@@ -839,64 +839,113 @@ fn draw_selection_highlight(
 /// Sample step size in spline parameter space for the flight preview.
 const SPLINE_PREVIEW_STEP: f32 = 0.1;
 
+/// Cached pre-computed spline preview line segments.
+#[derive(Resource, Default)]
+struct CachedSplinePreview {
+    /// Generation counter — incremented whenever obstacles change.
+    generation: u64,
+    /// Pre-computed line segments: (start, end, color).
+    segments: Vec<(Vec3, Vec3, Color)>,
+}
+
+/// Tracks the current obstacle generation so the spline preview can detect changes.
+fn compute_obstacle_generation(
+    placed_query: &Query<(&PlacedObstacle, &Transform)>,
+) -> u64 {
+    // Simple hash of obstacle count + positions + gate orders.
+    // Any change to obstacle layout will produce a different value.
+    let mut hash = 0u64;
+    for (placed, transform) in placed_query.iter() {
+        let t = transform.translation;
+        hash = hash.wrapping_add(
+            (t.x.to_bits() as u64)
+                .wrapping_mul(2654435761)
+                .wrapping_add((t.y.to_bits() as u64).wrapping_mul(1640531527))
+                .wrapping_add((t.z.to_bits() as u64).wrapping_mul(2246822519)),
+        );
+        let r = transform.rotation;
+        hash = hash.wrapping_add(
+            (r.x.to_bits() as u64)
+                .wrapping_mul(3266489917)
+                .wrapping_add((r.w.to_bits() as u64).wrapping_mul(1503267967)),
+        );
+        let s = transform.scale;
+        hash = hash.wrapping_add((s.x.to_bits() as u64).wrapping_mul(2891336453));
+        hash = hash.wrapping_add(placed.gate_order.unwrap_or(u32::MAX) as u64);
+        hash = hash.wrapping_add(if placed.gate_forward_flipped { 1 } else { 0 });
+    }
+    hash
+}
+
 fn draw_flight_spline_preview(
     mut gizmos: Gizmos<CourseGizmoGroup>,
     placed_query: Query<(&PlacedObstacle, &Transform)>,
     library: Res<ObstacleLibrary>,
     tuning: Res<AiTuningParams>,
+    mut cache: Local<CachedSplinePreview>,
 ) {
-    let instances: Vec<ObstacleInstance> = placed_query
-        .iter()
-        .map(|(placed, transform)| ObstacleInstance {
-            obstacle_id: placed.obstacle_id.clone(),
-            translation: transform.translation,
-            rotation: transform.rotation,
-            scale: transform.scale,
-            gate_order: placed.gate_order,
-            gate_forward_flipped: placed.gate_forward_flipped,
-        })
-        .collect();
+    let generation = compute_obstacle_generation(&placed_query);
 
-    let course = CourseData {
-        name: String::new(),
-        instances,
-    };
+    // Rebuild cached segments only when obstacles or tuning change
+    let tuning_changed = tuning.is_changed();
+    if generation != cache.generation || tuning_changed || cache.segments.is_empty() {
+        cache.generation = generation;
+        cache.segments.clear();
 
-    let Some(race_path) = generate_race_path(&course, &library) else {
-        return;
-    };
+        let instances: Vec<ObstacleInstance> = placed_query
+            .iter()
+            .map(|(placed, transform)| ObstacleInstance {
+                obstacle_id: placed.obstacle_id.clone(),
+                translation: transform.translation,
+                rotation: transform.rotation,
+                scale: transform.scale,
+                gate_order: placed.gate_order,
+                gate_forward_flipped: placed.gate_forward_flipped,
+            })
+            .collect();
 
-    let gate_count = race_path.gate_positions.len() as f32;
-    let cycle_t = gate_count * POINTS_PER_GATE;
-    let spline = &race_path.spline;
+        let course = CourseData {
+            name: String::new(),
+            instances,
+        };
 
-    let speed_range = (tuning.max_speed - tuning.min_curvature_speed).max(0.001);
+        let Some(race_path) = generate_race_path(&course, &library) else {
+            return;
+        };
 
-    let mut t = 0.0f32;
-    let mut prev_pos = spline.position(0.0);
-    t += SPLINE_PREVIEW_STEP;
+        let gate_count = race_path.gate_positions.len() as f32;
+        let cycle_t = gate_count * POINTS_PER_GATE;
+        let spline = &race_path.spline;
+        let speed_range = (tuning.max_speed - tuning.min_curvature_speed).max(0.001);
 
-    while t <= cycle_t {
-        let pos = spline.position(t.rem_euclid(cycle_t));
-        let k = cyclic_curvature(spline, t, cycle_t);
+        let mut t = 0.0f32;
+        let mut prev_pos = spline.position(0.0);
+        t += SPLINE_PREVIEW_STEP;
+
+        while t <= cycle_t {
+            let pos = spline.position(t.rem_euclid(cycle_t));
+            let k = cyclic_curvature(spline, t, cycle_t);
+            let v_safe = safe_speed_for_curvature(k, &tuning);
+            let ratio = ((v_safe - tuning.min_curvature_speed) / speed_range).clamp(0.0, 1.0);
+            let color = Color::srgb(1.0 - ratio * 0.8, 0.2 + ratio * 0.8, 0.2);
+            cache.segments.push((prev_pos, pos, color));
+            prev_pos = pos;
+            t += SPLINE_PREVIEW_STEP;
+        }
+
+        // Close the loop
+        let start_pos = spline.position(0.0);
+        let k = cyclic_curvature(spline, 0.0, cycle_t);
         let v_safe = safe_speed_for_curvature(k, &tuning);
         let ratio = ((v_safe - tuning.min_curvature_speed) / speed_range).clamp(0.0, 1.0);
-
-        // Green (safe) → Red (too tight)
         let color = Color::srgb(1.0 - ratio * 0.8, 0.2 + ratio * 0.8, 0.2);
-        gizmos.line(prev_pos, pos, color);
-
-        prev_pos = pos;
-        t += SPLINE_PREVIEW_STEP;
+        cache.segments.push((prev_pos, start_pos, color));
     }
 
-    // Close the loop back to the start
-    let start_pos = spline.position(0.0);
-    let k = cyclic_curvature(spline, 0.0, cycle_t);
-    let v_safe = safe_speed_for_curvature(k, &tuning);
-    let ratio = ((v_safe - tuning.min_curvature_speed) / speed_range).clamp(0.0, 1.0);
-    let color = Color::srgb(1.0 - ratio * 0.8, 0.2 + ratio * 0.8, 0.2);
-    gizmos.line(prev_pos, start_pos, color);
+    // Draw cached segments
+    for &(start, end, color) in &cache.segments {
+        gizmos.line(start, end, color);
+    }
 }
 
 // --- Helpers ---

@@ -202,11 +202,16 @@ pub fn dirty_air_perturbation(
     let t = time.elapsed_secs();
     let seed_phase = race_seed.map_or(0.0, |s| (s.0 & 0xFFFF) as f32 / 65536.0 * 100.0);
 
-    let drone_data: Vec<(u8, Vec3, Vec3, f32)> = query
-        .iter()
-        .filter(|(_, _, _, phase)| **phase != DronePhase::Crashed)
-        .map(|(tr, drone, dyn_, _)| (drone.index, tr.translation, dyn_.velocity, dyn_.velocity.length()))
-        .collect();
+    let mut drone_data = [(0u8, Vec3::ZERO, Vec3::ZERO, 0.0f32); 12];
+    let mut drone_count = 0;
+    for (tr, drone, dyn_, phase) in query.iter() {
+        if *phase == DronePhase::Crashed { continue; }
+        if drone_count < 12 {
+            drone_data[drone_count] = (drone.index, tr.translation, dyn_.velocity, dyn_.velocity.length());
+            drone_count += 1;
+        }
+    }
+    let drone_data = &drone_data[..drone_count];
 
     for (transform, drone, mut dynamics, phase) in &mut query {
         if *phase == DronePhase::Crashed {
@@ -216,7 +221,7 @@ pub fn dirty_air_perturbation(
         let my_idx = drone.index;
 
         // --- Dirty air: perturbation from flying in another drone's wake ---
-        for &(other_idx, other_pos, other_vel, other_speed) in &drone_data {
+        for &(other_idx, other_pos, other_vel, other_speed) in drone_data {
             if other_idx == my_idx || other_speed < 1.0 {
                 continue;
             }

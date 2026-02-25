@@ -47,19 +47,20 @@ src/
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
 │   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance (FixedUpdate, spline-based)
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
-│   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio (ExplosionParticle, ParticleKind, ExplosionSounds)
-│   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, RacePath/spline generation
+│   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio (ExplosionParticle, ParticleKind, ExplosionSounds, ExplosionMeshes)
+│   ├── paths.rs         RacePath, spline generation (race/drone/return), compute_start_positions, adaptive_approach_offset
+│   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, DRONE_COLORS/DRONE_NAMES
 ├── race/                Race mechanics
 │   ├── gate.rs          GateIndex, trigger volume overlap detection
 │   ├── progress.rs      RaceProgress, per-drone state tracking
 │   ├── timing.rs        RaceClock
 │   └── lifecycle.rs     Countdown, finish detection
 ├── camera/              Camera modes
-│   ├── spectator.rs     Free-fly WASD camera (Spectator mode)
-│   ├── fpv.rs           First-person drone-mounted camera (FPV mode)
-│   ├── chase.rs         Broadcast-style pack-follow camera (Chase mode, default)
-│   ├── switching.rs     CameraMode/CameraState, mode cycling (C key), drone cycling ([ ] keys)
-│   ├── orbit.rs         RTS camera (Course Editor), orbit camera (Workshop)
+│   ├── chase.rs         Broadcast-style pack-follow camera (Chase mode, default in Race)
+│   ├── fpv.rs           Stabilized close-follow camera on target drone (FPV mode)
+│   ├── spectator.rs     RTS-style orbit controls: middle-mouse orbit, scroll zoom, WASD pan
+│   ├── switching.rs     CameraMode/CameraState, number key switching (1=Chase, 2=Spectator, 3=FPV cycles target)
+│   ├── orbit.rs         Orbit math (shared between Spectator and Course Editor)
 │   └── settings.rs      CameraSettings resource (FOV, sensitivity, zoom)
 └── results/             Race results display
     ├── mod.rs           ResultsPlugin, cleanup
@@ -139,6 +140,7 @@ CourseData ──► spawn obstacles + drones
 | `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning, Crashed |
 | `ExplosionParticle` | Component | drone/explosion | Velocity, lifetime, remaining time, and `ParticleKind` (Debris/HotSmoke/DarkSmoke) for crash particles |
 | `ExplosionSounds` | Resource | drone/explosion | 4 handles to explosion audio variants (assets/sounds/explosion_{1..4}.wav) |
+| `ExplosionMeshes` | Resource | drone/explosion | Pre-allocated mesh handles for debris (3 sizes), hot smoke, dark smoke — shared across all explosions |
 | `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
 | `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (14 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength, proximity avoidance radius/strength, velocity feedforward blend). Persists across race restarts. Exposed via dev dashboard (F4) |
 | `LeaderboardRoot` | Component | race/ui | Marker on the race leaderboard panel (top-left standings display, 12 rows with color bars, names, times) |
@@ -167,27 +169,27 @@ assets/
 
 ## Drone Pipeline
 ```
-Blender ──► drone.glb ──► DroneGltfHandle (Startup load)
+Blender ──► drone.glb ──► DroneGltfHandle (OnEnter(Race) load)
                                 │
                           DroneAssets (Update poll until loaded)
                                 │
 CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve (editor preview)
-                │
-                └──► generate_drone_race_path() ──► per-drone unique CubicCurve (12x)
-                     (midleg lateral shift + approach scaling from DroneConfig)
-                                                               │
-                                                    spawn_drones() ──► 12 Drone entities
-                                                               │
-                                                    FixedUpdate chain (11-system, thrust-through-body):
-                                                    AI targets (spline projection) → racing line (spline sampling)
-                                                    → proximity_avoidance → hover_target → position_pid
-                                                    → attitude_controller → dirty_air_perturbation → motor_lag
-                                                    → apply_forces → integration → clamp
+        (paths.rs)  │
+                    └──► generate_drone_race_path() ──► per-drone unique CubicCurve (12x)
+                         (midleg lateral shift + gate 2D offset + approach scaling)
+                                                                   │
+                                                        spawn_drones() ──► 12 Drone entities
+                                                                   │
+                                                        FixedUpdate chain (11-system, thrust-through-body):
+                                                        update_ai_targets → compute_racing_line
+                                                        → proximity_avoidance → hover_target → position_pid
+                                                        → attitude_controller → dirty_air_perturbation → motor_lag
+                                                        → apply_forces → integrate_motion → clamp_transform
 
-                                                    Post-race: Racing → Returning (per-drone)
-                                                    → generate_return_path() → non-cyclic spline
-                                                    → smoothstep deceleration → return to start
-                                                    → Returning → Idle (hover)
+                                                        Post-race: Racing → Returning (per-drone)
+                                                        → generate_return_path() → non-cyclic spline
+                                                        → smoothstep deceleration → return to start
+                                                        → Returning → Idle (hover)
 ```
 
 The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior. Aerodynamic perturbations (dirty air from leading drones, prop wash on descent) add angular wobble that the PD must fight, producing visible instability in dirty air. Battery sag linearly reduces max thrust over the race duration.
@@ -204,7 +206,9 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `course::loader` | 9 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
-| `drone::spawning` | 19 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero, adaptive approach offset), per-drone path generation (paths differ, passes near gates, tangent alignment, neutral matches base), start positions (count, behind gate, no overlap), config randomization bounds (incl. cornering/braking/attitude/racing-line variation), PID variation, return path generation (valid spline, per-drone variation) |
+| `drone::paths` | 25 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero/alignment, flipped gate), per-drone path generation (paths differ, passes near gates, tangent alignment, gate offset 2D spread, neutral matches base), start positions (count, behind gate, hover height, gate width, no overlap, rotation), return path generation (valid spline, per-drone variation) |
+| `drone::spawning` | 2 | Config randomization bounds (100-iteration stress test), PID variation application |
+| `drone::ai` | 13 | safe_speed_for_curvature (zero/tiny/high/moderate curvature, lateral accel scaling), return_speed_fraction (start/end/midpoint, monotonicity, clamping), cyclic_curvature (circle constancy, straight-line low) |
 | `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, is_active, standings sorting (finished by time, finished before crashed, crashed by gates passed) |
 | `race::gate` | 8 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside) |
 | `rendering::cel_material` | 3 | Hue-shift algorithm: highlight warmth, shadow coolness, color clamping |
@@ -213,4 +217,5 @@ Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
 - `load_course_from_file` / `save_course` / `delete_course` — pure file I/O, no Bevy systems
 - `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability
-- `generate_race_path(course)` / `generate_drone_race_path(course, config, index)` / `compute_start_positions(...)` / `generate_return_path(...)` — pure geometry, no ECS
+- `generate_race_path(course)` / `generate_drone_race_path(course, config, index)` / `compute_start_positions(...)` / `generate_return_path(...)` — pure geometry, no ECS (in `drone::paths`)
+- `cyclic_curvature(spline, t, cycle_t)` / `safe_speed_for_curvature(κ, tuning)` — pure math (in `drone::ai`)
