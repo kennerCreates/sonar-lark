@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::course::loader::SelectedCourse;
 use crate::drone::components::*;
-use crate::drone::spawning::NoGatesCourse;
+use crate::drone::spawning::{DRONE_COLORS, NoGatesCourse};
 use crate::editor::course_editor::PendingEditorCourse;
 use crate::palette;
 use crate::states::AppState;
@@ -413,4 +413,171 @@ pub fn update_open_editor_button_visuals(
             }
         }
     }
+}
+
+// ── Leaderboard ─────────────────────────────────────────────────────────────
+
+const DRONE_NAMES: [&str; 12] = [
+    "FALCON", "VIPER", "HAWK", "PHANTOM",
+    "SPARK", "BLITZ", "NOVA", "DRIFT",
+    "SURGE", "BOLT", "ECHO", "FURY",
+];
+
+const LB_BG: Color = Color::srgba(0.02, 0.055, 0.102, 0.80);
+const LB_FONT: f32 = 13.0;
+const LB_WIDTH: f32 = 190.0;
+const LB_ROW_HEIGHT: f32 = 20.0;
+const LB_COLOR_BAR_W: f32 = 4.0;
+
+#[derive(Component)]
+pub(crate) struct LeaderboardRoot;
+
+#[derive(Component)]
+pub(crate) struct LbColorBar(usize);
+
+#[derive(Component)]
+pub(crate) struct LbNameText(usize);
+
+#[derive(Component)]
+pub(crate) struct LbTimeText(usize);
+
+pub fn setup_leaderboard(mut commands: Commands) {
+    commands
+        .spawn((
+            LeaderboardRoot,
+            DespawnOnExit(AppState::Race),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(10.0),
+                top: Val::Px(10.0),
+                width: Val::Px(LB_WIDTH),
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(6.0)),
+                row_gap: Val::Px(2.0),
+                ..default()
+            },
+            BackgroundColor(LB_BG),
+            GlobalZIndex(90),
+            Visibility::Hidden,
+        ))
+        .with_children(|panel| {
+            for i in 0..12usize {
+                panel
+                    .spawn(Node {
+                        height: Val::Px(LB_ROW_HEIGHT),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(4.0),
+                        padding: UiRect::right(Val::Px(4.0)),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        // Colored accent bar
+                        row.spawn((
+                            LbColorBar(i),
+                            Node {
+                                width: Val::Px(LB_COLOR_BAR_W),
+                                height: Val::Percent(100.0),
+                                ..default()
+                            },
+                            BackgroundColor(DRONE_COLORS[i]),
+                        ));
+                        // Position + name
+                        row.spawn((
+                            LbNameText(i),
+                            Text::new(format!("{:>2}  {}", i + 1, DRONE_NAMES[i])),
+                            TextFont {
+                                font_size: LB_FONT,
+                                ..default()
+                            },
+                            TextColor(palette::VANILLA),
+                            Node {
+                                flex_grow: 1.0,
+                                ..default()
+                            },
+                        ));
+                        // Time / status
+                        row.spawn((
+                            LbTimeText(i),
+                            Text::new("--:--.--"),
+                            TextFont {
+                                font_size: LB_FONT,
+                                ..default()
+                            },
+                            TextColor(palette::SIDEWALK),
+                        ));
+                    });
+            }
+        });
+}
+
+pub fn update_leaderboard(
+    phase: Res<RacePhase>,
+    progress: Option<Res<RaceProgress>>,
+    clock: Option<Res<RaceClock>>,
+    mut root_vis: Query<&mut Visibility, With<LeaderboardRoot>>,
+    mut color_bars: Query<(&LbColorBar, &mut BackgroundColor)>,
+    mut name_texts: Query<
+        (&LbNameText, &mut Text, &mut TextColor),
+        Without<LbTimeText>,
+    >,
+    mut time_texts: Query<
+        (&LbTimeText, &mut Text, &mut TextColor),
+        Without<LbNameText>,
+    >,
+) {
+    let show = matches!(*phase, RacePhase::Racing | RacePhase::Finished);
+    for mut vis in &mut root_vis {
+        *vis = if show {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+    }
+    if !show {
+        return;
+    }
+
+    let Some(progress) = progress else { return };
+    let elapsed = clock.map(|c| c.elapsed).unwrap_or(0.0);
+    let standings = progress.standings();
+
+    for (pos, &(drone_idx, ref state)) in standings.iter().enumerate() {
+        for (bar, mut bg) in &mut color_bars {
+            if bar.0 == pos {
+                *bg = BackgroundColor(DRONE_COLORS[drone_idx]);
+            }
+        }
+        for (nt, mut text, mut tc) in &mut name_texts {
+            if nt.0 == pos {
+                text.0 = format!("{:>2}  {}", pos + 1, DRONE_NAMES[drone_idx]);
+                *tc = if state.crashed {
+                    TextColor(palette::STONE)
+                } else {
+                    TextColor(palette::VANILLA)
+                };
+            }
+        }
+        for (tt, mut text, mut tc) in &mut time_texts {
+            if tt.0 == pos {
+                if state.finished {
+                    let t = state.finish_time.unwrap_or(0.0);
+                    text.0 = fmt_time(t);
+                    *tc = TextColor(palette::SEA_FOAM);
+                } else if state.crashed {
+                    text.0 = "DNF".into();
+                    *tc = TextColor(palette::NEON_RED);
+                } else {
+                    text.0 = fmt_time(elapsed);
+                    *tc = TextColor(palette::SIDEWALK);
+                }
+            }
+        }
+    }
+}
+
+fn fmt_time(t: f32) -> String {
+    let mins = (t / 60.0) as u32;
+    let secs = t % 60.0;
+    format!("{:01}:{:05.2}", mins, secs)
 }

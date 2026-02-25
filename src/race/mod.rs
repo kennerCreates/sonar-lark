@@ -12,7 +12,10 @@ pub struct RacePlugin;
 
 impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Race), (setup_race, ui::setup_race_ui))
+        app.add_systems(
+            OnEnter(AppState::Race),
+            (setup_race, ui::setup_race_ui, ui::setup_leaderboard),
+        )
             // Race logic chain: ordering matters for correctness
             .add_systems(
                 Update,
@@ -38,6 +41,7 @@ impl Plugin for RacePlugin {
                     ui::update_open_editor_button_visuals,
                     ui::manage_countdown_text,
                     ui::update_race_clock_display,
+                    ui::update_leaderboard,
                 )
                     .run_if(in_state(AppState::Race)),
             )
