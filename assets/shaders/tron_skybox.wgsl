@@ -164,9 +164,9 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
                         let temp = hash21(neighbor + vec2<f32>(73.7, 19.3));
                         var star_tint: vec3<f32>;
                         if temp < 0.15 {
-                            star_tint = vec3<f32>(1.0, 0.75, 0.4);   // warm amber
+                            star_tint = vec3<f32>(1.0, 0.725, 0.220);   // Sunshine #ffb938
                         } else if temp < 0.25 {
-                            star_tint = vec3<f32>(0.6, 0.7, 1.0);   // cool blue-white
+                            star_tint = vec3<f32>(0.494, 0.494, 0.949);   // Periwinkle #7e7ef2
                         } else if temp < 0.30 {
                             star_tint = mix(sky.moon_color.rgb, sky.neon_glow_color.rgb, 0.5);  // neon cyan
                         } else {

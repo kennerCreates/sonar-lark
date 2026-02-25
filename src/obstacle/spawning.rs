@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use super::definition::{ObstacleId, TriggerVolumeConfig};
+use crate::palette;
 use crate::rendering::{CelMaterial, cel_material_from_color};
 
 #[derive(Component)]
@@ -24,12 +25,11 @@ pub fn load_obstacles_gltf(mut commands: Commands, asset_server: Res<AssetServer
     commands.insert_resource(ObstaclesGltfHandle(handle));
 }
 
-/// Per-gate-type color from the 64-color palette (avoids drone colors and ground).
 fn gate_color(obstacle_id: &ObstacleId) -> Option<Color> {
     match obstacle_id.0.as_str() {
-        "gate_loop"   => Some(Color::srgb(0.980, 0.627, 0.196)), // Dandelion #faa032
-        "gate_ground" => Some(Color::srgb(0.769, 0.047, 0.180)), // Cherry    #c40c2e
-        "gate_best"   => Some(Color::srgb(0.682, 0.533, 0.890)), // Lavender  #ae88e3
+        "gate_loop"   => Some(palette::DANDELION),
+        "gate_ground" => Some(palette::CHERRY),
+        "gate_best"   => Some(palette::LAVENDER),
         _ => None,
     }
 }
@@ -81,7 +81,7 @@ pub fn spawn_obstacle(
                         .as_ref()
                         .and_then(|h| std_materials.get(h))
                         .map(|m| m.base_color)
-                        .unwrap_or(Color::srgb(0.5, 0.5, 0.5));
+                        .unwrap_or(palette::CHAINMAIL);
                     MeshMaterial3d(cel_materials.add(cel_material_from_color(base_color, light_dir)))
                 }
             };

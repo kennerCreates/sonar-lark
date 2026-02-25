@@ -5,14 +5,15 @@ use bevy::prelude::*;
 
 use crate::course::loader::{load_course_from_file, SelectedCourse};
 use crate::editor::course_editor::{LastEditedCourse, PendingEditorCourse};
+use crate::palette;
 use crate::states::AppState;
 
-const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
-const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
-const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
-const SELECTED_COURSE: Color = Color::srgb(0.2, 0.4, 0.6);
-const NORMAL_COURSE: Color = Color::srgb(0.1, 0.1, 0.1);
-const HOVERED_COURSE: Color = Color::srgb(0.2, 0.2, 0.2);
+const NORMAL_BUTTON: Color = palette::INDIGO;
+const HOVERED_BUTTON: Color = palette::SAPPHIRE;
+const PRESSED_BUTTON: Color = palette::GREEN;
+const SELECTED_COURSE: Color = palette::TEAL;
+const NORMAL_COURSE: Color = palette::SMOKY_BLACK;
+const HOVERED_COURSE: Color = palette::INDIGO;
 
 const MIN_RACEABLE_GATES: usize = 3;
 
@@ -106,7 +107,7 @@ pub fn setup_menu(mut commands: Commands) {
                     font_size: 64.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                TextColor(palette::VANILLA),
             ));
 
             // Subtitle
@@ -116,7 +117,7 @@ pub fn setup_menu(mut commands: Commands) {
                     font_size: 24.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.6, 0.6, 0.6)),
+                TextColor(palette::SIDEWALK),
             ));
 
             // Course selection area
@@ -135,7 +136,7 @@ pub fn setup_menu(mut commands: Commands) {
                             font_size: 20.0,
                             ..default()
                         },
-                        TextColor(Color::srgb(0.7, 0.7, 0.7)),
+                        TextColor(palette::SIDEWALK),
                     ));
 
                     if available.courses.is_empty() {
@@ -145,7 +146,7 @@ pub fn setup_menu(mut commands: Commands) {
                                 font_size: 16.0,
                                 ..default()
                             },
-                            TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                            TextColor(palette::CHAINMAIL),
                         ));
                     } else {
                         for (i, course) in available.courses.iter().enumerate() {
@@ -162,7 +163,7 @@ pub fn setup_menu(mut commands: Commands) {
                                         ..default()
                                     },
                                     BackgroundColor(NORMAL_COURSE),
-                                    BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+                                    BorderColor::all(palette::STEEL),
                                 ))
                                 .with_children(|btn| {
                                     btn.spawn((
@@ -171,7 +172,7 @@ pub fn setup_menu(mut commands: Commands) {
                                             font_size: 18.0,
                                             ..default()
                                         },
-                                        TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                                        TextColor(palette::SAND),
                                     ));
                                 });
                         }
@@ -200,7 +201,7 @@ pub fn setup_menu(mut commands: Commands) {
                             ..default()
                         },
                         BackgroundColor(NORMAL_BUTTON),
-                        BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+                        BorderColor::all(palette::STEEL),
                     ))
                     .with_children(|btn| {
                         btn.spawn((
@@ -209,7 +210,7 @@ pub fn setup_menu(mut commands: Commands) {
                                 font_size: 24.0,
                                 ..default()
                             },
-                            TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                            TextColor(palette::CHAINMAIL),
                             RaceButtonText,
                         ));
                     });
@@ -221,7 +222,7 @@ pub fn setup_menu(mut commands: Commands) {
                     font_size: 14.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.4, 0.4, 0.4)),
+                TextColor(palette::STONE),
                 HintText,
             ));
         });
@@ -243,7 +244,7 @@ fn spawn_menu_button(parent: &mut ChildSpawnerCommands, label: &str, marker: imp
                 ..default()
             },
             BackgroundColor(NORMAL_BUTTON),
-            BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+            BorderColor::all(palette::STEEL),
         ))
         .with_children(|btn: &mut ChildSpawnerCommands| {
             btn.spawn((
@@ -252,7 +253,7 @@ fn spawn_menu_button(parent: &mut ChildSpawnerCommands, label: &str, marker: imp
                     font_size: 24.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                TextColor(palette::VANILLA),
             ));
         });
 }
@@ -272,13 +273,13 @@ pub fn handle_course_selection(
             Interaction::Hovered => {
                 if available.selected_index != Some(course_item.0) {
                     *bg = BackgroundColor(HOVERED_COURSE);
-                    *border = BorderColor::all(Color::srgb(0.5, 0.5, 0.5));
+                    *border = BorderColor::all(palette::CHAINMAIL);
                 }
             }
             Interaction::None => {
                 if available.selected_index != Some(course_item.0) {
                     *bg = BackgroundColor(NORMAL_COURSE);
-                    *border = BorderColor::all(Color::srgb(0.3, 0.3, 0.3));
+                    *border = BorderColor::all(palette::STEEL);
                 }
             }
         }
@@ -298,10 +299,10 @@ pub fn update_course_highlights(
     for (course_item, mut bg, mut border) in &mut course_query {
         if available.selected_index == Some(course_item.0) {
             *bg = BackgroundColor(SELECTED_COURSE);
-            *border = BorderColor::all(Color::srgb(0.4, 0.7, 1.0));
+            *border = BorderColor::all(palette::SKY);
         } else {
             *bg = BackgroundColor(NORMAL_COURSE);
-            *border = BorderColor::all(Color::srgb(0.3, 0.3, 0.3));
+            *border = BorderColor::all(palette::STEEL);
         }
     }
 
@@ -312,9 +313,9 @@ pub fn update_course_highlights(
 
     for mut text_color in &mut race_text_query {
         *text_color = if raceable {
-            TextColor(Color::srgb(0.9, 0.9, 0.9))
+            TextColor(palette::VANILLA)
         } else {
-            TextColor(Color::srgb(0.5, 0.5, 0.5))
+            TextColor(palette::CHAINMAIL)
         };
     }
 
@@ -327,15 +328,15 @@ pub fn update_course_highlights(
                     if course.gate_count == 1 { "" } else { "s" },
                     MIN_RACEABLE_GATES,
                 );
-                *color = TextColor(Color::srgb(0.8, 0.5, 0.2));
+                *color = TextColor(palette::BRONZE);
             }
             Some(_) => {
                 **text = "Ready to race!".to_string();
-                *color = TextColor(Color::srgb(0.4, 0.8, 0.4));
+                *color = TextColor(palette::MINT);
             }
             None => {
                 **text = "Select a course to enable racing".to_string();
-                *color = TextColor(Color::srgb(0.4, 0.4, 0.4));
+                *color = TextColor(palette::STONE);
             }
         }
     }
@@ -399,15 +400,15 @@ pub fn handle_button_visuals(
         match *interaction {
             Interaction::Pressed => {
                 *bg = BackgroundColor(PRESSED_BUTTON);
-                *border = BorderColor::all(Color::WHITE);
+                *border = BorderColor::all(palette::VANILLA);
             }
             Interaction::Hovered => {
                 *bg = BackgroundColor(HOVERED_BUTTON);
-                *border = BorderColor::all(Color::srgb(0.6, 0.6, 0.6));
+                *border = BorderColor::all(palette::SIDEWALK);
             }
             Interaction::None => {
                 *bg = BackgroundColor(NORMAL_BUTTON);
-                *border = BorderColor::all(Color::srgb(0.3, 0.3, 0.3));
+                *border = BorderColor::all(palette::STEEL);
             }
         }
     }

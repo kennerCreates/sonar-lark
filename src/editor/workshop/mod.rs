@@ -7,6 +7,7 @@ use bevy::{
 
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
+use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::EditorMode;
 
@@ -215,7 +216,7 @@ fn populate_node_list(
                     font_size: 14.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                TextColor(palette::CHAINMAIL),
             ));
         } else {
             for node in &nodes {
@@ -258,7 +259,7 @@ pub fn spawn_preview(
                 .as_ref()
                 .and_then(|h| std_materials.get(h))
                 .map(|m| m.base_color)
-                .unwrap_or(Color::srgb(0.5, 0.5, 0.5));
+                .unwrap_or(Color::srgb(0.502, 0.475, 0.502)); // Chainmail #807980
             let mat = MeshMaterial3d(cel_materials.add(cel_material_from_color(base_color, light_dir)));
             (p.mesh.clone(), mat)
         })
@@ -327,7 +328,7 @@ fn spawn_placeholder_preview(
         .spawn((
             Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
             MeshMaterial3d(cel_materials.add(cel_material_from_color(
-                Color::srgb(0.5, 0.5, 0.6),
+                palette::CHAINMAIL,
                 light_dir.0,
             ))),
             Transform::from_translation(offset),

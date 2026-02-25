@@ -137,14 +137,13 @@ pub fn miss_detection(
             dynamics.angular_velocity = Vec3::ZERO;
             *visibility = Visibility::Hidden;
 
-            let [r, g, b] = DRONE_COLORS[drone_idx];
             explosion::spawn_explosion(
                 &mut commands,
                 &mut meshes,
                 &mut materials,
                 transform.translation,
                 crash_velocity,
-                Color::srgb(r, g, b),
+                DRONE_COLORS[drone_idx],
                 explosion_sounds.as_deref(),
             );
 

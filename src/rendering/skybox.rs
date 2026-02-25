@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, Face};
 use bevy::shader::ShaderRef;
 
+use crate::palette;
+
 const SHADER_PATH: &str = "shaders/tron_skybox.wgsl";
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
@@ -53,12 +55,11 @@ pub fn spawn_skybox(
     meshes: &mut Assets<Mesh>,
     skybox_materials: &mut Assets<SkyboxMaterial>,
 ) {
-    // Palette colors for TRON night sky
-    let sky_dark = Color::srgb(0.020, 0.055, 0.102);     // Smoky Black #050e1a
-    let sky_mid = Color::srgb(0.051, 0.129, 0.251);       // Indigo #0d2140
-    let sky_bright = Color::srgb(0.110, 0.157, 0.302);    // Space Cadet #1c284d
-    let moon_color = Color::srgb(0.949, 0.949, 0.855);    // Vanilla #f2f2da
-    let neon_glow = Color::srgb(0.286, 0.761, 0.949);     // Sky #49c2f2
+    let sky_dark = palette::SMOKY_BLACK;
+    let sky_mid = palette::INDIGO;
+    let sky_bright = palette::SAPPHIRE;
+    let moon_color = palette::VANILLA;
+    let neon_glow = palette::SKY;
 
     let sphere = meshes.add(Sphere::new(2000.0).mesh().ico(5).unwrap());
     let material = skybox_materials.add(SkyboxMaterial {

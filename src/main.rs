@@ -5,6 +5,7 @@ mod drone;
 mod editor;
 mod menu;
 mod obstacle;
+pub mod palette;
 mod race;
 mod rendering;
 mod results;

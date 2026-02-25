@@ -3,18 +3,19 @@ use bevy::prelude::*;
 
 use crate::obstacle::definition::{ObstacleDef, ObstacleId, TriggerVolumeConfig};
 use crate::obstacle::library::{save_obstacle_library, ObstacleLibrary};
+use crate::palette;
 use crate::states::{AppState, EditorMode};
 
 use super::{EditTarget, PreviewObstacle, WorkshopState};
 
-const PANEL_BG: Color = Color::srgba(0.08, 0.08, 0.08, 0.9);
-const BUTTON_NORMAL: Color = Color::srgb(0.15, 0.15, 0.15);
-const BUTTON_HOVERED: Color = Color::srgb(0.25, 0.25, 0.25);
-const BUTTON_PRESSED: Color = Color::srgb(0.35, 0.75, 0.35);
-const TOGGLE_ON: Color = Color::srgb(0.2, 0.6, 0.3);
-const TOGGLE_OFF: Color = Color::srgb(0.4, 0.15, 0.15);
-const RADIO_ACTIVE: Color = Color::srgb(0.2, 0.4, 0.7);
-const RADIO_INACTIVE: Color = Color::srgb(0.15, 0.15, 0.15);
+const PANEL_BG: Color = palette::SMOKY_BLACK;
+const BUTTON_NORMAL: Color = palette::INDIGO;
+const BUTTON_HOVERED: Color = palette::SAPPHIRE;
+const BUTTON_PRESSED: Color = palette::GREEN;
+const TOGGLE_ON: Color = palette::FROG;
+const TOGGLE_OFF: Color = palette::BURGUNDY;
+const RADIO_ACTIVE: Color = palette::TEAL;
+const RADIO_INACTIVE: Color = palette::INDIGO;
 
 // Marker components
 #[derive(Component)]
@@ -101,7 +102,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     font_size: 22.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                TextColor(palette::VANILLA),
             ));
 
             panel.spawn((
@@ -110,7 +111,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     font_size: 16.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.7, 0.7, 0.7)),
+                TextColor(palette::SIDEWALK),
                 Node {
                     margin: UiRect::top(Val::Px(8.0)),
                     ..default()
@@ -134,7 +135,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                             font_size: 14.0,
                             ..default()
                         },
-                        TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                        TextColor(palette::CHAINMAIL),
                     ));
                 });
 
@@ -146,7 +147,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     margin: UiRect::vertical(Val::Px(8.0)),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.3, 0.3, 0.3)),
+                BackgroundColor(palette::STEEL),
             ));
 
             panel.spawn((
@@ -155,7 +156,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     font_size: 16.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.7, 0.7, 0.7)),
+                TextColor(palette::SIDEWALK),
             ));
 
             panel
@@ -175,7 +176,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 font_size: 14.0,
                                 ..default()
                             },
-                            TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                            TextColor(palette::CHAINMAIL),
                         ));
                     } else {
                         let mut ids: Vec<&ObstacleId> = library.definitions.keys().collect();
@@ -218,7 +219,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                     font_size: 14.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.6, 0.6, 0.6)),
+                TextColor(palette::SIDEWALK),
             ));
 
             panel
@@ -233,8 +234,8 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                         border: UiRect::all(Val::Px(1.0)),
                         ..default()
                     },
-                    BackgroundColor(Color::srgb(0.05, 0.05, 0.05)),
-                    BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+                    BackgroundColor(palette::BLACK),
+                    BorderColor::all(palette::STEEL),
                 ))
                 .with_children(|field| {
                     field.spawn((
@@ -243,7 +244,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                             font_size: 14.0,
                             ..default()
                         },
-                        TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                        TextColor(palette::CHAINMAIL),
                         NameDisplayText,
                     ));
                 });
@@ -263,9 +264,9 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             });
 
             spawn_divider(panel);
-            spawn_action_button(panel, "Save Obstacle", SaveButton, Color::srgb(0.15, 0.4, 0.15));
+            spawn_action_button(panel, "Save Obstacle", SaveButton, palette::JUNGLE);
             spawn_action_button(panel, "New / Clear", NewButton, BUTTON_NORMAL);
-            spawn_action_button(panel, "Delete", DeleteButton, Color::srgb(0.5, 0.12, 0.12));
+            spawn_action_button(panel, "Delete", DeleteButton, palette::MAROON);
         });
 }
 
@@ -283,7 +284,7 @@ pub fn spawn_node_button(parent: &mut ChildSpawnerCommands, name: &str) {
                 ..default()
             },
             BackgroundColor(BUTTON_NORMAL),
-            BorderColor::all(Color::srgb(0.25, 0.25, 0.25)),
+            BorderColor::all(palette::SAPPHIRE),
         ))
         .with_children(|btn| {
             btn.spawn((
@@ -292,7 +293,7 @@ pub fn spawn_node_button(parent: &mut ChildSpawnerCommands, name: &str) {
                     font_size: 13.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                TextColor(palette::SAND),
             ));
         });
 }
@@ -311,7 +312,7 @@ fn spawn_library_button(parent: &mut ChildSpawnerCommands, id: &str) {
                 ..default()
             },
             BackgroundColor(BUTTON_NORMAL),
-            BorderColor::all(Color::srgb(0.25, 0.25, 0.25)),
+            BorderColor::all(palette::SAPPHIRE),
         ))
         .with_children(|btn| {
             btn.spawn((
@@ -320,7 +321,7 @@ fn spawn_library_button(parent: &mut ChildSpawnerCommands, id: &str) {
                     font_size: 13.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.7, 0.85, 0.7)),
+                TextColor(palette::SEA_FOAM),
             ));
         });
 }
@@ -339,7 +340,7 @@ fn spawn_small_button(parent: &mut ChildSpawnerCommands, label: &str, marker: im
                 ..default()
             },
             BackgroundColor(BUTTON_NORMAL),
-            BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+            BorderColor::all(palette::STEEL),
         ))
         .with_children(|btn| {
             btn.spawn((
@@ -348,7 +349,7 @@ fn spawn_small_button(parent: &mut ChildSpawnerCommands, label: &str, marker: im
                     font_size: 14.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                TextColor(palette::SAND),
             ));
         });
 }
@@ -380,7 +381,7 @@ fn spawn_toggle_row(
                     ..default()
                 },
                 BackgroundColor(if initial { TOGGLE_ON } else { TOGGLE_OFF }),
-                BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+                BorderColor::all(palette::STEEL),
             ))
             .with_children(|btn| {
                 btn.spawn((
@@ -389,7 +390,7 @@ fn spawn_toggle_row(
                         font_size: 12.0,
                         ..default()
                     },
-                    TextColor(Color::WHITE),
+                    TextColor(palette::VANILLA),
                     text_marker,
                 ));
             });
@@ -400,7 +401,7 @@ fn spawn_toggle_row(
                     font_size: 14.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.8, 0.8, 0.8)),
+                TextColor(palette::SAND),
             ));
         });
 }
@@ -439,7 +440,7 @@ fn spawn_radio_option(
                 ..default()
             },
             BackgroundColor(bg),
-            BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+            BorderColor::all(palette::STEEL),
         ))
         .with_children(|btn| {
             btn.spawn((
@@ -448,7 +449,7 @@ fn spawn_radio_option(
                     font_size: 13.0,
                     ..default()
                 },
-                TextColor(Color::WHITE),
+                TextColor(palette::VANILLA),
             ));
         });
 }
@@ -473,7 +474,7 @@ fn spawn_action_button(
                 ..default()
             },
             BackgroundColor(bg),
-            BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+            BorderColor::all(palette::STEEL),
         ))
         .with_children(|btn| {
             btn.spawn((
@@ -482,7 +483,7 @@ fn spawn_action_button(
                     font_size: 15.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                TextColor(palette::VANILLA),
             ));
         });
 }
@@ -495,7 +496,7 @@ fn spawn_divider(parent: &mut ChildSpawnerCommands) {
             margin: UiRect::vertical(Val::Px(4.0)),
             ..default()
         },
-        BackgroundColor(Color::srgb(0.3, 0.3, 0.3)),
+        BackgroundColor(palette::STEEL),
     ));
 }
 
@@ -710,7 +711,7 @@ pub fn handle_name_field_focus(
         if *interaction == Interaction::Pressed {
             state.editing_name = true;
             if let Ok(mut b) = border.single_mut() {
-                *b = BorderColor::all(Color::srgb(0.4, 0.7, 1.0));
+                *b = BorderColor::all(palette::SKY);
             }
         }
     }
@@ -734,7 +735,7 @@ pub fn handle_name_text_input(
             Key::Enter | Key::Escape => {
                 state.editing_name = false;
                 if let Ok(mut b) = border.single_mut() {
-                    *b = BorderColor::all(Color::srgb(0.3, 0.3, 0.3));
+                    *b = BorderColor::all(palette::STEEL);
                 }
             }
             Key::Backspace => {
@@ -855,7 +856,7 @@ fn rebuild_library_list(
                     font_size: 14.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.5, 0.5, 0.5)),
+                TextColor(palette::CHAINMAIL),
             ));
         } else {
             let mut ids: Vec<&ObstacleId> = library.definitions.keys().collect();

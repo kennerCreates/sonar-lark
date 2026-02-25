@@ -3,12 +3,13 @@ pub mod skybox;
 
 use bevy::prelude::*;
 
+use crate::palette;
 pub use cel_material::{CelMaterial, cel_material_flat, cel_material_from_color};
 pub use skybox::SkyboxMaterial;
 
 /// Shared fog parameters — single source of truth for cel shader, skybox, and camera fog.
 pub fn fog_color() -> Color {
-    Color::srgb(0.110, 0.157, 0.302) // Space Cadet — matches sky_bright palette
+    palette::SAPPHIRE
 }
 pub const FOG_START: f32 = 200.0;
 pub const FOG_END: f32 = 500.0;

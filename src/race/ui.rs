@@ -4,16 +4,17 @@ use crate::course::loader::SelectedCourse;
 use crate::drone::components::*;
 use crate::drone::spawning::NoGatesCourse;
 use crate::editor::course_editor::PendingEditorCourse;
+use crate::palette;
 use crate::states::AppState;
 
 use super::lifecycle::{CountdownTimer, RacePhase};
 use super::progress::RaceProgress;
 use super::timing::RaceClock;
 
-const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
-const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
-const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
-const DISABLED_BUTTON: Color = Color::srgb(0.1, 0.1, 0.1);
+const NORMAL_BUTTON: Color = palette::INDIGO;
+const HOVERED_BUTTON: Color = palette::SAPPHIRE;
+const PRESSED_BUTTON: Color = palette::GREEN;
+const DISABLED_BUTTON: Color = palette::SMOKY_BLACK;
 
 #[derive(Component)]
 pub(crate) struct StartRaceButton;
@@ -61,7 +62,7 @@ pub fn setup_race_ui(mut commands: Commands) {
                         ..default()
                     },
                     BackgroundColor(NORMAL_BUTTON),
-                    BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+                    BorderColor::all(palette::STEEL),
                 ))
                 .with_children(|btn| {
                     btn.spawn((
@@ -70,7 +71,7 @@ pub fn setup_race_ui(mut commands: Commands) {
                             font_size: 24.0,
                             ..default()
                         },
-                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                        TextColor(palette::VANILLA),
                         StartRaceButtonText,
                     ));
                 });
@@ -125,20 +126,20 @@ pub fn update_start_button_visuals(
         match *phase {
             RacePhase::Countdown | RacePhase::Racing => {
                 *bg = BackgroundColor(DISABLED_BUTTON);
-                *border = BorderColor::all(Color::srgb(0.2, 0.2, 0.2));
+                *border = BorderColor::all(palette::INDIGO);
             }
             RacePhase::WaitingToStart | RacePhase::Finished => match *interaction {
                 Interaction::Pressed => {
                     *bg = BackgroundColor(PRESSED_BUTTON);
-                    *border = BorderColor::all(Color::WHITE);
+                    *border = BorderColor::all(palette::VANILLA);
                 }
                 Interaction::Hovered => {
                     *bg = BackgroundColor(HOVERED_BUTTON);
-                    *border = BorderColor::all(Color::srgb(0.6, 0.6, 0.6));
+                    *border = BorderColor::all(palette::SIDEWALK);
                 }
                 Interaction::None => {
                     *bg = BackgroundColor(NORMAL_BUTTON);
-                    *border = BorderColor::all(Color::srgb(0.3, 0.3, 0.3));
+                    *border = BorderColor::all(palette::STEEL);
                 }
             },
         }
@@ -156,19 +157,19 @@ pub fn update_start_button_text(
         match *phase {
             RacePhase::WaitingToStart => {
                 text.0 = "START RACE".to_string();
-                *color = TextColor(Color::srgb(0.9, 0.9, 0.9));
+                *color = TextColor(palette::VANILLA);
             }
             RacePhase::Countdown => {
                 text.0 = "GET READY...".to_string();
-                *color = TextColor(Color::srgb(0.4, 0.4, 0.4));
+                *color = TextColor(palette::STONE);
             }
             RacePhase::Racing => {
                 text.0 = "RACING...".to_string();
-                *color = TextColor(Color::srgb(0.4, 0.4, 0.4));
+                *color = TextColor(palette::STONE);
             }
             RacePhase::Finished => {
                 text.0 = "RACE AGAIN".to_string();
-                *color = TextColor(Color::srgb(0.9, 0.9, 0.9));
+                *color = TextColor(palette::VANILLA);
             }
         }
     }
@@ -218,7 +219,7 @@ pub fn manage_countdown_text(
                                 font_size: 120.0,
                                 ..default()
                             },
-                            TextColor(Color::srgba(1.0, 1.0, 1.0, 0.9)),
+                            TextColor(palette::VANILLA),
                             CountdownTextContent,
                         ));
                     });
@@ -270,7 +271,7 @@ pub fn update_race_clock_display(
                             font_size: 36.0,
                             ..default()
                         },
-                        TextColor(Color::WHITE),
+                        TextColor(palette::VANILLA),
                         RaceClockTextContent,
                     ));
                 });
@@ -329,8 +330,8 @@ pub fn show_no_gates_banner(
                         border: UiRect::all(Val::Px(2.0)),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.15, 0.1, 0.0, 0.9)),
-                    BorderColor::all(Color::srgb(0.9, 0.6, 0.1)),
+                    BackgroundColor(palette::SMOKY_BLACK),
+                    BorderColor::all(palette::GOLDENROD),
                 ))
                 .with_children(|banner| {
                     banner.spawn((
@@ -339,7 +340,7 @@ pub fn show_no_gates_banner(
                             font_size: 20.0,
                             ..default()
                         },
-                        TextColor(Color::srgb(1.0, 0.8, 0.2)),
+                        TextColor(palette::LIMON),
                     ));
                 });
 
@@ -357,7 +358,7 @@ pub fn show_no_gates_banner(
                         ..default()
                     },
                     BackgroundColor(NORMAL_BUTTON),
-                    BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+                    BorderColor::all(palette::STEEL),
                 ))
                 .with_children(|btn| {
                     btn.spawn((
@@ -366,7 +367,7 @@ pub fn show_no_gates_banner(
                             font_size: 24.0,
                             ..default()
                         },
-                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                        TextColor(palette::VANILLA),
                     ));
                 });
         });
@@ -400,15 +401,15 @@ pub fn update_open_editor_button_visuals(
         match *interaction {
             Interaction::Pressed => {
                 *bg = BackgroundColor(PRESSED_BUTTON);
-                *border = BorderColor::all(Color::WHITE);
+                *border = BorderColor::all(palette::VANILLA);
             }
             Interaction::Hovered => {
                 *bg = BackgroundColor(HOVERED_BUTTON);
-                *border = BorderColor::all(Color::srgb(0.6, 0.6, 0.6));
+                *border = BorderColor::all(palette::SIDEWALK);
             }
             Interaction::None => {
                 *bg = BackgroundColor(NORMAL_BUTTON);
-                *border = BorderColor::all(Color::srgb(0.3, 0.3, 0.3));
+                *border = BorderColor::all(palette::STEEL);
             }
         }
     }

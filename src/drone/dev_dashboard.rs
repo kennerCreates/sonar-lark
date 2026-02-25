@@ -1,21 +1,22 @@
 use bevy::prelude::*;
 
 use super::components::*;
+use crate::palette;
 use crate::states::AppState;
 
-const PANEL_BG: Color = Color::srgba(0.06, 0.06, 0.06, 0.92);
-const ROW_BG: Color = Color::srgba(0.1, 0.1, 0.1, 0.8);
-const ROW_BG_ALT: Color = Color::srgba(0.13, 0.13, 0.13, 0.8);
-const BTN_NORMAL: Color = Color::srgb(0.2, 0.2, 0.2);
-const BTN_HOVERED: Color = Color::srgb(0.35, 0.35, 0.35);
-const BTN_PRESSED: Color = Color::srgb(0.3, 0.7, 0.3);
-const RESET_NORMAL: Color = Color::srgb(0.5, 0.15, 0.15);
-const RESET_HOVERED: Color = Color::srgb(0.65, 0.2, 0.2);
-const RESET_PRESSED: Color = Color::srgb(0.8, 0.3, 0.3);
-const TITLE_COLOR: Color = Color::srgb(0.9, 0.75, 0.2);
-const LABEL_COLOR: Color = Color::srgb(0.7, 0.7, 0.7);
-const VALUE_COLOR: Color = Color::srgb(0.95, 0.95, 0.95);
-const MODIFIED_COLOR: Color = Color::srgb(0.3, 0.95, 0.5);
+const PANEL_BG: Color = palette::SMOKY_BLACK;
+const ROW_BG: Color = palette::SMOKY_BLACK;
+const ROW_BG_ALT: Color = palette::INDIGO;
+const BTN_NORMAL: Color = palette::SAPPHIRE;
+const BTN_HOVERED: Color = palette::STEEL;
+const BTN_PRESSED: Color = palette::GREEN;
+const RESET_NORMAL: Color = palette::EGGPLANT;
+const RESET_HOVERED: Color = palette::GRAPE;
+const RESET_PRESSED: Color = palette::MAROON;
+const TITLE_COLOR: Color = palette::SUNSHINE;
+const LABEL_COLOR: Color = palette::SIDEWALK;
+const VALUE_COLOR: Color = palette::VANILLA;
+const MODIFIED_COLOR: Color = palette::SEA_FOAM;
 
 /// Marker on the dashboard root entity.
 #[derive(Component)]
@@ -170,7 +171,7 @@ fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
                         ..default()
                     },
                     BackgroundColor(RESET_NORMAL),
-                    BorderColor::all(Color::srgb(0.6, 0.2, 0.2)),
+                    BorderColor::all(palette::GRAPE),
                 ))
                 .with_children(|btn| {
                     btn.spawn((
@@ -179,7 +180,7 @@ fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
                             font_size: 14.0,
                             ..default()
                         },
-                        TextColor(Color::srgb(0.95, 0.85, 0.85)),
+                        TextColor(palette::PALE_PINK),
                     ));
                 });
         });
@@ -204,7 +205,7 @@ fn spawn_param_button(
                 ..default()
             },
             BackgroundColor(BTN_NORMAL),
-            BorderColor::all(Color::srgb(0.3, 0.3, 0.3)),
+            BorderColor::all(palette::STEEL),
         ))
         .with_children(|btn| {
             btn.spawn((
@@ -213,7 +214,7 @@ fn spawn_param_button(
                     font_size: 14.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                TextColor(palette::VANILLA),
             ));
         });
 }

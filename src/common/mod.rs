@@ -1,6 +1,7 @@
 use bevy::picking::Pickable;
 use bevy::prelude::*;
 
+use crate::palette;
 use crate::rendering::{
     CelLightDir, CelMaterial, cel_material_flat,
     skybox::{self, SkyboxMaterial},
@@ -41,7 +42,7 @@ fn setup_environment(
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(6000.0, 6000.0))),
         MeshMaterial3d(cel_materials.add(cel_material_flat(
-            Color::srgb(0.020, 0.055, 0.102), // Smoky Black #050e1a
+            palette::SMOKY_BLACK,
             light_dir,
         ))),
         Pickable::IGNORE,

@@ -5,6 +5,7 @@ use rand::seq::SliceRandom;
 
 use crate::course::data::CourseData;
 use crate::obstacle::library::ObstacleLibrary;
+use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::AppState;
 use super::components::*;
@@ -16,21 +17,20 @@ const GRAVITY: f32 = 9.81;
 /// Fraction of gate width used for the start line (leaves margin at edges).
 const GATE_WIDTH_USAGE: f32 = 0.8;
 
-/// Per-drone colors from the 64-color palette (assets/color/color_palette_64.hex).
-/// 12 colors chosen for maximum hue spread and visual contrast.
-pub const DRONE_COLORS: [[f32; 3]; 12] = [
-    [0.961, 0.192, 0.255], // Neon Red    #f53141
-    [0.961, 0.506, 0.133], // Sunflower   #f58122
-    [0.980, 0.851, 0.216], // Limon       #fad937
-    [0.580, 0.749, 0.188], // Grass       #94bf30
-    [0.090, 0.612, 0.263], // Frog        #179c43
-    [0.239, 0.631, 0.494], // Jade        #3da17e
-    [0.286, 0.761, 0.949], // Sky         #49c2f2
-    [0.110, 0.459, 0.741], // Homeworld   #1c75bd
-    [0.494, 0.494, 0.949], // Periwinkle  #7e7ef2
-    [0.639, 0.365, 0.851], // Amethyst    #a35dd9
-    [0.851, 0.298, 0.557], // Pink        #d94c8e
-    [0.949, 0.949, 0.855], // Vanilla     #f2f2da
+/// Per-drone colors — 12 palette colors chosen for maximum hue spread.
+pub const DRONE_COLORS: [Color; 12] = [
+    palette::NEON_RED,
+    palette::SUNFLOWER,
+    palette::LIMON,
+    palette::GRASS,
+    palette::FROG,
+    palette::JADE,
+    palette::SKY,
+    palette::HOMEWORLD,
+    palette::PERIWINKLE,
+    palette::AMETHYST,
+    palette::PINK,
+    palette::VANILLA,
 ];
 
 /// Marker resource inserted when `spawn_drones` detects the course has no gates.
@@ -221,9 +221,9 @@ pub fn spawn_drones(
             DespawnOnExit(AppState::Race),
         ));
 
-        let [r, g, b] = DRONE_COLORS[i as usize];
+        let drone_color = DRONE_COLORS[i as usize];
         let drone_mat =
-            cel_materials.add(cel_material_from_color(Color::srgb(r, g, b), light_dir.0));
+            cel_materials.add(cel_material_from_color(drone_color, light_dir.0));
         entity_cmd.with_children(|children| {
             for mesh in &assets.mesh_primitives {
                 children.spawn((
