@@ -123,9 +123,10 @@ pub fn spawn_explosion(
 
     // --- Hot smoke (bright orange/red core) ---
     let hot_smoke_mesh = meshes.add(Cuboid::new(HOT_SMOKE_SIZE, HOT_SMOKE_SIZE, HOT_SMOKE_SIZE));
+    // Tangerine #f2621f from palette
     let hot_smoke_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.95, 0.4, 0.1),
-        emissive: LinearRgba::new(3.0, 1.2, 0.2, 1.0),
+        base_color: Color::srgb(0.949, 0.384, 0.122),
+        emissive: LinearRgba::new(2.8, 1.15, 0.37, 1.0),
         unlit: true,
         ..default()
     });
@@ -156,8 +157,9 @@ pub fn spawn_explosion(
 
     // --- Dark smoke (black/charcoal halo) ---
     let dark_smoke_mesh = meshes.add(Cuboid::new(DARK_SMOKE_SIZE, DARK_SMOKE_SIZE, DARK_SMOKE_SIZE));
+    // Smoky Black #050e1a from palette
     let dark_smoke_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.08, 0.08, 0.08),
+        base_color: Color::srgb(0.020, 0.055, 0.102),
         unlit: true,
         ..default()
     });

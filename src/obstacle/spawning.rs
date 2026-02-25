@@ -23,6 +23,16 @@ pub fn load_obstacles_gltf(mut commands: Commands, asset_server: Res<AssetServer
     commands.insert_resource(ObstaclesGltfHandle(handle));
 }
 
+/// Per-gate-type color from the 64-color palette (avoids drone colors and ground).
+fn gate_color(obstacle_id: &ObstacleId) -> Option<Color> {
+    match obstacle_id.0.as_str() {
+        "gate_loop"   => Some(Color::srgb(0.980, 0.627, 0.196)), // Dandelion #faa032
+        "gate_ground" => Some(Color::srgb(0.769, 0.047, 0.180)), // Cherry    #c40c2e
+        "gate_best"   => Some(Color::srgb(0.682, 0.533, 0.890)), // Lavender  #ae88e3
+        _ => None,
+    }
+}
+
 /// Spawn an obstacle from a named node in the glTF file.
 ///
 /// Looks up the node by name, then spawns its mesh primitives as children
@@ -55,13 +65,18 @@ pub fn spawn_obstacle(
         rotation: node.transform.rotation,
         scale: node.transform.scale,
     };
+    let override_mat = gate_color(obstacle_id)
+        .map(|color| materials.add(StandardMaterial { base_color: color, ..default() }));
     let primitives: Vec<(Handle<Mesh>, MeshMaterial3d<StandardMaterial>)> = gltf_mesh
         .primitives
         .iter()
         .map(|p| {
-            let mat = match &p.material {
+            let mat = match &override_mat {
                 Some(m) => MeshMaterial3d(m.clone()),
-                None => MeshMaterial3d(materials.add(StandardMaterial::default())),
+                None => match &p.material {
+                    Some(m) => MeshMaterial3d(m.clone()),
+                    None => MeshMaterial3d(materials.add(StandardMaterial::default())),
+                },
             };
             (p.mesh.clone(), mat)
         })

@@ -25,8 +25,13 @@ fn setup_environment(
 
     // Ground plane (not pickable — clicks pass through to obstacles)
     commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(200.0, 200.0))),
-        MeshMaterial3d(materials.add(Color::srgb(0.3, 0.5, 0.3))),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(6000.0, 6000.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.024, 0.502, 0.318), // Jungle #068051
+            perceptual_roughness: 1.0,
+            reflectance: 0.0,
+            ..default()
+        })),
         Pickable::IGNORE,
     ));
 }
