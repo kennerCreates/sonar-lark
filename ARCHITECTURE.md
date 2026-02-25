@@ -22,7 +22,11 @@ AppState::Menu ──► AppState::Editor ──► AppState::Race ──► App
 src/
 ├── main.rs              App builder, plugin registration
 ├── states.rs            AppState, EditorMode
-├── common/              Environment setup (light, ground)
+├── rendering/           Custom shaders and materials
+│   ├── mod.rs           RenderingPlugin, CelLightDir resource
+│   ├── cel_material.rs  CelMaterial (cel-shading with halftone + hue shifting)
+│   └── skybox.rs        SkyboxMaterial, procedural TRON night sky
+├── common/              Environment setup (light, ground, skybox)
 ├── menu/                Menu UI, state navigation
 ├── obstacle/            Obstacle data layer
 │   ├── definition.rs    ObstacleId, ObstacleDef, TriggerVolumeConfig
@@ -108,6 +112,10 @@ CourseData ──► spawn obstacles + drones
 | `RacePhase` | Resource | race/lifecycle | WaitingToStart → Countdown → Racing → Finished |
 | `CountdownTimer` | Resource | race/lifecycle | 3-second countdown timer (inserted on Countdown, removed on Racing) |
 | `RaceClock` | Resource | race/timing | Elapsed race time, running flag |
+| `CelMaterial` | Asset | rendering/cel_material | Cel-shading material with halftone transition and hue-shifted highlights/shadows |
+| `SkyboxMaterial` | Asset | rendering/skybox | Procedural TRON night sky (stars, moon, neon horizon glow) |
+| `CelLightDir` | Resource | rendering/mod | World-space light direction shared by all CelMaterial instances |
+| `SkyboxEntity` | Component | rendering/skybox | Marker on the skybox sphere entity |
 | `CameraState` | Resource | camera/switching | Current mode + target drone |
 | `SpectatorSettings` | Resource | camera/spectator | Movement speed + mouse sensitivity |
 | `AvailableCourses` | Resource | menu/ui | Discovered course files (Menu state only) |
@@ -131,6 +139,8 @@ CourseData ──► spawn obstacles + drones
 assets/
 ├── models/obstacles.glb              Single Blender file, all obstacle meshes
 ├── models/drone.glb                  Drone model (named node "Drone"), materials from glb
+├── shaders/cel_halftone.wgsl         Cel-shading fragment shader (halftone dots, hue shifting)
+├── shaders/tron_skybox.wgsl          Procedural TRON night skybox shader
 ├── library/default.obstacles.ron     Obstacle type definitions
 └── courses/*.course.ron              Saved race courses
 ```
@@ -187,6 +197,7 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `drone::spawning` | 19 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero, adaptive approach offset), per-drone path generation (paths differ, passes near gates, tangent alignment, neutral matches base), start positions (count, behind gate, no overlap), config randomization bounds (incl. cornering/braking/attitude/racing-line variation), PID variation, return path generation (valid spline, per-drone variation) |
 | `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, is_active, standings sorting (finished by time, finished before crashed, crashed by gates passed) |
 | `race::gate` | 8 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside) |
+| `rendering::cel_material` | 3 | Hue-shift algorithm: highlight warmth, shadow coolness, color clamping |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems

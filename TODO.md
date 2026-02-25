@@ -14,6 +14,8 @@
 - [x] **Phase 6b**: Drone Realism Audit — motor lag 40→25ms, attitude PD underdamping (kp=7/kd=0.20), per-drone cornering aggression/braking distance/attitude PD variation, adaptive approach offset, dirty air perturbation, prop wash (faked), battery sag, dev dashboard expanded to 11 params
 - [x] **Phase 7**: Race — Gate Validation, Timing, Lifecycle (RaceProgress per-drone tracking, RaceClock, AABB gate trigger detection, gate ordering enforcement, hard crash on missed gate, 3-second countdown sequence, race completion detection, countdown + clock UI)
 
+- [x] **Rendering Overhaul**: Cel-shaded materials with halftone gradient effect and hue shifting (warm highlights, cool shadows). Procedural TRON night skybox (stars, moon, neon horizon glow). Custom WGSL shaders. All spawn points (ground, obstacles, drones) refactored from StandardMaterial to CelMaterial. Explosions unchanged (unlit emissive).
+
 ### Phase 8: Results, FPV Camera, Chase Camera
 - [ ] Results UI: display race standings (finish time, crashed status)
 - [ ] Results navigation: buttons for back-to-menu, replay

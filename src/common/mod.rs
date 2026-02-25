@@ -1,6 +1,12 @@
 use bevy::picking::Pickable;
 use bevy::prelude::*;
 
+use crate::rendering::{
+    CelLightDir, CelMaterial, cel_material_from_color,
+    skybox::{self, SkyboxMaterial},
+    light_direction_from_transform,
+};
+
 pub struct CommonPlugin;
 
 impl Plugin for CommonPlugin {
@@ -12,26 +18,33 @@ impl Plugin for CommonPlugin {
 fn setup_environment(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    mut skybox_materials: ResMut<Assets<SkyboxMaterial>>,
 ) {
     // Light
+    let light_transform =
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.5, -0.5, 0.0));
+    let light_dir = light_direction_from_transform(&light_transform);
+    commands.insert_resource(CelLightDir(light_dir));
+
     commands.spawn((
         DirectionalLight {
             illuminance: 10_000.0,
             ..default()
         },
-        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.5, -0.5, 0.0)),
+        light_transform,
     ));
 
-    // Ground plane (not pickable — clicks pass through to obstacles)
+    // Ground plane: dark TRON ground (not pickable — clicks pass through to obstacles)
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(6000.0, 6000.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.024, 0.502, 0.318), // Jungle #068051
-            perceptual_roughness: 1.0,
-            reflectance: 0.0,
-            ..default()
-        })),
+        MeshMaterial3d(cel_materials.add(cel_material_from_color(
+            Color::srgb(0.020, 0.055, 0.102), // Smoky Black #050e1a
+            light_dir,
+        ))),
         Pickable::IGNORE,
     ));
+
+    // Skybox
+    skybox::spawn_skybox(&mut commands, &mut meshes, &mut skybox_materials);
 }

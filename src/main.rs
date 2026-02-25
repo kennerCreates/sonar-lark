@@ -6,6 +6,7 @@ mod editor;
 mod menu;
 mod obstacle;
 mod race;
+mod rendering;
 mod results;
 mod states;
 
@@ -18,6 +19,7 @@ fn main() {
         .init_state::<states::AppState>()
         .add_sub_state::<states::EditorMode>()
         .add_plugins((
+            rendering::RenderingPlugin,
             common::CommonPlugin,
             menu::MenuPlugin,
             obstacle::ObstaclePlugin,

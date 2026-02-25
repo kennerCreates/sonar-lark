@@ -8,6 +8,7 @@ use crate::course::loader::{delete_course, load_course_from_file, save_course};
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
+use crate::rendering::{CelLightDir, CelMaterial};
 use crate::states::{AppState, EditorMode};
 
 use super::{LastEditedCourse, PendingEditorCourse, PlacedObstacle, PlacementState, TransformMode};
@@ -638,7 +639,9 @@ pub fn handle_palette_selection(
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    std_materials: Res<Assets<StandardMaterial>>,
+    light_dir: Res<CelLightDir>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -659,7 +662,9 @@ pub fn handle_palette_selection(
             &gltf_assets,
             &node_assets,
             &mesh_assets,
-            &mut materials,
+            &mut cel_materials,
+            &std_materials,
+            light_dir.0,
             handle,
             &def.id,
             &def.glb_node_name,
@@ -986,7 +991,9 @@ fn load_course_into_editor(
     gltf_assets: &Assets<bevy::gltf::Gltf>,
     node_assets: &Assets<bevy::gltf::GltfNode>,
     mesh_assets: &Assets<bevy::gltf::GltfMesh>,
-    materials: &mut Assets<StandardMaterial>,
+    cel_materials: &mut Assets<CelMaterial>,
+    std_materials: &Assets<StandardMaterial>,
+    light_dir: Vec3,
     course: &CourseData,
 ) {
     for entity in placed_query {
@@ -1024,7 +1031,9 @@ fn load_course_into_editor(
             gltf_assets,
             node_assets,
             mesh_assets,
-            materials,
+            cel_materials,
+            std_materials,
+            light_dir,
             gltf_handle,
             &def.id,
             &def.glb_node_name,
@@ -1066,7 +1075,9 @@ pub fn handle_load_button(
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    std_materials: Res<Assets<StandardMaterial>>,
+    light_dir: Res<CelLightDir>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -1096,7 +1107,9 @@ pub fn handle_load_button(
             &gltf_assets,
             &node_assets,
             &mesh_assets,
-            &mut materials,
+            &mut cel_materials,
+            &std_materials,
+            light_dir.0,
             &course,
         );
 
@@ -1117,7 +1130,9 @@ pub fn auto_load_pending_course(
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    std_materials: Res<Assets<StandardMaterial>>,
+    light_dir: Res<CelLightDir>,
 ) {
     let Some(pending) = pending else { return };
     let Some(handle) = &gltf_handle else { return };
@@ -1145,7 +1160,9 @@ pub fn auto_load_pending_course(
         &gltf_assets,
         &node_assets,
         &mesh_assets,
-        &mut materials,
+        &mut cel_materials,
+        &std_materials,
+        light_dir.0,
         &course,
     );
 

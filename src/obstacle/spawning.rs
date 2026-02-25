@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use super::definition::{ObstacleId, TriggerVolumeConfig};
+use crate::rendering::{CelMaterial, cel_material_from_color};
 
 #[derive(Component)]
 pub struct ObstacleMarker {
@@ -42,7 +43,9 @@ pub fn spawn_obstacle(
     gltf_assets: &Assets<bevy::gltf::Gltf>,
     node_assets: &Assets<bevy::gltf::GltfNode>,
     mesh_assets: &Assets<bevy::gltf::GltfMesh>,
-    materials: &mut Assets<StandardMaterial>,
+    cel_materials: &mut Assets<CelMaterial>,
+    std_materials: &Assets<StandardMaterial>,
+    light_dir: Vec3,
     gltf_handle: &ObstaclesGltfHandle,
     obstacle_id: &ObstacleId,
     node_name: &str,
@@ -59,24 +62,28 @@ pub fn spawn_obstacle(
     let gltf_mesh = mesh_assets.get(gltf_mesh_handle)?;
 
     // Pre-collect primitive meshes and materials before entering with_children, since
-    // materials is &mut and cannot be borrowed inside the closure alongside entity_commands.
+    // cel_materials is &mut and cannot be borrowed inside the closure alongside entity_commands.
     let mesh_transform = Transform {
         translation: model_offset,
         rotation: node.transform.rotation,
         scale: node.transform.scale,
     };
     let override_mat = gate_color(obstacle_id)
-        .map(|color| materials.add(StandardMaterial { base_color: color, ..default() }));
-    let primitives: Vec<(Handle<Mesh>, MeshMaterial3d<StandardMaterial>)> = gltf_mesh
+        .map(|color| cel_materials.add(cel_material_from_color(color, light_dir)));
+    let primitives: Vec<(Handle<Mesh>, MeshMaterial3d<CelMaterial>)> = gltf_mesh
         .primitives
         .iter()
         .map(|p| {
             let mat = match &override_mat {
                 Some(m) => MeshMaterial3d(m.clone()),
-                None => match &p.material {
-                    Some(m) => MeshMaterial3d(m.clone()),
-                    None => MeshMaterial3d(materials.add(StandardMaterial::default())),
-                },
+                None => {
+                    let base_color = p.material
+                        .as_ref()
+                        .and_then(|h| std_materials.get(h))
+                        .map(|m| m.base_color)
+                        .unwrap_or(Color::srgb(0.5, 0.5, 0.5));
+                    MeshMaterial3d(cel_materials.add(cel_material_from_color(base_color, light_dir)))
+                }
             };
             (p.mesh.clone(), mat)
         })

@@ -7,6 +7,7 @@ use bevy::{
 
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
+use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::EditorMode;
 
 use super::gizmos::{closest_point_on_axis, point_to_segment_distance, Axis, Sign};
@@ -232,7 +233,9 @@ pub fn spawn_preview(
     gltf_assets: &Assets<bevy::gltf::Gltf>,
     node_assets: &Assets<bevy::gltf::GltfNode>,
     mesh_assets: &Assets<bevy::gltf::GltfMesh>,
-    materials: &mut Assets<StandardMaterial>,
+    cel_materials: &mut Assets<CelMaterial>,
+    std_materials: &Assets<StandardMaterial>,
+    light_dir: Vec3,
     gltf_handle: &ObstaclesGltfHandle,
     node_name: &str,
     model_offset: Vec3,
@@ -246,6 +249,21 @@ pub fn spawn_preview(
     let mut transform = node.transform;
     transform.translation = model_offset;
 
+    // Pre-collect materials before spawning to avoid borrow conflicts
+    let primitives: Vec<(Handle<Mesh>, MeshMaterial3d<CelMaterial>)> = gltf_mesh
+        .primitives
+        .iter()
+        .map(|p| {
+            let base_color = p.material
+                .as_ref()
+                .and_then(|h| std_materials.get(h))
+                .map(|m| m.base_color)
+                .unwrap_or(Color::srgb(0.5, 0.5, 0.5));
+            let mat = MeshMaterial3d(cel_materials.add(cel_material_from_color(base_color, light_dir)));
+            (p.mesh.clone(), mat)
+        })
+        .collect();
+
     let parent = commands
         .spawn((
             transform,
@@ -254,15 +272,10 @@ pub fn spawn_preview(
         ))
         .id();
 
-    for primitive in &gltf_mesh.primitives {
-        let material = match primitive.material {
-            Some(ref mat) => MeshMaterial3d(mat.clone()),
-            None => MeshMaterial3d(materials.add(StandardMaterial::default())),
-        };
-
+    for (mesh, material) in primitives {
         commands
             .spawn((
-                Mesh3d(primitive.mesh.clone()),
+                Mesh3d(mesh),
                 material,
                 Transform::default(),
             ))
@@ -276,7 +289,9 @@ fn spawn_placeholder_preview(
     mut commands: Commands,
     mut state: ResMut<WorkshopState>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    std_materials: Res<Assets<StandardMaterial>>,
+    light_dir: Res<CelLightDir>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
@@ -295,7 +310,9 @@ fn spawn_placeholder_preview(
             &gltf_assets,
             &node_assets,
             &mesh_assets,
-            &mut materials,
+            &mut cel_materials,
+            &std_materials,
+            light_dir.0,
             handle,
             &state.node_name,
             offset,
@@ -309,10 +326,10 @@ fn spawn_placeholder_preview(
     let entity = commands
         .spawn((
             Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::srgb(0.5, 0.5, 0.6),
-                ..default()
-            })),
+            MeshMaterial3d(cel_materials.add(cel_material_from_color(
+                Color::srgb(0.5, 0.5, 0.6),
+                light_dir.0,
+            ))),
             Transform::from_translation(offset),
             PreviewObstacle,
         ))

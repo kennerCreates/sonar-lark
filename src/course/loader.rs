@@ -5,6 +5,7 @@ use bevy::prelude::*;
 
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{spawn_obstacle, ObstaclesGltfHandle};
+use crate::rendering::{CelLightDir, CelMaterial};
 use super::data::CourseData;
 
 #[derive(Resource)]
@@ -45,7 +46,9 @@ pub fn spawn_course(
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    std_materials: Res<Assets<StandardMaterial>>,
+    light_dir: Res<CelLightDir>,
     already_spawned: Option<Res<CourseSpawned>>,
 ) {
     if already_spawned.is_some() {
@@ -75,7 +78,9 @@ pub fn spawn_course(
             &gltf_assets,
             &node_assets,
             &mesh_assets,
-            &mut materials,
+            &mut cel_materials,
+            &std_materials,
+            light_dir.0,
             &gltf_handle,
             &def.id,
             &def.glb_node_name,

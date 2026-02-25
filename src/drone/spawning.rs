@@ -5,6 +5,7 @@ use rand::seq::SliceRandom;
 
 use crate::course::data::CourseData;
 use crate::obstacle::library::ObstacleLibrary;
+use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::AppState;
 use super::components::*;
 
@@ -106,7 +107,8 @@ pub fn spawn_drones(
     library: Res<ObstacleLibrary>,
     existing_drones: Query<(), With<Drone>>,
     no_gates: Option<Res<NoGatesCourse>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    light_dir: Res<CelLightDir>,
 ) {
     if !existing_drones.is_empty() || no_gates.is_some() {
         return;
@@ -220,10 +222,8 @@ pub fn spawn_drones(
         ));
 
         let [r, g, b] = DRONE_COLORS[i as usize];
-        let drone_mat = materials.add(StandardMaterial {
-            base_color: Color::srgb(r, g, b),
-            ..default()
-        });
+        let drone_mat =
+            cel_materials.add(cel_material_from_color(Color::srgb(r, g, b), light_dir.0));
         entity_cmd.with_children(|children| {
             for mesh in &assets.mesh_primitives {
                 children.spawn((
