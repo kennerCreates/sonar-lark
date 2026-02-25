@@ -14,7 +14,7 @@ impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             OnEnter(AppState::Race),
-            (setup_race, ui::setup_race_ui, ui::setup_leaderboard),
+            (setup_race, ui::setup_race_ui, ui::setup_leaderboard, ui::setup_camera_hud),
         )
             // Race logic chain: ordering matters for correctness
             .add_systems(
@@ -29,6 +29,11 @@ impl Plugin for RacePlugin {
                     .chain()
                     .run_if(in_state(AppState::Race)),
             )
+            // Results transition timer (runs after race logic chain)
+            .add_systems(
+                Update,
+                lifecycle::tick_results_transition.run_if(in_state(AppState::Race)),
+            )
             // UI systems: independent, no ordering needed
             .add_systems(
                 Update,
@@ -42,6 +47,7 @@ impl Plugin for RacePlugin {
                     ui::manage_countdown_text,
                     ui::update_race_clock_display,
                     ui::update_leaderboard,
+                    ui::update_camera_hud,
                 )
                     .run_if(in_state(AppState::Race)),
             )
@@ -58,4 +64,5 @@ fn cleanup_race(mut commands: Commands) {
     commands.remove_resource::<progress::RaceProgress>();
     commands.remove_resource::<timing::RaceClock>();
     commands.remove_resource::<lifecycle::CountdownTimer>();
+    commands.remove_resource::<lifecycle::ResultsTransitionTimer>();
 }

@@ -55,11 +55,15 @@ src/
 │   ├── timing.rs        RaceClock
 │   └── lifecycle.rs     Countdown, finish detection
 ├── camera/              Camera modes
-│   ├── spectator.rs     Free-fly WASD camera
-│   ├── fpv.rs           First-person drone-mounted
-│   ├── chase.rs         Third-person follow
-│   └── switching.rs     CameraMode/CameraState, mode switching
+│   ├── spectator.rs     Free-fly WASD camera (Spectator mode)
+│   ├── fpv.rs           First-person drone-mounted camera (FPV mode)
+│   ├── chase.rs         Broadcast-style pack-follow camera (Chase mode, default)
+│   ├── switching.rs     CameraMode/CameraState, mode cycling (C key), drone cycling ([ ] keys)
+│   ├── orbit.rs         RTS camera (Course Editor), orbit camera (Workshop)
+│   └── settings.rs      CameraSettings resource (FOV, sensitivity, zoom)
 └── results/             Race results display
+    ├── mod.rs           ResultsPlugin, cleanup
+    └── ui.rs            Results screen UI (standings, RACE AGAIN, MAIN MENU buttons)
 ```
 
 ## Data Flow
@@ -116,8 +120,13 @@ CourseData ──► spawn obstacles + drones
 | `SkyboxMaterial` | Asset | rendering/skybox | Procedural TRON night sky (stars, moon, neon horizon glow) |
 | `CelLightDir` | Resource | rendering/mod | World-space light direction shared by all CelMaterial instances |
 | `SkyboxEntity` | Component | rendering/skybox | Marker on the skybox sphere entity |
-| `CameraState` | Resource | camera/switching | Current mode + target drone |
+| `CameraState` | Resource | camera/switching | Current camera mode (Chase/FPV/Spectator) + FPV target drone standings index |
+| `CameraMode` | Enum | camera/switching | Chase (pack follow, default), Fpv (drone-mounted), Spectator (free-fly) |
+| `ChaseState` | Resource | camera/chase | Smoothed center/velocity for broadcast-style pack-follow camera |
 | `SpectatorSettings` | Resource | camera/spectator | Movement speed + mouse sensitivity |
+| `RaceResults` | Resource | race/progress | Snapshot of final standings, persists Race→Results state transition |
+| `RaceResultEntry` | Data | race/progress | Per-drone result: index, finished, finish_time, crashed, gates_passed |
+| `ResultsTransitionTimer` | Resource | race/lifecycle | Brief delay (0.5s) before auto-transitioning Race→Results |
 | `AvailableCourses` | Resource | menu/ui | Discovered course files (Menu state only) |
 | `SelectedCourse` | Resource | course/loader | User's course selection for racing |
 | `WorkshopState` | Resource | editor/workshop | Current obstacle being edited (scene, trigger config, preview) |

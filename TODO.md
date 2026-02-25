@@ -14,17 +14,7 @@
 - [x] **Phase 6b**: Drone Realism Audit — motor lag 40→25ms, attitude PD underdamping (kp=7/kd=0.20), per-drone cornering aggression/braking distance/attitude PD variation, adaptive approach offset, dirty air perturbation, prop wash (faked), battery sag, dev dashboard expanded to 11 params
 - [x] **Phase 7**: Race — Gate Validation, Timing, Lifecycle (RaceProgress per-drone tracking, RaceClock, AABB gate trigger detection, gate ordering enforcement, hard crash on missed gate, 3-second countdown sequence, race completion detection, countdown + clock UI)
 - [x] **Rendering Overhaul**: Cel-shaded materials with halftone gradient effect and hue shifting (warm highlights, cool shadows). Procedural TRON night skybox (stars, moon, neon horizon glow). Custom WGSL shaders. All spawn points (ground, obstacles, drones) refactored from StandardMaterial to CelMaterial. Explosions unchanged (unlit emissive).
-
-### Phase 8: Results, FPV Camera, Chase Camera
-- [x] Race leaderboard: live standings panel (top-left, 12 drone cards with color bars, names, times, DNF)
-- [ ] Results UI: display race standings (finish time, crashed status)
-- [ ] Results navigation: buttons for back-to-menu, replay
-- [ ] `DespawnOnExit(AppState::Results)` on results UI
-- [ ] FPV camera: mount on target drone transform
-- [ ] Chase camera: follow behind/above with smoothing
-- [ ] Camera switching: keybinds to cycle mode (Spectator/FPV/Chase)
-- [ ] Camera switching: keybinds to cycle target drone
-- [ ] Full loop test: Menu → Editor → Race → Results → Menu
+- [x] **Phase 8**: Results, FPV Camera, Chase Camera — Race results screen with standings/times/DNF, auto-transition Race→Results, RACE AGAIN/MAIN MENU buttons, pack-follow chase camera (default), FPV drone-mounted camera with standings-order cycling, camera mode switching (C key), camera HUD indicator, full gameplay loop (Menu→Race→Results→Menu)
 
 ## Future (Post-MVP)
 - [ ] Player-controlled drone (same throttle/pitch/roll/yaw interface as AI)

@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 
+use crate::camera::switching::{CameraMode, CameraState};
 use crate::course::loader::SelectedCourse;
 use crate::drone::components::*;
-use crate::drone::spawning::{DRONE_COLORS, NoGatesCourse};
+use crate::drone::spawning::{DRONE_COLORS, DRONE_NAMES, NoGatesCourse};
 use crate::editor::course_editor::PendingEditorCourse;
 use crate::palette;
 use crate::states::AppState;
@@ -417,12 +418,6 @@ pub fn update_open_editor_button_visuals(
 
 // ── Leaderboard ─────────────────────────────────────────────────────────────
 
-const DRONE_NAMES: [&str; 12] = [
-    "FALCON", "VIPER", "HAWK", "PHANTOM",
-    "SPARK", "BLITZ", "NOVA", "DRIFT",
-    "SURGE", "BOLT", "ECHO", "FURY",
-];
-
 const LB_BG: Color = Color::srgba(0.02, 0.055, 0.102, 0.80);
 const LB_FONT: f32 = 13.0;
 const LB_WIDTH: f32 = 190.0;
@@ -580,4 +575,96 @@ fn fmt_time(t: f32) -> String {
     let mins = (t / 60.0) as u32;
     let secs = t % 60.0;
     format!("{:01}:{:05.2}", mins, secs)
+}
+
+// ── Camera HUD ──────────────────────────────────────────────────────────────
+
+#[derive(Component)]
+pub(crate) struct CameraHudRoot;
+
+#[derive(Component)]
+pub(crate) struct CameraHudModeText;
+
+#[derive(Component)]
+pub(crate) struct CameraHudHintText;
+
+pub fn setup_camera_hud(mut commands: Commands) {
+    commands
+        .spawn((
+            CameraHudRoot,
+            DespawnOnExit(AppState::Race),
+            Node {
+                position_type: PositionType::Absolute,
+                bottom: Val::Px(10.0),
+                left: Val::Px(10.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(2.0),
+                ..default()
+            },
+            GlobalZIndex(80),
+        ))
+        .with_children(|panel| {
+            panel.spawn((
+                CameraHudModeText,
+                Text::new("CHASE CAM"),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(palette::SKY),
+            ));
+            panel.spawn((
+                CameraHudHintText,
+                Text::new("[C] Camera  [\\[] [\\]] Drone"),
+                TextFont {
+                    font_size: 11.0,
+                    ..default()
+                },
+                TextColor(palette::STONE),
+            ));
+        });
+}
+
+pub fn update_camera_hud(
+    camera_state: Res<CameraState>,
+    progress: Option<Res<RaceProgress>>,
+    mut mode_text: Query<&mut Text, (With<CameraHudModeText>, Without<CameraHudHintText>)>,
+    mut hint_text: Query<&mut Text, (With<CameraHudHintText>, Without<CameraHudModeText>)>,
+) {
+    if !camera_state.is_changed() {
+        // Also update when progress changes (drone names shift in FPV)
+        if camera_state.mode != CameraMode::Fpv || progress.as_ref().is_none_or(|p| !p.is_changed()) {
+            return;
+        }
+    }
+
+    let mode_label = match camera_state.mode {
+        CameraMode::Chase => "CHASE CAM".to_string(),
+        CameraMode::Spectator => "SPECTATOR".to_string(),
+        CameraMode::Fpv => {
+            let drone_name = progress
+                .as_ref()
+                .and_then(|p| {
+                    let standings = p.standings();
+                    let idx = camera_state.target_standings_index.min(standings.len().saturating_sub(1));
+                    standings.get(idx).map(|&(drone_idx, _)| {
+                        DRONE_NAMES.get(drone_idx).copied().unwrap_or("???")
+                    })
+                })
+                .unwrap_or("---");
+            format!("FPV: {}", drone_name)
+        }
+    };
+
+    for mut text in &mut mode_text {
+        text.0 = mode_label.clone();
+    }
+
+    let hint = match camera_state.mode {
+        CameraMode::Fpv => "[C] Camera  [[] []] Cycle drone",
+        _ => "[C] Switch camera",
+    };
+    for mut text in &mut hint_text {
+        text.0 = hint.to_string();
+    }
 }

@@ -10,10 +10,11 @@ use bevy::prelude::*;
 
 use crate::rendering::{fog_color, FOG_END, FOG_START};
 use crate::states::{AppState, EditorMode};
+use chase::ChaseState;
 use orbit::MainCamera;
 use settings::CameraSettings;
 use spectator::SpectatorSettings;
-use switching::CameraState;
+use switching::{CameraMode, CameraState};
 
 pub struct CameraPlugin;
 
@@ -22,11 +23,38 @@ impl Plugin for CameraPlugin {
         app.init_resource::<CameraState>()
             .init_resource::<SpectatorSettings>()
             .init_resource::<CameraSettings>()
+            .init_resource::<ChaseState>()
             .add_systems(Startup, spawn_camera)
-            // Spectator for Race only
+            // Race camera lifecycle
+            .add_systems(OnEnter(AppState::Race), switching::reset_camera_for_race)
+            .add_systems(OnExit(AppState::Race), switching::reset_camera_on_exit)
+            // Race camera mode switching (always active during race)
             .add_systems(
                 Update,
-                spectator::spectator_movement.run_if(in_state(AppState::Race)),
+                (
+                    switching::cycle_camera_mode,
+                    switching::cycle_target_drone,
+                )
+                    .run_if(in_state(AppState::Race)),
+            )
+            // Mode-specific camera systems during Race
+            .add_systems(
+                Update,
+                spectator::spectator_movement
+                    .run_if(in_state(AppState::Race))
+                    .run_if(camera_mode_is(CameraMode::Spectator)),
+            )
+            .add_systems(
+                Update,
+                chase::chase_camera_update
+                    .run_if(in_state(AppState::Race))
+                    .run_if(camera_mode_is(CameraMode::Chase)),
+            )
+            .add_systems(
+                Update,
+                fpv::fpv_camera_update
+                    .run_if(in_state(AppState::Race))
+                    .run_if(camera_mode_is(CameraMode::Fpv)),
             )
             // Editor camera rig lifecycle
             .add_systems(OnEnter(AppState::Editor), orbit::setup_editor_camera)
@@ -51,6 +79,10 @@ impl Plugin for CameraPlugin {
                     .run_if(in_state(EditorMode::ObstacleWorkshop)),
             );
     }
+}
+
+fn camera_mode_is(mode: CameraMode) -> impl Fn(Res<CameraState>) -> bool {
+    move |state: Res<CameraState>| state.mode == mode
 }
 
 fn spawn_camera(mut commands: Commands) {

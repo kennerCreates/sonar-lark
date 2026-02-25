@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
+use crate::course::loader::SelectedCourse;
 use crate::drone::components::{AIController, Drone, DronePhase};
+use crate::states::AppState;
 
 use super::progress::{DroneRaceState, RaceProgress};
 use super::timing::RaceClock;
@@ -23,6 +25,12 @@ impl Default for CountdownTimer {
     fn default() -> Self {
         Self { remaining: 3.0 }
     }
+}
+
+/// Timer for auto-transitioning from Race → Results after finish.
+#[derive(Resource)]
+pub struct ResultsTransitionTimer {
+    pub remaining: f32,
 }
 
 /// Run condition: returns true only when `RacePhase::Racing` is active.
@@ -93,10 +101,12 @@ pub fn tick_countdown(
 }
 
 /// Transitions from Racing → Finished when every drone has finished or crashed.
+/// Also starts the auto-transition timer to the Results screen.
 pub fn check_race_finished(
     mut phase: ResMut<RacePhase>,
     progress: Option<Res<RaceProgress>>,
     mut clock: Option<ResMut<RaceClock>>,
+    mut commands: Commands,
 ) {
     if *phase != RacePhase::Racing {
         return;
@@ -115,6 +125,46 @@ pub fn check_race_finished(
         if let Some(ref mut clock) = clock {
             clock.running = false;
         }
+        commands.insert_resource(ResultsTransitionTimer { remaining: 0.5 });
         info!("Race finished! All drones completed or crashed.");
     }
+}
+
+/// Ticks the results transition timer. When it expires, snapshots race results
+/// and transitions to the Results state.
+pub fn tick_results_transition(
+    time: Res<Time>,
+    mut timer: Option<ResMut<ResultsTransitionTimer>>,
+    mut commands: Commands,
+    mut next_state: ResMut<NextState<AppState>>,
+    progress: Option<Res<RaceProgress>>,
+    clock: Option<Res<RaceClock>>,
+    selected_course: Option<Res<SelectedCourse>>,
+) {
+    let Some(ref mut timer) = timer else { return };
+
+    timer.remaining -= time.delta_secs();
+    if timer.remaining > 0.0 {
+        return;
+    }
+
+    // Build RaceResults snapshot before leaving Race state
+    if let Some(progress) = progress {
+        let total_time = clock.map(|c| c.elapsed).unwrap_or(0.0);
+        let course_name = selected_course
+            .map(|s| {
+                std::path::Path::new(&s.path)
+                    .file_stem()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("Unknown")
+                    .trim_end_matches(".course")
+                    .to_string()
+            })
+            .unwrap_or_else(|| "Unknown".to_string());
+        commands.insert_resource(progress.to_race_results(total_time, course_name));
+    }
+
+    commands.remove_resource::<ResultsTransitionTimer>();
+    next_state.set(AppState::Results);
+    info!("Transitioning to Results screen.");
 }

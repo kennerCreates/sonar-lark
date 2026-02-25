@@ -33,6 +33,13 @@ pub const DRONE_COLORS: [Color; 12] = [
     palette::VANILLA,
 ];
 
+/// Callsigns for each of the 12 drones, matching `DRONE_COLORS` indices.
+pub const DRONE_NAMES: [&str; 12] = [
+    "FALCON", "VIPER", "HAWK", "PHANTOM",
+    "SPARK", "BLITZ", "NOVA", "DRIFT",
+    "SURGE", "BOLT", "ECHO", "FURY",
+];
+
 /// Marker resource inserted when `spawn_drones` detects the course has no gates.
 /// Prevents the warning from repeating every frame and signals the UI to show a banner.
 #[derive(Resource)]
