@@ -31,7 +31,7 @@ const COURSE_DEFAULT_YAW: f32 = 0.0;
 const COURSE_DEFAULT_PITCH: f32 = 0.7;
 const COURSE_DEFAULT_DISTANCE: f32 = 40.0;
 
-fn orbit_to_transform(orbit: &OrbitState) -> Transform {
+pub(crate) fn orbit_to_transform(orbit: &OrbitState) -> Transform {
     let x = orbit.distance * orbit.pitch.cos() * orbit.yaw.sin();
     let y = orbit.distance * orbit.pitch.sin();
     let z = orbit.distance * orbit.pitch.cos() * orbit.yaw.cos();

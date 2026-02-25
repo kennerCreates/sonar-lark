@@ -11,9 +11,10 @@ use bevy::prelude::*;
 use crate::rendering::{fog_color, FOG_END, FOG_START};
 use crate::states::{AppState, EditorMode};
 use chase::ChaseState;
+use fpv::FpvFollowState;
 use orbit::MainCamera;
 use settings::CameraSettings;
-use spectator::SpectatorSettings;
+use spectator::SpectatorOrbitState;
 use switching::{CameraMode, CameraState};
 
 pub struct CameraPlugin;
@@ -21,9 +22,10 @@ pub struct CameraPlugin;
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraState>()
-            .init_resource::<SpectatorSettings>()
             .init_resource::<CameraSettings>()
             .init_resource::<ChaseState>()
+            .init_resource::<FpvFollowState>()
+            .init_resource::<SpectatorOrbitState>()
             .add_systems(Startup, spawn_camera)
             // Race camera lifecycle
             .add_systems(OnEnter(AppState::Race), switching::reset_camera_for_race)
@@ -31,11 +33,7 @@ impl Plugin for CameraPlugin {
             // Race camera mode switching (always active during race)
             .add_systems(
                 Update,
-                (
-                    switching::cycle_camera_mode,
-                    switching::cycle_target_drone,
-                )
-                    .run_if(in_state(AppState::Race)),
+                switching::handle_camera_keys.run_if(in_state(AppState::Race)),
             )
             // Mode-specific camera systems during Race
             .add_systems(

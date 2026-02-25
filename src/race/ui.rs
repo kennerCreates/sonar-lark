@@ -615,7 +615,7 @@ pub fn setup_camera_hud(mut commands: Commands) {
             ));
             panel.spawn((
                 CameraHudHintText,
-                Text::new("[C] Camera  [\\[] [\\]] Drone"),
+                Text::new("[1] Chase  [2] Spectator  [3] FPV"),
                 TextFont {
                     font_size: 11.0,
                     ..default()
@@ -661,8 +661,8 @@ pub fn update_camera_hud(
     }
 
     let hint = match camera_state.mode {
-        CameraMode::Fpv => "[C] Camera  [[] []] Cycle drone",
-        _ => "[C] Switch camera",
+        CameraMode::Fpv => "[1] Chase  [2] Spectator  [3] Next drone",
+        _ => "[1] Chase  [2] Spectator  [3] FPV",
     };
     for mut text in &mut hint_text {
         text.0 = hint.to_string();

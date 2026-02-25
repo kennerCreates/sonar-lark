@@ -17,5 +17,21 @@
             gate_order: Some(1),
             gate_forward_flipped: false,
         ),
+        (
+            obstacle_id: ("gate_ground"),
+            translation: (38.215073, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            scale: (1.0, 1.0, 1.0),
+            gate_order: None,
+            gate_forward_flipped: false,
+        ),
+        (
+            obstacle_id: ("gate_ground"),
+            translation: (-31.52771, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            scale: (1.0, 1.0, 1.0),
+            gate_order: None,
+            gate_forward_flipped: false,
+        ),
     ],
 )

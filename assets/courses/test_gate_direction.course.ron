@@ -52,7 +52,7 @@
         (
             obstacle_id: ("gate_loop"),
             translation: (-61.512352, 0.0, -53.489983),
-            rotation: (0.0, -0.19076654, 0.0, 0.98163545),
+            rotation: (0.0, -0.3666569, 0.0, 0.93035626),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(4),
             gate_forward_flipped: true,

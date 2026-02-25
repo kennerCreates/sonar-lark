@@ -27,50 +27,39 @@ impl Default for CameraState {
     }
 }
 
-/// Cycle camera mode on C key press: Chase → FPV → Spectator → Chase.
-pub fn cycle_camera_mode(
-    mut state: ResMut<CameraState>,
-    mut key_events: MessageReader<KeyboardInput>,
-) {
-    for event in key_events.read() {
-        if event.state.is_pressed() && event.key_code == KeyCode::KeyC {
-            state.mode = match state.mode {
-                CameraMode::Chase => CameraMode::Fpv,
-                CameraMode::Fpv => CameraMode::Spectator,
-                CameraMode::Spectator => CameraMode::Chase,
-            };
-        }
-    }
-}
-
-/// Cycle target drone in FPV mode: [ for previous, ] for next (standings order).
-pub fn cycle_target_drone(
+/// Camera switching via number keys:
+/// 1 = Chase, 2 = Spectator, 3 = FPV (repeated press cycles drone).
+pub fn handle_camera_keys(
     mut state: ResMut<CameraState>,
     mut key_events: MessageReader<KeyboardInput>,
     progress: Option<Res<RaceProgress>>,
 ) {
-    if state.mode != CameraMode::Fpv {
-        return;
-    }
-    let count = progress
-        .as_ref()
-        .map(|p| p.drone_states.len())
-        .unwrap_or(12);
-    if count == 0 {
-        return;
-    }
-
     for event in key_events.read() {
         if !event.state.is_pressed() {
             continue;
         }
         match event.key_code {
-            KeyCode::BracketRight => {
-                state.target_standings_index = (state.target_standings_index + 1) % count;
+            KeyCode::Digit1 => {
+                state.mode = CameraMode::Chase;
             }
-            KeyCode::BracketLeft => {
-                state.target_standings_index =
-                    (state.target_standings_index + count - 1) % count;
+            KeyCode::Digit2 => {
+                state.mode = CameraMode::Spectator;
+            }
+            KeyCode::Digit3 => {
+                if state.mode == CameraMode::Fpv {
+                    // Already in FPV — cycle to next drone
+                    let count = progress
+                        .as_ref()
+                        .map(|p| p.drone_states.len())
+                        .unwrap_or(12);
+                    if count > 0 {
+                        state.target_standings_index =
+                            (state.target_standings_index + 1) % count;
+                    }
+                } else {
+                    state.mode = CameraMode::Fpv;
+                    state.target_standings_index = 0;
+                }
             }
             _ => {}
         }
