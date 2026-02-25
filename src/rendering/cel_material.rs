@@ -21,6 +21,12 @@ pub struct CelMaterial {
     pub light_dir: Vec3,
     #[uniform(0)]
     pub halftone_scale: f32,
+    #[uniform(0)]
+    pub fog_color: LinearRgba,
+    #[uniform(0)]
+    pub fog_start: f32,
+    #[uniform(0)]
+    pub fog_end: f32,
 }
 
 impl Material for CelMaterial {
@@ -82,6 +88,9 @@ pub fn cel_material_from_color(base: Color, light_dir: Vec3) -> CelMaterial {
         shadow2_color: shadow2,
         light_dir,
         halftone_scale: DEFAULT_HALFTONE_SCALE,
+        fog_color: super::fog_color().to_linear(),
+        fog_start: super::FOG_START,
+        fog_end: super::FOG_END,
     }
 }
 
@@ -98,6 +107,9 @@ pub fn cel_material_flat(base: Color, light_dir: Vec3) -> CelMaterial {
         shadow2_color: linear,
         light_dir,
         halftone_scale: DEFAULT_HALFTONE_SCALE,
+        fog_color: super::fog_color().to_linear(),
+        fog_start: super::FOG_START,
+        fog_end: super::FOG_END,
     }
 }
 

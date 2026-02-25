@@ -5,8 +5,10 @@ pub mod settings;
 pub mod spectator;
 pub mod switching;
 
+use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
 
+use crate::rendering::{fog_color, FOG_END, FOG_START};
 use crate::states::{AppState, EditorMode};
 use orbit::MainCamera;
 use settings::CameraSettings;
@@ -56,5 +58,14 @@ fn spawn_camera(mut commands: Commands) {
         Camera3d::default(),
         MainCamera,
         Transform::from_xyz(0.0, 20.0, 40.0).looking_at(Vec3::ZERO, Vec3::Y),
+        DistanceFog {
+            color: fog_color(),
+            directional_light_color: Color::NONE,
+            directional_light_exponent: 0.0,
+            falloff: FogFalloff::Linear {
+                start: FOG_START,
+                end: FOG_END,
+            },
+        },
     ));
 }

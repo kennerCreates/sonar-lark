@@ -6,6 +6,13 @@ use bevy::prelude::*;
 pub use cel_material::{CelMaterial, cel_material_flat, cel_material_from_color};
 pub use skybox::SkyboxMaterial;
 
+/// Shared fog parameters — single source of truth for cel shader, skybox, and camera fog.
+pub fn fog_color() -> Color {
+    Color::srgb(0.110, 0.157, 0.302) // Space Cadet — matches sky_bright palette
+}
+pub const FOG_START: f32 = 200.0;
+pub const FOG_END: f32 = 500.0;
+
 /// World-space light direction for cel materials (toward the light source).
 /// Computed once from the DirectionalLight transform and shared by all CelMaterial instances.
 #[derive(Resource)]

@@ -10,15 +10,10 @@ struct SkyboxUniforms {
     star_density: f32,
     camera_pos: vec3<f32>,
     time: f32,
+    fog_color: vec4<f32>,
 };
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> sky: SkyboxUniforms;
-
-// ─── Sky band thresholds ───
-const THRESH_HORIZON: f32 = -0.01;
-const THRESH_LOW: f32 = 0.15;
-const THRESH_HIGH: f32 = 0.50;
-const TRANS_HW: f32 = 0.14;
 
 // ─── Halftone ───
 const HALFTONE_ANGLE: f32 = 0.7854;
@@ -58,25 +53,6 @@ fn fbm3(p: vec2<f32>) -> f32 {
         amp *= 0.45;
     }
     return val;
-}
-
-// ─── Halftone blend ───
-fn halftone_blend(dark: vec3<f32>, light: vec3<f32>, band_t: f32, screen_pos: vec2<f32>) -> vec3<f32> {
-    let cs = cos(HALFTONE_ANGLE);
-    let sn = sin(HALFTONE_ANGLE);
-    let rotated = vec2<f32>(
-        screen_pos.x * cs - screen_pos.y * sn,
-        screen_pos.x * sn + screen_pos.y * cs,
-    );
-
-    let cell = floor(rotated / HALFTONE_SCALE);
-    let cell_center = (cell + 0.5) * HALFTONE_SCALE;
-    let dist = length(rotated - cell_center) / (HALFTONE_SCALE * 0.5);
-
-    let dot_radius = 1.0 - band_t;
-    let dot_mask = smoothstep(dot_radius - SMOOTHING, dot_radius + SMOOTHING, dist);
-
-    return mix(dark, light, dot_mask);
 }
 
 // ─── Shooting stars ───
@@ -128,61 +104,29 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     let moon_dir = normalize(sky.moon_dir);
     let moon_dot = dot(dir, moon_dir);
 
-    // ─── Sky gradient with halftone transitions ───
+    // ─── Smooth sky gradient ───
     let below_color = sky.sky_dark.rgb * 0.5;
-    var color: vec3<f32>;
 
-    if elevation >= THRESH_HIGH + TRANS_HW {
-        color = sky.sky_bright.rgb;
-    } else if elevation >= THRESH_HIGH - TRANS_HW {
-        let t = (elevation - (THRESH_HIGH - TRANS_HW)) / (TRANS_HW * 2.0);
-        color = halftone_blend(sky.sky_mid.rgb, sky.sky_bright.rgb, t, screen_pos);
-    } else if elevation >= THRESH_LOW + TRANS_HW {
-        color = sky.sky_mid.rgb;
-    } else if elevation >= THRESH_LOW - TRANS_HW {
-        let t = (elevation - (THRESH_LOW - TRANS_HW)) / (TRANS_HW * 2.0);
-        color = halftone_blend(sky.sky_dark.rgb, sky.sky_mid.rgb, t, screen_pos);
-    } else if elevation >= THRESH_HORIZON + TRANS_HW {
-        color = sky.sky_dark.rgb;
-    } else if elevation >= THRESH_HORIZON - TRANS_HW {
-        let t = (elevation - (THRESH_HORIZON - TRANS_HW)) / (TRANS_HW * 2.0);
-        color = halftone_blend(below_color, sky.sky_dark.rgb, t, screen_pos);
-    } else {
-        color = below_color;
-    }
+    let horizon_blend = smoothstep(-0.05, 0.10, elevation);
+    let mid_blend = smoothstep(0.06, 0.40, elevation);
+    let high_blend = smoothstep(0.30, 0.65, elevation);
 
-    // ─── Nebula wisps (FBM noise, subtle colored patches) ───
-    if elevation > 0.05 {
-        let neb_uv = vec2<f32>(theta * 0.8, phi * 2.0);
-        let drift = vec2<f32>(sky.time * 0.005, sky.time * 0.002);
-        let n = fbm3(neb_uv * 1.8 + drift);
-        let wisp = smoothstep(0.48, 0.62, n);
-        let tint_select = hash21(floor(neb_uv * 2.0));
-        let nebula_color = mix(
-            vec3<f32>(0.12, 0.04, 0.22),  // deep purple
-            vec3<f32>(0.04, 0.12, 0.20),  // teal
-            tint_select
-        );
-        let height_fade = smoothstep(0.05, 0.2, elevation);
-        color += nebula_color * wisp * height_fade * 0.35;
-    }
+    var color = mix(below_color, sky.sky_dark.rgb, horizon_blend);
+    color = mix(color, sky.sky_mid.rgb, mid_blend);
+    color = mix(color, sky.sky_bright.rgb, high_blend);
 
-    // ─── Aurora shimmer (neon curtains, cyan to magenta) ───
-    if elevation > 0.15 && elevation < 0.75 {
-        let wave1 = sin(theta * 3.0 + sky.time * 0.15) * 0.5 + 0.5;
-        let wave2 = sin(theta * 6.0 - sky.time * 0.1 + 2.0) * 0.3;
-        let distort = noise2d(vec2<f32>(theta * 2.0 + sky.time * 0.08, elevation * 5.0));
-        let curtain = wave1 + wave2 + distort * 0.25;
-        let mask = smoothstep(0.7, 0.9, curtain);
-        let height_mask = smoothstep(0.15, 0.3, elevation) * smoothstep(0.75, 0.55, elevation);
-        let aurora_color = mix(
-            sky.neon_glow_color.rgb * 0.6,     // cyan at base
-            vec3<f32>(0.5, 0.1, 0.6),          // magenta at top
-            smoothstep(0.25, 0.6, elevation)
-        );
-        let shimmer = 0.8 + 0.2 * sin(sky.time * 0.5 + theta * 3.0);
-        color += aurora_color * mask * height_mask * shimmer * 0.12;
-    }
+    // Halftone dot overlay — subtle luminance dither for retro feel
+    let ht_cs = cos(HALFTONE_ANGLE);
+    let ht_sn = sin(HALFTONE_ANGLE);
+    let ht_rotated = vec2<f32>(
+        screen_pos.x * ht_cs - screen_pos.y * ht_sn,
+        screen_pos.x * ht_sn + screen_pos.y * ht_cs,
+    );
+    let ht_cell = floor(ht_rotated / HALFTONE_SCALE);
+    let ht_center = (ht_cell + 0.5) * HALFTONE_SCALE;
+    let ht_dist = length(ht_rotated - ht_center) / (HALFTONE_SCALE * 0.5);
+    let ht_dot = smoothstep(0.5 - SMOOTHING, 0.5 + SMOOTHING, ht_dist);
+    color = mix(color * 0.96, color * 1.04, ht_dot);
 
     // ─── Pulsing neon horizon glow ───
     if elevation > -0.02 && elevation < 0.12 {
@@ -193,8 +137,9 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
 
     // ─── Stars with color variety ───
     if elevation > 0.01 {
-        // Suppress stars near moon
+        // Suppress stars near moon and fade out toward horizon
         let star_moon_fade = 1.0 - smoothstep(0.985, 0.995, moon_dot);
+        let star_horizon_fade = smoothstep(0.01, 0.20, elevation);
 
         let grid_scale = sky.star_density;
         let grid_uv = vec2<f32>(theta, phi) * grid_scale;
@@ -210,7 +155,7 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
                     let star_pos = vec2<f32>(f32(dx), f32(dy)) + rnd;
                     let d = length(cell_frac - star_pos);
 
-                    let star_size = 0.03 + rnd.y * 0.07;
+                    let star_size = 0.06 + rnd.y * 0.14;
                     if d < star_size {
                         let twinkle = 0.3 + 0.7 * sin(sky.time * (1.0 + rnd.x * 4.0) + rnd.y * 6.2832);
                         let brightness = (1.0 - d / star_size) * twinkle;
@@ -228,7 +173,7 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
                             star_tint = sky.moon_color.rgb;          // default warm white
                         }
 
-                        color += star_tint * brightness * 0.9 * star_moon_fade;
+                        color += star_tint * brightness * 0.9 * star_moon_fade * star_horizon_fade;
                     }
                 }
             }
@@ -236,7 +181,7 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
 
         // Shooting stars
         let streak = shooting_stars(theta, phi, sky.time);
-        color += sky.moon_color.rgb * streak * 1.2 * star_moon_fade;
+        color += sky.moon_color.rgb * streak * 1.2 * star_moon_fade * star_horizon_fade;
     }
 
     // ─── Moon (smooth continuous falloff, no rings) ───
@@ -251,6 +196,12 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     // Core disc
     let core_t = smoothstep(0.993, 0.998, moon_dot);
     color = mix(color, sky.moon_color.rgb * 1.3, core_t);
+
+    // ─── Horizon fog blend ───
+    // Fade toward fog color at the horizon so the skybox seamlessly meets
+    // distance-fogged geometry. The neon glow and stars remain visible above.
+    let fog_blend = 1.0 - smoothstep(-0.02, 0.15, elevation);
+    color = mix(color, sky.fog_color.rgb, fog_blend);
 
     return vec4<f32>(color, 1.0);
 }

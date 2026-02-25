@@ -1,4 +1,5 @@
 #import bevy_pbr::forward_io::VertexOutput
+#import bevy_pbr::mesh_view_bindings::view
 
 struct CelMaterial {
     base_color: vec4<f32>,
@@ -8,6 +9,9 @@ struct CelMaterial {
     shadow2_color: vec4<f32>,
     light_dir: vec3<f32>,
     halftone_scale: f32,
+    fog_color: vec4<f32>,
+    fog_start: f32,
+    fog_end: f32,
 };
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> material: CelMaterial;
@@ -24,6 +28,8 @@ const TRANS_HW: f32 = 0.04;
 
 const HALFTONE_ANGLE: f32 = 0.7854; // 45 degrees
 const SMOOTHING: f32 = 0.4;         // Anti-alias softness at dot edges
+
+// Band transition half-width for halftone dithering
 
 fn halftone_blend(dark: vec3<f32>, light: vec3<f32>, band_t: f32, screen_pos: vec2<f32>) -> vec3<f32> {
     let cs = cos(HALFTONE_ANGLE);
@@ -88,6 +94,11 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
         // Solid shadow2
         final_color = material.shadow2_color.rgb;
     }
+
+    // Distance fog
+    let dist = length(mesh.world_position.xyz - view.world_position.xyz);
+    let fog_factor = clamp((material.fog_end - dist) / (material.fog_end - material.fog_start), 0.0, 1.0);
+    final_color = mix(material.fog_color.rgb, final_color, fog_factor);
 
     return vec4<f32>(final_color, material.base_color.a);
 }

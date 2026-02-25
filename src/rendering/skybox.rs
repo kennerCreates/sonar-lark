@@ -24,6 +24,8 @@ pub struct SkyboxMaterial {
     pub camera_pos: Vec3,
     #[uniform(0)]
     pub time: f32,
+    #[uniform(0)]
+    pub fog_color: LinearRgba,
 }
 
 impl Material for SkyboxMaterial {
@@ -58,7 +60,7 @@ pub fn spawn_skybox(
     let moon_color = Color::srgb(0.949, 0.949, 0.855);    // Vanilla #f2f2da
     let neon_glow = Color::srgb(0.286, 0.761, 0.949);     // Sky #49c2f2
 
-    let sphere = meshes.add(Sphere::new(2000.0).mesh().ico(4).unwrap());
+    let sphere = meshes.add(Sphere::new(2000.0).mesh().ico(5).unwrap());
     let material = skybox_materials.add(SkyboxMaterial {
         sky_dark: sky_dark.to_linear(),
         sky_mid: sky_mid.to_linear(),
@@ -66,9 +68,10 @@ pub fn spawn_skybox(
         moon_color: moon_color.to_linear(),
         neon_glow_color: neon_glow.to_linear(),
         moon_dir: Vec3::new(0.3, 0.65, -0.5).normalize(),
-        star_density: 180.0,
+        star_density: 120.0,
         camera_pos: Vec3::ZERO,
         time: 0.0,
+        fog_color: super::fog_color().to_linear(),
     });
 
     commands.spawn((
