@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use std::cmp::Ordering;
 
+use crate::drone::components::{AIController, Drone, DronePhase};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DnfReason {
     MissedGate(u32),
@@ -14,6 +16,9 @@ pub struct DroneRaceState {
     pub finish_time: Option<f32>,
     pub crashed: bool,
     pub dnf_reason: Option<DnfReason>,
+    /// Continuous progress along the race spline, synced from AIController each frame.
+    /// Used as a tiebreaker in standings when gates_passed is equal.
+    pub spline_t: f32,
 }
 
 impl Default for DroneRaceState {
@@ -25,6 +30,7 @@ impl Default for DroneRaceState {
             finish_time: None,
             crashed: false,
             dnf_reason: None,
+            spline_t: 0.0,
         }
     }
 }
@@ -103,10 +109,32 @@ impl RaceProgress {
                 }
                 (true, false) => Ordering::Less,
                 (false, true) => Ordering::Greater,
-                (false, false) => b.gates_passed.cmp(&a.gates_passed),
+                (false, false) => b.gates_passed.cmp(&a.gates_passed).then(
+                    b.spline_t
+                        .partial_cmp(&a.spline_t)
+                        .unwrap_or(Ordering::Equal),
+                ),
             }
         });
         entries
+    }
+}
+
+/// Syncs spline_t from AIController into RaceProgress each frame,
+/// so standings reflect continuous progress between gates.
+pub fn sync_spline_progress(
+    mut progress: Option<ResMut<RaceProgress>>,
+    drones: Query<(&Drone, &AIController, &DronePhase)>,
+) {
+    let Some(ref mut progress) = progress else { return };
+    for (drone, ai, phase) in &drones {
+        if *phase != DronePhase::Racing {
+            continue;
+        }
+        let idx = drone.index as usize;
+        if let Some(state) = progress.drone_states.get_mut(idx) {
+            state.spline_t = ai.spline_t;
+        }
     }
 }
 
@@ -272,5 +300,25 @@ mod tests {
         assert_eq!(s[0].0, 1); // 3 gates
         assert_eq!(s[1].0, 0); // 1 gate
         assert_eq!(s[2].0, 2); // 0 gates
+    }
+
+    #[test]
+    fn standings_uses_spline_t_as_tiebreaker() {
+        let mut p = make_progress(3, 5);
+        // All three drones have passed 2 gates
+        p.record_gate_pass(0, 0);
+        p.record_gate_pass(0, 1);
+        p.record_gate_pass(1, 0);
+        p.record_gate_pass(1, 1);
+        p.record_gate_pass(2, 0);
+        p.record_gate_pass(2, 1);
+        // But drone 2 is furthest along the spline, drone 1 next, drone 0 last
+        p.drone_states[0].spline_t = 6.5;
+        p.drone_states[1].spline_t = 7.8;
+        p.drone_states[2].spline_t = 8.2;
+        let s = p.standings();
+        assert_eq!(s[0].0, 2); // highest spline_t
+        assert_eq!(s[1].0, 1);
+        assert_eq!(s[2].0, 0); // lowest spline_t
     }
 }

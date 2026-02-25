@@ -8,6 +8,7 @@ use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::AppState;
 use super::components::*;
+use super::interpolation::{PreviousTranslation, PreviousRotation};
 use super::paths::{RacePath, generate_race_path, generate_drone_race_path, compute_start_positions};
 
 const DRONE_COUNT: u8 = 12;
@@ -223,6 +224,8 @@ pub fn spawn_drones(
                 translation: position,
             },
             DronePhase::default(),
+            PreviousTranslation(position),
+            PreviousRotation(rotation),
             DespawnOnExit(AppState::Race),
         ));
 

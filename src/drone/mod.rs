@@ -3,6 +3,7 @@ pub mod components;
 pub mod debug_draw;
 pub mod dev_dashboard;
 pub mod explosion;
+pub mod interpolation;
 pub mod paths;
 pub mod physics;
 pub mod spawning;
@@ -25,6 +26,12 @@ impl Plugin for DronePlugin {
                 spawning::load_drone_gltf,
                 explosion::load_explosion_assets,
             ))
+            // Snapshot transforms before physics for camera interpolation
+            .add_systems(
+                FixedPreUpdate,
+                interpolation::save_previous_transforms
+                    .run_if(in_state(AppState::Race)),
+            )
             // Poll for asset readiness and spawn drones once ready
             .add_systems(
                 Update,

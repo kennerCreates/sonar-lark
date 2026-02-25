@@ -24,6 +24,7 @@ impl Plugin for RacePlugin {
                     timing::tick_race_clock,
                     gate::gate_trigger_check,
                     gate::miss_detection,
+                    progress::sync_spline_progress,
                     lifecycle::check_race_finished,
                 )
                     .chain()

@@ -3,6 +3,7 @@ pub mod fpv;
 pub mod orbit;
 pub mod settings;
 pub mod spectator;
+pub mod spring;
 pub mod switching;
 
 use bevy::pbr::{DistanceFog, FogFalloff};

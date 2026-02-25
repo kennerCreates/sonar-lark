@@ -42,9 +42,9 @@ pub fn spectator_movement(
     time: Res<Time>,
     settings: Res<CameraSettings>,
     mut orbit: ResMut<SpectatorOrbitState>,
-    mut camera: Query<(&mut Transform, &GlobalTransform), With<MainCamera>>,
+    mut camera: Query<(&mut Transform, &GlobalTransform, &mut Projection), With<MainCamera>>,
 ) {
-    let Ok((mut cam_tf, cam_gt)) = camera.single_mut() else {
+    let Ok((mut cam_tf, cam_gt, mut projection)) = camera.single_mut() else {
         return;
     };
 
@@ -56,6 +56,11 @@ pub fn spectator_movement(
         orbit.yaw = pos.x.atan2(pos.z);
         orbit.center = Vec3::ZERO;
         orbit.initialized = true;
+
+        // Reset FOV to base when entering spectator mode (may have been widened by Chase/FPV)
+        if let Projection::Perspective(ref mut persp) = *projection {
+            persp.fov = settings.fov_degrees.to_radians();
+        }
     }
 
     let dt = time.delta_secs();

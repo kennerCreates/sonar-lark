@@ -1,30 +1,47 @@
 use bevy::prelude::*;
+use bevy::time::Fixed;
 
-use crate::drone::components::{Drone, DroneDynamics, DronePhase};
+use crate::drone::components::{AIController, Drone, DroneDynamics, DronePhase, POINTS_PER_GATE};
+use crate::drone::interpolation::PreviousTranslation;
 use crate::race::progress::RaceProgress;
 
 use super::orbit::MainCamera;
+use super::spring::{SpringF32, SpringVec3};
 use super::switching::{CameraMode, CameraState};
 
 const FOLLOW_DISTANCE: f32 = 2.5;
 const FOLLOW_HEIGHT: f32 = 1.0;
 const LOOK_AHEAD_OFFSET: f32 = 2.0;
-const POSITION_SMOOTHING: f32 = 5.0;
-const HEADING_SMOOTHING: f32 = 4.0;
+const LOOK_AHEAD_SPLINE_T: f32 = 0.5;
+
+// Spring half-lives (seconds to reach halfway to target)
+const POSITION_HALF_LIFE: f32 = 0.08;
+const HEADING_HALF_LIFE: f32 = 0.12;
+const LOOK_TARGET_HALF_LIFE: f32 = 0.06;
+
+// Dynamic FOV
+const FPV_BASE_FOV_DEG: f32 = 60.0;
+const FPV_FOV_INCREASE_DEG: f32 = 15.0;
+const FPV_FOV_HALF_LIFE: f32 = 0.25;
+const MAX_DRONE_SPEED: f32 = 55.0;
 
 /// Smoothed state for the FPV follow camera.
 #[derive(Resource)]
 pub struct FpvFollowState {
-    pub smoothed_pos: Vec3,
-    pub smoothed_heading: Vec3,
+    pub position: SpringVec3,
+    pub heading: SpringVec3,
+    pub look_target: SpringVec3,
+    pub fov: SpringF32,
     pub initialized: bool,
 }
 
 impl Default for FpvFollowState {
     fn default() -> Self {
         Self {
-            smoothed_pos: Vec3::ZERO,
-            smoothed_heading: Vec3::NEG_Z,
+            position: SpringVec3::new(Vec3::ZERO),
+            heading: SpringVec3::new(Vec3::NEG_Z),
+            look_target: SpringVec3::new(Vec3::ZERO),
+            fov: SpringF32::new(FPV_BASE_FOV_DEG.to_radians()),
             initialized: false,
         }
     }
@@ -35,9 +52,17 @@ impl Default for FpvFollowState {
 pub fn fpv_camera_update(
     camera_state: Res<CameraState>,
     time: Res<Time>,
+    fixed_time: Res<Time<Fixed>>,
     progress: Option<Res<RaceProgress>>,
-    drones: Query<(&Transform, &Drone, &DronePhase, &DroneDynamics)>,
-    mut camera: Query<&mut Transform, (With<MainCamera>, Without<Drone>)>,
+    drones: Query<(
+        &Transform,
+        &Drone,
+        &DronePhase,
+        &DroneDynamics,
+        &AIController,
+        &PreviousTranslation,
+    )>,
+    mut camera: Query<(&mut Transform, &mut Projection), (With<MainCamera>, Without<Drone>)>,
     mut follow: ResMut<FpvFollowState>,
 ) {
     if camera_state.mode != CameraMode::Fpv {
@@ -56,20 +81,24 @@ pub fn fpv_camera_update(
         return;
     };
 
-    let Some((drone_tf, _, phase, dynamics)) = drones
+    let Some((drone_tf, _, phase, dynamics, ai, prev)) = drones
         .iter()
-        .find(|(_, d, _, _)| d.index as usize == drone_idx)
+        .find(|(_, d, _, _, _, _)| d.index as usize == drone_idx)
     else {
         return;
     };
 
-    let Ok(mut cam_tf) = camera.single_mut() else {
+    let Ok((mut cam_tf, mut projection)) = camera.single_mut() else {
         return;
     };
 
+    // Interpolated drone position (smooth between fixed ticks)
+    let alpha = fixed_time.overstep_fraction();
+    let interp_pos = prev.0.lerp(drone_tf.translation, alpha);
+
     // For crashed drones, just look at the crash site
     if *phase == DronePhase::Crashed {
-        cam_tf.look_at(drone_tf.translation, Vec3::Y);
+        cam_tf.look_at(interp_pos, Vec3::Y);
         return;
     }
 
@@ -86,31 +115,55 @@ pub fn fpv_camera_update(
     };
 
     if !follow.initialized {
-        follow.smoothed_heading = raw_heading;
+        follow.heading = SpringVec3::new(raw_heading);
         let target_pos =
-            drone_tf.translation - raw_heading * FOLLOW_DISTANCE + Vec3::Y * FOLLOW_HEIGHT;
-        follow.smoothed_pos = target_pos;
+            interp_pos - raw_heading * FOLLOW_DISTANCE + Vec3::Y * FOLLOW_HEIGHT;
+        follow.position = SpringVec3::new(target_pos);
+        follow.look_target =
+            SpringVec3::new(interp_pos + raw_heading * LOOK_AHEAD_OFFSET);
+        follow.fov = SpringF32::new(FPV_BASE_FOV_DEG.to_radians());
         follow.initialized = true;
     }
 
-    // Smooth heading (yaw-only tracking, no roll/pitch)
-    let heading_factor = 1.0 - (-HEADING_SMOOTHING * dt).exp();
-    follow.smoothed_heading = follow
-        .smoothed_heading
-        .lerp(raw_heading, heading_factor)
-        .normalize_or(Vec3::NEG_Z);
+    // Spring-smooth heading (yaw-only tracking, no roll/pitch)
+    follow.heading.update(raw_heading, HEADING_HALF_LIFE, dt);
+    let smoothed_heading = Vec3::new(
+        follow.heading.value.x,
+        0.0,
+        follow.heading.value.z,
+    )
+    .normalize_or(Vec3::NEG_Z);
 
     // Desired camera position: behind and above the drone
-    let target_pos = drone_tf.translation - follow.smoothed_heading * FOLLOW_DISTANCE
-        + Vec3::Y * FOLLOW_HEIGHT;
+    let target_pos =
+        interp_pos - smoothed_heading * FOLLOW_DISTANCE + Vec3::Y * FOLLOW_HEIGHT;
 
-    // Smooth position
-    let pos_factor = 1.0 - (-POSITION_SMOOTHING * dt).exp();
-    follow.smoothed_pos = follow.smoothed_pos.lerp(target_pos, pos_factor);
+    // Spring-smooth position
+    follow.position.update(target_pos, POSITION_HALF_LIFE, dt);
+    cam_tf.translation = follow.position.value;
 
-    cam_tf.translation = follow.smoothed_pos;
+    // Compute look target: spline-based during Racing, velocity-based otherwise
+    let raw_look_target = if *phase == DronePhase::Racing && ai.spline_t > 0.0 {
+        let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
+        let sample_t = ai.spline_t + LOOK_AHEAD_SPLINE_T;
+        let spline_ahead = ai.spline.position(sample_t.rem_euclid(cycle_t));
+        // Blend: mostly spline target, grounded by actual drone position
+        interp_pos * 0.3 + spline_ahead * 0.7
+    } else {
+        interp_pos + smoothed_heading * LOOK_AHEAD_OFFSET
+    };
 
-    // Look at drone (slightly ahead for natural framing)
-    let look_target = drone_tf.translation + follow.smoothed_heading * LOOK_AHEAD_OFFSET;
-    cam_tf.look_at(look_target, Vec3::Y);
+    // Spring-smooth look target for stable rotation
+    follow.look_target.update(raw_look_target, LOOK_TARGET_HALF_LIFE, dt);
+    cam_tf.look_at(follow.look_target.value, Vec3::Y);
+
+    // Dynamic FOV based on drone speed
+    let speed = dynamics.velocity.length();
+    let speed_fraction = (speed / MAX_DRONE_SPEED).clamp(0.0, 1.0);
+    let target_fov =
+        (FPV_BASE_FOV_DEG + speed_fraction * FPV_FOV_INCREASE_DEG).to_radians();
+    follow.fov.update(target_fov, FPV_FOV_HALF_LIFE, dt);
+    if let Projection::Perspective(ref mut persp) = *projection {
+        persp.fov = follow.fov.value;
+    }
 }

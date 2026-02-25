@@ -3,6 +3,9 @@ use bevy::prelude::*;
 
 use crate::race::progress::RaceProgress;
 
+use super::orbit::MainCamera;
+use super::settings::CameraSettings;
+
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 pub enum CameraMode {
     #[default]
@@ -66,12 +69,30 @@ pub fn handle_camera_keys(
     }
 }
 
-pub fn reset_camera_for_race(mut state: ResMut<CameraState>) {
+pub fn reset_camera_for_race(
+    mut state: ResMut<CameraState>,
+    settings: Res<CameraSettings>,
+    mut camera: Query<&mut Projection, With<MainCamera>>,
+) {
     state.mode = CameraMode::Chase;
     state.target_standings_index = 0;
+    if let Ok(mut projection) = camera.single_mut() {
+        if let Projection::Perspective(ref mut persp) = *projection {
+            persp.fov = settings.fov_degrees.to_radians();
+        }
+    }
 }
 
-pub fn reset_camera_on_exit(mut state: ResMut<CameraState>) {
+pub fn reset_camera_on_exit(
+    mut state: ResMut<CameraState>,
+    settings: Res<CameraSettings>,
+    mut camera: Query<&mut Projection, With<MainCamera>>,
+) {
     state.mode = CameraMode::Spectator;
     state.target_standings_index = 0;
+    if let Ok(mut projection) = camera.single_mut() {
+        if let Projection::Perspective(ref mut persp) = *projection {
+            persp.fov = settings.fov_degrees.to_radians();
+        }
+    }
 }
