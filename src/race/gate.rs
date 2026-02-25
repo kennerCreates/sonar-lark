@@ -131,6 +131,7 @@ pub fn miss_detection(
 
         if ai.spline_t > miss_threshold {
             progress.record_crash(drone_idx, DnfReason::MissedGate(expected));
+            let crash_velocity = dynamics.velocity;
             *phase = DronePhase::Crashed;
             dynamics.velocity = Vec3::ZERO;
             dynamics.angular_velocity = Vec3::ZERO;
@@ -142,6 +143,7 @@ pub fn miss_detection(
                 &mut meshes,
                 &mut materials,
                 transform.translation,
+                crash_velocity,
                 Color::srgb(r, g, b),
                 explosion_sounds.as_deref(),
             );

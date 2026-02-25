@@ -3,19 +3,50 @@ use rand::Rng;
 
 use crate::states::AppState;
 
-const PARTICLE_COUNT: usize = 24;
-const PARTICLE_LIFETIME: f32 = 1.5;
-const PARTICLE_SIZE: f32 = 0.08;
-const PARTICLE_SPEED_MIN: f32 = 3.0;
-const PARTICLE_SPEED_MAX: f32 = 12.0;
+// --- Debris ---
+const DEBRIS_COUNT: usize = 55;
+const DEBRIS_SIZE_SMALL: f32 = 0.04;
+const DEBRIS_SIZE_MED: f32 = 0.08;
+const DEBRIS_SIZE_LARGE: f32 = 0.12;
+const DEBRIS_LIFETIME: f32 = 1.5;
+const DEBRIS_SPEED_MIN: f32 = 3.0;
+const DEBRIS_SPEED_MAX: f32 = 12.0;
+const DEBRIS_MOMENTUM_FACTOR: f32 = 0.4;
+
+// --- Hot smoke (inner bright layer) ---
+const HOT_SMOKE_COUNT: usize = 10;
+const HOT_SMOKE_SIZE: f32 = 0.5;
+const HOT_SMOKE_LIFETIME: f32 = 2.0;
+const HOT_SMOKE_RISE_SPEED: f32 = 1.2;
+const HOT_SMOKE_SPREAD_SPEED: f32 = 1.5;
+const HOT_SMOKE_DRAG: f32 = 1.8;
+const HOT_SMOKE_GROW_PEAK: f32 = 0.25;
+
+// --- Dark smoke (outer halo layer) ---
+const DARK_SMOKE_COUNT: usize = 12;
+const DARK_SMOKE_SIZE: f32 = 0.8;
+const DARK_SMOKE_LIFETIME: f32 = 3.5;
+const DARK_SMOKE_RISE_SPEED: f32 = 0.8;
+const DARK_SMOKE_SPREAD_SPEED: f32 = 1.0;
+const DARK_SMOKE_DRAG: f32 = 1.5;
+const DARK_SMOKE_GROW_PEAK: f32 = 0.2;
+
 const GRAVITY: f32 = 9.81;
 const EXPLOSION_SOUND_COUNT: usize = 4;
+
+#[derive(Clone, Copy)]
+pub enum ParticleKind {
+    Debris,
+    HotSmoke,
+    DarkSmoke,
+}
 
 #[derive(Component)]
 pub struct ExplosionParticle {
     pub velocity: Vec3,
     pub lifetime: f32,
     pub remaining: f32,
+    pub kind: ParticleKind,
 }
 
 #[derive(Resource)]
@@ -33,14 +64,19 @@ pub fn spawn_explosion(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     position: Vec3,
+    drone_velocity: Vec3,
     color: Color,
     explosion_sounds: Option<&ExplosionSounds>,
 ) {
     let mut rng = rand::thread_rng();
 
-    let particle_mesh = meshes.add(Cuboid::new(PARTICLE_SIZE, PARTICLE_SIZE, PARTICLE_SIZE));
+    // --- Debris ---
+    let mesh_small = meshes.add(Cuboid::new(DEBRIS_SIZE_SMALL, DEBRIS_SIZE_SMALL, DEBRIS_SIZE_SMALL));
+    let mesh_med = meshes.add(Cuboid::new(DEBRIS_SIZE_MED, DEBRIS_SIZE_MED, DEBRIS_SIZE_MED));
+    let mesh_large = meshes.add(Cuboid::new(DEBRIS_SIZE_LARGE, DEBRIS_SIZE_LARGE, DEBRIS_SIZE_LARGE));
+
     let linear = color.to_linear();
-    let particle_material = materials.add(StandardMaterial {
+    let debris_material = materials.add(StandardMaterial {
         base_color: color,
         emissive: LinearRgba::new(
             linear.red * 3.0,
@@ -52,7 +88,9 @@ pub fn spawn_explosion(
         ..default()
     });
 
-    for _ in 0..PARTICLE_COUNT {
+    let momentum = drone_velocity * DEBRIS_MOMENTUM_FACTOR;
+
+    for i in 0..DEBRIS_COUNT {
         let dir = Vec3::new(
             rng.gen_range(-1.0..1.0),
             rng.gen_range(0.0..1.0),
@@ -60,22 +98,95 @@ pub fn spawn_explosion(
         )
         .normalize_or(Vec3::Y);
 
-        let speed = rng.gen_range(PARTICLE_SPEED_MIN..PARTICLE_SPEED_MAX);
+        let speed = rng.gen_range(DEBRIS_SPEED_MIN..DEBRIS_SPEED_MAX);
+
+        let mesh = match i % 3 {
+            0 => mesh_small.clone(),
+            1 => mesh_med.clone(),
+            _ => mesh_large.clone(),
+        };
 
         commands.spawn((
             Transform::from_translation(position),
             Visibility::default(),
-            Mesh3d(particle_mesh.clone()),
-            MeshMaterial3d(particle_material.clone()),
+            Mesh3d(mesh),
+            MeshMaterial3d(debris_material.clone()),
             ExplosionParticle {
-                velocity: dir * speed,
-                lifetime: PARTICLE_LIFETIME,
-                remaining: PARTICLE_LIFETIME,
+                velocity: dir * speed + momentum,
+                lifetime: DEBRIS_LIFETIME,
+                remaining: DEBRIS_LIFETIME,
+                kind: ParticleKind::Debris,
             },
             DespawnOnExit(AppState::Race),
         ));
     }
 
+    // --- Hot smoke (bright orange/red core) ---
+    let hot_smoke_mesh = meshes.add(Cuboid::new(HOT_SMOKE_SIZE, HOT_SMOKE_SIZE, HOT_SMOKE_SIZE));
+    let hot_smoke_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.95, 0.4, 0.1),
+        emissive: LinearRgba::new(3.0, 1.2, 0.2, 1.0),
+        unlit: true,
+        ..default()
+    });
+
+    for _ in 0..HOT_SMOKE_COUNT {
+        let radial = Vec3::new(
+            rng.gen_range(-1.0..1.0),
+            rng.gen_range(0.0..0.5),
+            rng.gen_range(-1.0..1.0),
+        )
+        .normalize_or(Vec3::Y);
+
+        commands.spawn((
+            Transform::from_translation(position).with_scale(Vec3::splat(0.1)),
+            Visibility::default(),
+            Mesh3d(hot_smoke_mesh.clone()),
+            MeshMaterial3d(hot_smoke_material.clone()),
+            ExplosionParticle {
+                velocity: radial * HOT_SMOKE_SPREAD_SPEED
+                    + Vec3::Y * (HOT_SMOKE_RISE_SPEED + rng.gen_range(-0.3..0.3)),
+                lifetime: HOT_SMOKE_LIFETIME,
+                remaining: HOT_SMOKE_LIFETIME,
+                kind: ParticleKind::HotSmoke,
+            },
+            DespawnOnExit(AppState::Race),
+        ));
+    }
+
+    // --- Dark smoke (black/charcoal halo) ---
+    let dark_smoke_mesh = meshes.add(Cuboid::new(DARK_SMOKE_SIZE, DARK_SMOKE_SIZE, DARK_SMOKE_SIZE));
+    let dark_smoke_material = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.08, 0.08, 0.08),
+        unlit: true,
+        ..default()
+    });
+
+    for _ in 0..DARK_SMOKE_COUNT {
+        let radial = Vec3::new(
+            rng.gen_range(-1.0..1.0),
+            rng.gen_range(0.0..0.3),
+            rng.gen_range(-1.0..1.0),
+        )
+        .normalize_or(Vec3::Y);
+
+        commands.spawn((
+            Transform::from_translation(position).with_scale(Vec3::splat(0.1)),
+            Visibility::default(),
+            Mesh3d(dark_smoke_mesh.clone()),
+            MeshMaterial3d(dark_smoke_material.clone()),
+            ExplosionParticle {
+                velocity: radial * DARK_SMOKE_SPREAD_SPEED
+                    + Vec3::Y * (DARK_SMOKE_RISE_SPEED + rng.gen_range(-0.2..0.2)),
+                lifetime: DARK_SMOKE_LIFETIME,
+                remaining: DARK_SMOKE_LIFETIME,
+                kind: ParticleKind::DarkSmoke,
+            },
+            DespawnOnExit(AppState::Race),
+        ));
+    }
+
+    // --- Audio ---
     if let Some(sounds) = explosion_sounds {
         if !sounds.0.is_empty() {
             let idx = rng.gen_range(0..sounds.0.len());
@@ -106,11 +217,49 @@ pub fn update_explosion_particles(
             continue;
         }
 
-        particle.velocity.y -= GRAVITY * dt;
-        transform.translation += particle.velocity * dt;
+        let life_fraction = (particle.remaining / particle.lifetime).clamp(0.0, 1.0);
 
-        let life_fraction = (particle.remaining / particle.lifetime).max(0.0);
-        transform.scale = Vec3::splat(life_fraction);
+        match particle.kind {
+            ParticleKind::Debris => {
+                particle.velocity.y -= GRAVITY * dt;
+                transform.translation += particle.velocity * dt;
+                transform.scale = Vec3::splat(life_fraction);
+            }
+            ParticleKind::HotSmoke => {
+                let drag_factor = (-HOT_SMOKE_DRAG * dt).exp();
+                particle.velocity *= drag_factor;
+                particle.velocity.y += 0.3 * dt;
+                transform.translation += particle.velocity * dt;
+
+                let elapsed = 1.0 - life_fraction;
+                let scale = if elapsed < HOT_SMOKE_GROW_PEAK {
+                    // Grow from 0.1 to 1.0
+                    0.1 + 0.9 * (elapsed / HOT_SMOKE_GROW_PEAK)
+                } else {
+                    // Shrink from 1.0 to 0.0
+                    let t = (elapsed - HOT_SMOKE_GROW_PEAK) / (1.0 - HOT_SMOKE_GROW_PEAK);
+                    1.0 - t
+                };
+                transform.scale = Vec3::splat(scale.max(0.01));
+            }
+            ParticleKind::DarkSmoke => {
+                let drag_factor = (-DARK_SMOKE_DRAG * dt).exp();
+                particle.velocity *= drag_factor;
+                particle.velocity.y += 0.2 * dt;
+                transform.translation += particle.velocity * dt;
+
+                let elapsed = 1.0 - life_fraction;
+                let scale = if elapsed < DARK_SMOKE_GROW_PEAK {
+                    // Grow from 0.1 to 1.0
+                    0.1 + 0.9 * (elapsed / DARK_SMOKE_GROW_PEAK)
+                } else {
+                    // Hold large then slowly shrink
+                    let t = (elapsed - DARK_SMOKE_GROW_PEAK) / (1.0 - DARK_SMOKE_GROW_PEAK);
+                    1.0 - t * t
+                };
+                transform.scale = Vec3::splat(scale.max(0.01));
+            }
+        }
     }
 }
 
