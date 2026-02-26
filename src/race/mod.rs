@@ -16,6 +16,13 @@ impl Plugin for RacePlugin {
             OnEnter(AppState::Race),
             (setup_race, ui::setup_race_ui, ui::setup_leaderboard, ui::setup_camera_hud),
         )
+            // Build GatePlanes resource once gate entities are spawned
+            .add_systems(
+                Update,
+                gate::build_gate_planes
+                    .run_if(in_state(AppState::Race))
+                    .run_if(not(resource_exists::<gate::GatePlanes>)),
+            )
             // Race logic chain: ordering matters for correctness
             .add_systems(
                 Update,
@@ -67,6 +74,7 @@ fn cleanup_race(mut commands: Commands) {
     commands.remove_resource::<timing::RaceClock>();
     commands.remove_resource::<lifecycle::CountdownTimer>();
     commands.remove_resource::<lifecycle::ResultsTransitionTimer>();
+    commands.remove_resource::<gate::GatePlanes>();
 }
 
 fn cleanup_race_progress(mut commands: Commands) {

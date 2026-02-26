@@ -29,7 +29,7 @@ const WILLOW_GROW_PEAK: f32 = 0.15;
 
 // --- Confetti (gate-level burst) ---
 const CONFETTI_COUNT: usize = 30;
-const CONFETTI_SIZE: f32 = 0.04;
+const CONFETTI_SIZE: f32 = 0.08;
 const CONFETTI_LIFETIME: f32 = 1.5;
 const CONFETTI_SPEED_MIN: f32 = 5.0;
 const CONFETTI_SPEED_MAX: f32 = 12.0;
@@ -273,7 +273,7 @@ fn spawn_confetti(
         // Horizontal fan: gate forward + lateral spread + slight upward
         let forward_bias = gate_forward * rng.gen_range(0.3..1.0);
         let lateral_spread = lateral * rng.gen_range(-1.0..1.0);
-        let up_bias = Vec3::Y * rng.gen_range(0.2..0.8);
+        let up_bias = Vec3::Y * rng.gen_range(0.8..2.6);
         let dir = (forward_bias + lateral_spread + up_bias).normalize_or(Vec3::Y);
         let speed = rng.gen_range(CONFETTI_SPEED_MIN..CONFETTI_SPEED_MAX);
 

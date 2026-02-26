@@ -13,6 +13,11 @@ const MAX_ADVANCE_PER_TICK: f32 = 0.15;
 /// 1.5 puts the finish well past gate 0's departure (at cycle + 1.0).
 pub const FINISH_EXTENSION: f32 = 1.5;
 
+/// Small epsilon added to finish_t guards so that spline_t can advance slightly
+/// past the finish, allowing miss_detection's strict `>` check to fire on drones
+/// that miss the finish gate.
+const FINISH_EPSILON: f32 = 0.01;
+
 /// How many samples ahead to scan for upcoming curvature (for speed limiting).
 const SPEED_CURVATURE_SAMPLES: usize = 5;
 
@@ -95,7 +100,7 @@ pub fn update_ai_targets(
                 let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
                 let finish_t = cycle_t + FINISH_EXTENSION;
 
-                if ai.spline_t >= finish_t {
+                if ai.spline_t >= finish_t + FINISH_EPSILON {
                     // Only transition to VictoryLap if RaceProgress confirms the drone finished.
                     // If not finished, stay Racing so miss_detection (in Update) can crash it.
                     let confirmed = race_progress.as_ref().map_or(true, |p| {
@@ -231,7 +236,7 @@ pub fn compute_racing_line(
                 let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
                 let finish_t = cycle_t + FINISH_EXTENSION;
 
-                if ai.spline_t >= finish_t {
+                if ai.spline_t >= finish_t + FINISH_EPSILON {
                     desired.position = transform.translation;
                     desired.velocity_hint = Vec3::ZERO;
                     desired.max_speed = tuning.max_speed;
