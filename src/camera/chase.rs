@@ -100,13 +100,12 @@ pub fn chase_camera_update(
                     standings.iter().find_map(|&(idx, _)| {
                         drones.iter().find(|(_, d, _, phase, _)| {
                             d.index as usize == idx && **phase != DronePhase::Crashed
-                                && **phase != DronePhase::Returning
                         })
                     })
                 })
         });
 
-    // If all drones are returning/crashed, smoothly pull back to frame the finish gate
+    // If all drones are crashed, smoothly pull back to frame the finish gate
     let (leader_pos, leader_vel) = if let Some((tf, _, dynamics, _, prev)) = target_data {
         let interp_pos = prev.0.lerp(tf.translation, alpha);
         (interp_pos, dynamics.velocity)

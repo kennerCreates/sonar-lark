@@ -18,6 +18,14 @@ pub const FINISH_EXTENSION: f32 = 1.5;
 /// that miss the finish gate.
 const FINISH_EPSILON: f32 = 0.01;
 
+/// How far ahead (in spline parameter units) gate correction begins.
+/// 2.0 = starts from the previous gate's midleg waypoint.
+const GATE_CORRECTION_RANGE: f32 = 2.0;
+
+/// Maximum blend factor toward the gate position (0.0–1.0).
+/// 0.7 = at the gate midpoint, 70% gate target / 30% spline look-ahead.
+const GATE_CORRECTION_STRENGTH: f32 = 0.7;
+
 /// How many samples ahead to scan for upcoming curvature (for speed limiting).
 const SPEED_CURVATURE_SAMPLES: usize = 5;
 
@@ -95,7 +103,7 @@ pub fn update_ai_targets(
 
     for (transform, mut ai, mut phase, dynamics, drone) in &mut query {
         match *phase {
-            DronePhase::Idle | DronePhase::Crashed | DronePhase::Returning => continue,
+            DronePhase::Idle | DronePhase::Crashed => continue,
             DronePhase::Racing => {
                 let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
                 let finish_t = cycle_t + FINISH_EXTENSION;
@@ -236,7 +244,7 @@ pub fn compute_racing_line(
 
     for (transform, ai, config, phase, mut desired) in &mut query {
         match *phase {
-            DronePhase::Idle | DronePhase::Crashed | DronePhase::Returning => continue,
+            DronePhase::Idle | DronePhase::Crashed => continue,
             DronePhase::Racing => {
                 let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
                 let finish_t = cycle_t + FINISH_EXTENSION;
@@ -266,14 +274,63 @@ pub fn compute_racing_line(
                     (ai.spline_t + adaptive_vel_look_ahead * POINTS_PER_GATE).min(finish_t);
                 let tangent = cyclic_vel(&ai.spline, vel_t, cycle_t).normalize_or(Vec3::NEG_Z);
 
-                // Small organic wobble — main per-drone variation comes from the unique spline
-                let lateral = Vec3::Y.cross(tangent).normalize_or(Vec3::X);
+                // Gate correction: blend target toward the gate when approaching.
+                // Simulates a pilot actively aiming for the gate opening.
+                let next_gate_idx =
+                    ((ai.spline_t - 0.5) / POINTS_PER_GATE + 1.0).floor() as usize;
+                let gate_blend = if next_gate_idx < ai.gate_positions.len() {
+                    let gate_t = next_gate_idx as f32 * POINTS_PER_GATE + 0.5;
+                    let dist_t = gate_t - ai.spline_t;
+                    if dist_t > 0.0 && dist_t < GATE_CORRECTION_RANGE {
+                        let t = 1.0 - dist_t / GATE_CORRECTION_RANGE;
+                        t * t * GATE_CORRECTION_STRENGTH
+                    } else {
+                        0.0
+                    }
+                } else if next_gate_idx == ai.gate_positions.len() {
+                    // Finish gate = gate 0 again
+                    let gate_t = cycle_t + 0.5;
+                    let dist_t = gate_t - ai.spline_t;
+                    if dist_t > 0.0 && dist_t < GATE_CORRECTION_RANGE {
+                        let t = 1.0 - dist_t / GATE_CORRECTION_RANGE;
+                        t * t * GATE_CORRECTION_STRENGTH
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                };
+
+                let gate_world_idx = if next_gate_idx >= ai.gate_positions.len() {
+                    0
+                } else {
+                    next_gate_idx
+                };
+                let corrected_target = if gate_blend > 0.0 {
+                    let gate_pos = ai.gate_positions[gate_world_idx];
+                    target_pos.lerp(gate_pos, gate_blend)
+                } else {
+                    target_pos
+                };
+
+                // Blend velocity hint toward gate direction so the PID steers toward it
+                let corrected_tangent = if gate_blend > 0.0 {
+                    let gate_pos = ai.gate_positions[gate_world_idx];
+                    let to_gate = (gate_pos - transform.translation).normalize_or(tangent);
+                    tangent.lerp(to_gate, gate_blend)
+                } else {
+                    tangent
+                };
+
+                // Small organic wobble, suppressed near gates
+                let lateral = Vec3::Y.cross(corrected_tangent).normalize_or(Vec3::X);
+                let wobble_suppress = 1.0 - gate_blend / GATE_CORRECTION_STRENGTH;
                 let noise = (elapsed * config.noise_frequency + config.line_offset * 3.14).sin()
-                    * config.noise_amplitude * 0.3;
+                    * config.noise_amplitude * 0.3 * wobble_suppress;
                 let offset = lateral * noise;
 
-                desired.position = target_pos + offset;
-                desired.velocity_hint = tangent;
+                desired.position = corrected_target + offset;
+                desired.velocity_hint = corrected_tangent;
 
                 // Curvature-aware speed limit: scan ahead for the tightest upcoming turn.
                 // Per-drone variation: aggressive drones carry more speed, cautious drones brake earlier.

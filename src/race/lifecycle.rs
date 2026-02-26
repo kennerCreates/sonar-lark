@@ -44,7 +44,7 @@ pub fn drones_are_active(
     }
     drones
         .iter()
-        .any(|dp| matches!(*dp, DronePhase::Returning | DronePhase::VictoryLap))
+        .any(|dp| matches!(*dp, DronePhase::VictoryLap))
 }
 
 /// Ticks the countdown timer each frame, then transitions to Racing when it expires.

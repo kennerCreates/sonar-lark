@@ -160,24 +160,15 @@ pub struct DroneStartPosition {
 #[derive(Resource)]
 pub struct RaceSeed(pub u32);
 
-/// Per-drone lifecycle phase, tracking whether the drone is idle, racing, or returning to start.
+/// Per-drone lifecycle phase.
 #[derive(Component, Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum DronePhase {
     #[default]
     Idle,
     Racing,
-    Returning,
     /// Drone has finished the race and is continuing to lap the course.
     VictoryLap,
     Crashed,
-}
-
-/// A one-way spline path for a drone flying back to its start position after finishing the race.
-#[derive(Component)]
-pub struct ReturnPath {
-    pub spline: CubicCurve<Vec3>,
-    pub spline_t: f32,
-    pub total_t: f32,
 }
 
 /// Runtime-tunable AI and physics parameters. Exposed via the dev dashboard (F4).

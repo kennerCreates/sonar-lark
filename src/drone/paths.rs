@@ -1,4 +1,4 @@
-use bevy::math::cubic_splines::{CubicCardinalSpline, CubicCurve, CubicGenerator, CyclicCubicGenerator};
+use bevy::math::cubic_splines::{CubicCardinalSpline, CubicCurve, CyclicCubicGenerator};
 use bevy::prelude::*;
 
 use crate::course::data::CourseData;
@@ -197,67 +197,6 @@ pub fn generate_drone_race_path(
         .ok()?;
 
     Some(RacePath { spline, gate_positions: drone_gate_positions, gate_forwards })
-}
-
-/// Generates a non-cyclic Catmull-Rom spline from the drone's finish position
-/// back to its start position. Each drone gets a unique path based on its index
-/// and config, producing organic per-drone variation.
-pub fn generate_return_path(
-    current_pos: Vec3,
-    velocity: Vec3,
-    start_pos: Vec3,
-    config: &DroneConfig,
-    drone_index: u8,
-    race_seed: u32,
-) -> Option<CubicCurve<Vec3>> {
-    let speed = velocity.length();
-    let vel_dir = if speed > 0.1 {
-        velocity / speed
-    } else {
-        Vec3::NEG_Z
-    };
-
-    // Deterministic per-drone hash for variation (seed mixed in)
-    let hash = ((drone_index as u32).wrapping_mul(2654435761))
-        .wrapping_add(race_seed.wrapping_mul(1503267967))
-        >> 16;
-    let hash_f = (hash & 0xFFFF) as f32 / 65536.0; // 0.0..1.0
-
-    // W0: current position
-    let w0 = current_pos;
-
-    // W1: momentum carry-through (drone continues in its current direction)
-    let carry_dist = 12.0 + (drone_index as f32 * 1.7) % 8.0;
-    let w1 = current_pos + vel_dir * carry_dist;
-
-    // Direction from carry point toward start (used for lateral offsets)
-    let return_dir = (start_pos - w1).normalize_or(Vec3::NEG_Z);
-    let lateral = Vec3::Y.cross(return_dir).normalize_or(Vec3::X);
-
-    // W2: high midpoint with large lateral + vertical offset
-    let mid = (w1 + start_pos) * 0.5;
-    let lat_offset_high = config.line_offset * 6.0 + (hash_f - 0.5) * 16.0;
-    let alt_offset_high = 10.0 + hash_f * 8.0;
-    let w2 = mid + lateral * lat_offset_high + Vec3::Y * alt_offset_high;
-
-    // W3: lower midpoint with moderate offset (opposite lateral bias for S-curve feel)
-    let mid_low = (mid + start_pos) * 0.5;
-    let lat_offset_low = -config.line_offset * 3.0 + (hash_f - 0.5) * 6.0;
-    let alt_offset_low = 3.0 + hash_f * 5.0;
-    let w3 = mid_low + lateral * lat_offset_low + Vec3::Y * alt_offset_low;
-
-    // W4: approach from above start (staggered height per drone)
-    let approach_height = 3.0 + drone_index as f32 * 0.4;
-    let w4 = start_pos + Vec3::Y * approach_height;
-
-    // W5: final start position
-    let w5 = start_pos;
-
-    let points = [w0, w1, w2, w3, w4, w5];
-    let spline = CubicCardinalSpline::new_catmull_rom(points)
-        .to_curve()
-        .ok()?;
-    Some(spline)
 }
 
 pub fn compute_start_positions(
@@ -745,66 +684,6 @@ mod tests {
         assert!(
             (positions[0].z - positions[2].z).abs() > 1.0,
             "drones should be spread along Z"
-        );
-    }
-
-    #[test]
-    fn return_path_produces_valid_spline() {
-        let config = DroneConfig {
-            line_offset: 0.5,
-            ..neutral_drone_config()
-        };
-
-        let current_pos = Vec3::new(50.0, 5.0, 30.0);
-        let velocity = Vec3::new(0.0, 0.0, -20.0);
-        let start_pos = Vec3::new(0.0, 1.5, 5.0);
-
-        let spline =
-            generate_return_path(current_pos, velocity, start_pos, &config, 0, 0)
-                .expect("should produce a return path");
-
-        // Spline starts near current_pos and ends near start_pos
-        let start = spline.position(0.0);
-        let end_t = spline.segments().len() as f32;
-        let end = spline.position(end_t);
-
-        assert!(
-            (start - current_pos).length() < 1.0,
-            "spline start {:?} should be near current_pos {:?}",
-            start,
-            current_pos
-        );
-        assert!(
-            (end - start_pos).length() < 1.0,
-            "spline end {:?} should be near start_pos {:?}",
-            end,
-            start_pos
-        );
-    }
-
-    #[test]
-    fn return_path_varies_by_drone_index() {
-        let config = DroneConfig {
-            line_offset: 0.5,
-            ..neutral_drone_config()
-        };
-
-        let current_pos = Vec3::new(50.0, 5.0, 30.0);
-        let velocity = Vec3::new(0.0, 0.0, -20.0);
-        let start_pos = Vec3::new(0.0, 1.5, 5.0);
-
-        let spline0 =
-            generate_return_path(current_pos, velocity, start_pos, &config, 0, 0).unwrap();
-        let spline5 =
-            generate_return_path(current_pos, velocity, start_pos, &config, 5, 0).unwrap();
-
-        // Sample at midpoint — different drones should take different paths
-        let mid_t = spline0.segments().len() as f32 / 2.0;
-        let pos0 = spline0.position(mid_t);
-        let pos5 = spline5.position(mid_t);
-        assert!(
-            (pos0 - pos5).length() > 1.0,
-            "drone 0 and drone 5 return paths should differ at midpoint"
         );
     }
 

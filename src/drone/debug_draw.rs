@@ -134,7 +134,6 @@ pub fn draw_drone_state(
         &DronePhase,
         &DesiredPosition,
         &DroneDynamics,
-        Option<&ReturnPath>,
     )>,
 ) {
     let Some(debug) = debug else { return };
@@ -142,7 +141,7 @@ pub fn draw_drone_state(
         return;
     }
 
-    for (transform, drone, ai, phase, desired, dynamics, return_path) in &query {
+    for (transform, drone, ai, phase, desired, dynamics) in &query {
         let pos = transform.translation;
         let total_t = ai.gate_count as f32 * POINTS_PER_GATE;
 
@@ -179,32 +178,6 @@ pub fn draw_drone_state(
                     let tangent =
                         ai.spline.velocity(ai.spline_t).normalize_or(Vec3::ZERO) * 2.0;
                     gizmos.arrow(curve_pos, curve_pos + tangent, Color::srgb(1.0, 1.0, 0.0));
-                }
-            }
-            DronePhase::Returning => {
-                if let Some(rp) = return_path {
-                    // Draw return spline polyline (pink/magenta)
-                    let samples = (rp.total_t * 15.0) as usize;
-                    if samples >= 2 {
-                        for i in 0..samples {
-                            let t0 = (i as f32 / samples as f32) * rp.total_t;
-                            let t1 = ((i + 1) as f32 / samples as f32) * rp.total_t;
-                            let p0 = rp.spline.position(t0);
-                            let p1 = rp.spline.position(t1);
-                            gizmos.line(p0, p1, Color::srgba(1.0, 0.4, 0.8, 0.6));
-                        }
-                    }
-
-                    // Current position on return spline (pink sphere)
-                    if rp.spline_t < rp.total_t {
-                        let curve_pos = rp.spline.position(rp.spline_t);
-                        gizmos.sphere(
-                            Isometry3d::from_translation(curve_pos),
-                            0.2,
-                            Color::srgb(1.0, 0.4, 0.8),
-                        );
-                        gizmos.line(pos, curve_pos, Color::srgba(1.0, 0.4, 0.8, 0.5));
-                    }
                 }
             }
             DronePhase::Idle | DronePhase::Crashed => {}

@@ -102,8 +102,8 @@ pub fn fpv_camera_update(
         return;
     }
 
-    // For returning/idle drones, freeze the camera
-    if *phase == DronePhase::Returning || *phase == DronePhase::Idle {
+    // For idle drones, freeze the camera
+    if *phase == DronePhase::Idle {
         return;
     }
 
