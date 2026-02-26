@@ -216,6 +216,11 @@ fn advance_cyclic_spline(
 /// Maximum lateral offset a drone can be pushed by avoidance (meters).
 const MAX_AVOIDANCE_OFFSET: f32 = 3.0;
 
+/// Distance to next gate at which proximity avoidance starts to fade.
+const GATE_SUPPRESS_RADIUS: f32 = 10.0;
+/// Minimum avoidance multiplier at the gate itself (20% of full avoidance).
+const GATE_SUPPRESS_MIN: f32 = 0.2;
+
 pub fn compute_racing_line(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
@@ -327,7 +332,14 @@ pub fn compute_racing_line(
 /// Runs after compute_racing_line, before position_pid.
 pub fn proximity_avoidance(
     tuning: Res<AiTuningParams>,
-    mut query: Query<(&Transform, &Drone, &DroneDynamics, &DronePhase, &mut DesiredPosition)>,
+    mut query: Query<(
+        &Transform,
+        &Drone,
+        &DroneDynamics,
+        &DronePhase,
+        &AIController,
+        &mut DesiredPosition,
+    )>,
 ) {
     if tuning.avoidance_strength == 0.0 {
         return;
@@ -339,7 +351,7 @@ pub fn proximity_avoidance(
     // Snapshot positions, velocities, and indices (stack-allocated, 12 drones max)
     let mut drone_data = [(0u8, Vec3::ZERO, Vec3::ZERO); 12];
     let mut drone_count = 0;
-    for (tr, drone, dyn_, phase, _) in query.iter() {
+    for (tr, drone, dyn_, phase, _, _) in query.iter() {
         if matches!(*phase, DronePhase::Idle | DronePhase::Crashed) { continue; }
         if drone_count < 12 {
             drone_data[drone_count] = (drone.index, tr.translation, dyn_.velocity);
@@ -348,7 +360,7 @@ pub fn proximity_avoidance(
     }
     let drone_data = &drone_data[..drone_count];
 
-    for (transform, drone, dynamics, phase, mut desired) in &mut query {
+    for (transform, drone, dynamics, phase, ai, mut desired) in &mut query {
         if matches!(*phase, DronePhase::Idle | DronePhase::Crashed) {
             continue;
         }
@@ -399,7 +411,17 @@ pub fn proximity_avoidance(
             total_offset += lateral_dir * weight;
         }
 
-        let offset = total_offset * tuning.avoidance_strength;
+        // Suppress avoidance near the next gate so drones don't get pushed out of the opening
+        let gate_idx = (ai.target_gate_index as usize).min(ai.gate_positions.len().saturating_sub(1));
+        let gate_dist = (my_pos - ai.gate_positions[gate_idx]).length();
+        let suppress = if gate_dist < GATE_SUPPRESS_RADIUS {
+            GATE_SUPPRESS_MIN
+                + (1.0 - GATE_SUPPRESS_MIN) * (gate_dist / GATE_SUPPRESS_RADIUS)
+        } else {
+            1.0
+        };
+
+        let offset = total_offset * tuning.avoidance_strength * suppress;
         let mag = offset.length();
         if mag > MAX_AVOIDANCE_OFFSET {
             desired.position += offset * (MAX_AVOIDANCE_OFFSET / mag);
