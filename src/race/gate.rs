@@ -123,22 +123,6 @@ pub fn build_gate_planes(
     }
 }
 
-/// Pure function: test if a point is inside a trigger volume defined by its
-/// GlobalTransform and half_extents. Handles rotation and non-uniform scale.
-/// Retained as a utility (replaced by plane_crossing_check for gate detection).
-#[allow(dead_code)]
-pub fn point_in_trigger_volume(
-    point: Vec3,
-    trigger_global: &GlobalTransform,
-    half_extents: Vec3,
-) -> bool {
-    let inv = trigger_global.affine().inverse();
-    let local = inv.transform_point3(point);
-    local.x.abs() < half_extents.x
-        && local.y.abs() < half_extents.y
-        && local.z.abs() < half_extents.z
-}
-
 /// Checks each racing drone against gate planes using line-segment crossing detection.
 /// Uses PreviousTranslation → current Transform to detect plane crossings, eliminating
 /// tunneling at any speed. Only counts front-to-back crossings (directional validation).
@@ -268,97 +252,160 @@ pub fn miss_detection(
 mod tests {
     use super::*;
 
+    fn default_gate_plane() -> GatePlane {
+        // Gate at origin, facing +Z (normal = +Z means approach from +Z side).
+        // Right = +X, Up = +Y. 4m wide, 3m tall.
+        GatePlane {
+            gate_index: 0,
+            center: Vec3::ZERO,
+            normal: Vec3::Z,
+            right: Vec3::X,
+            up: Vec3::Y,
+            half_width: 2.0,
+            half_height: 1.5,
+        }
+    }
+
     #[test]
-    fn point_inside_identity_trigger() {
-        let gt = GlobalTransform::from(Transform::IDENTITY);
-        assert!(point_in_trigger_volume(
-            Vec3::new(0.5, 0.5, 0.5),
-            &gt,
-            Vec3::new(1.0, 1.0, 1.0),
+    fn front_to_back_within_bounds() {
+        let plane = default_gate_plane();
+        // Fly from +Z to -Z (front to back), through center
+        assert!(plane_crossing_check(
+            Vec3::new(0.0, 0.0, 5.0),
+            Vec3::new(0.0, 0.0, -5.0),
+            &plane,
+            1.0,
         ));
     }
 
     #[test]
-    fn point_outside_identity_trigger() {
-        let gt = GlobalTransform::from(Transform::IDENTITY);
-        assert!(!point_in_trigger_volume(
-            Vec3::new(2.0, 0.0, 0.0),
-            &gt,
-            Vec3::new(1.0, 1.0, 1.0),
+    fn back_to_front_rejected() {
+        let plane = default_gate_plane();
+        // Fly from -Z to +Z (back to front) — wrong direction
+        assert!(!plane_crossing_check(
+            Vec3::new(0.0, 0.0, -5.0),
+            Vec3::new(0.0, 0.0, 5.0),
+            &plane,
+            1.0,
         ));
     }
 
     #[test]
-    fn point_inside_translated_trigger() {
-        let gt = GlobalTransform::from(Transform::from_translation(Vec3::new(10.0, 0.0, 0.0)));
-        assert!(point_in_trigger_volume(
-            Vec3::new(10.5, 0.0, 0.0),
-            &gt,
-            Vec3::new(1.0, 1.0, 1.0),
+    fn outside_bounds_horizontally() {
+        let plane = default_gate_plane();
+        // Cross the plane but 3m to the right (half_width = 2.0)
+        assert!(!plane_crossing_check(
+            Vec3::new(3.0, 0.0, 5.0),
+            Vec3::new(3.0, 0.0, -5.0),
+            &plane,
+            1.0,
         ));
     }
 
     #[test]
-    fn point_outside_translated_trigger() {
-        let gt = GlobalTransform::from(Transform::from_translation(Vec3::new(10.0, 0.0, 0.0)));
-        assert!(!point_in_trigger_volume(
-            Vec3::new(0.5, 0.0, 0.0),
-            &gt,
-            Vec3::new(1.0, 1.0, 1.0),
+    fn outside_bounds_vertically() {
+        let plane = default_gate_plane();
+        // Cross the plane but 2m above (half_height = 1.5)
+        assert!(!plane_crossing_check(
+            Vec3::new(0.0, 2.0, 5.0),
+            Vec3::new(0.0, 2.0, -5.0),
+            &plane,
+            1.0,
         ));
     }
 
     #[test]
-    fn point_inside_rotated_trigger() {
-        // Rotate 90 degrees around Y: local X becomes world Z
-        let gt = GlobalTransform::from(Transform::from_rotation(Quat::from_rotation_y(
-            std::f32::consts::FRAC_PI_2,
-        )));
-        // half_extents (2, 1, 1): local X extends ±2.
-        // After 90° Y rotation, world Z maps to local X.
-        // So a point at world (0, 0, 1.5) should be inside (local X = 1.5 < 2.0)
-        assert!(point_in_trigger_volume(
-            Vec3::new(0.0, 0.0, 1.5),
-            &gt,
-            Vec3::new(2.0, 1.0, 1.0),
+    fn both_positions_same_side_no_crossing() {
+        let plane = default_gate_plane();
+        // Both positions on the +Z (front) side — no crossing
+        assert!(!plane_crossing_check(
+            Vec3::new(0.0, 0.0, 10.0),
+            Vec3::new(0.0, 0.0, 5.0),
+            &plane,
+            1.0,
         ));
     }
 
     #[test]
-    fn point_outside_rotated_trigger() {
-        let gt = GlobalTransform::from(Transform::from_rotation(Quat::from_rotation_y(
-            std::f32::consts::FRAC_PI_2,
-        )));
-        // After 90° Y rotation, world X maps to local -Z.
-        // half_extents Z = 1.0, so world X=1.5 → local Z=1.5 > 1.0 → outside
-        assert!(!point_in_trigger_volume(
-            Vec3::new(1.5, 0.0, 0.0),
-            &gt,
-            Vec3::new(2.0, 1.0, 1.0),
+    fn edge_graze_rejected_without_margin() {
+        let plane = default_gate_plane();
+        // Cross at x=1.99, just inside half_width=2.0 → passes with margin=1.0
+        assert!(plane_crossing_check(
+            Vec3::new(1.99, 0.0, 5.0),
+            Vec3::new(1.99, 0.0, -5.0),
+            &plane,
+            1.0,
+        ));
+        // Cross at x=2.05, just outside half_width=2.0 → fails with margin=1.0
+        assert!(!plane_crossing_check(
+            Vec3::new(2.05, 0.0, 5.0),
+            Vec3::new(2.05, 0.0, -5.0),
+            &plane,
+            1.0,
+        ));
+        // But passes with margin=1.1 (effective half_width = 2.2)
+        assert!(plane_crossing_check(
+            Vec3::new(2.05, 0.0, 5.0),
+            Vec3::new(2.05, 0.0, -5.0),
+            &plane,
+            1.1,
         ));
     }
 
     #[test]
-    fn point_inside_scaled_trigger() {
-        // Parent with scale 2.0. Trigger half_extents are (1, 1, 1) in local space.
-        // After parent scale, effective world-space extent is 2.0 in each axis.
-        let gt = GlobalTransform::from(Transform::from_scale(Vec3::splat(2.0)));
-        // World position 1.5 → local position 1.5/2.0 = 0.75 < 1.0 → inside
-        assert!(point_in_trigger_volume(
-            Vec3::new(1.5, 0.0, 0.0),
-            &gt,
-            Vec3::new(1.0, 1.0, 1.0),
+    fn rotated_gate_90_degrees() {
+        // Gate rotated 90° around Y: now faces +X (normal=+X, right=−Z, up=+Y)
+        let plane = GatePlane {
+            gate_index: 0,
+            center: Vec3::ZERO,
+            normal: Vec3::X,
+            right: Vec3::NEG_Z,
+            up: Vec3::Y,
+            half_width: 2.0,
+            half_height: 1.5,
+        };
+        // Approach from +X, depart toward −X
+        assert!(plane_crossing_check(
+            Vec3::new(5.0, 0.0, 0.0),
+            Vec3::new(-5.0, 0.0, 0.0),
+            &plane,
+            1.0,
+        ));
+        // Wrong direction (−X to +X)
+        assert!(!plane_crossing_check(
+            Vec3::new(-5.0, 0.0, 0.0),
+            Vec3::new(5.0, 0.0, 0.0),
+            &plane,
+            1.0,
         ));
     }
 
     #[test]
-    fn point_outside_scaled_trigger() {
-        let gt = GlobalTransform::from(Transform::from_scale(Vec3::splat(2.0)));
-        // World position 2.5 → local position 2.5/2.0 = 1.25 > 1.0 → outside
-        assert!(!point_in_trigger_volume(
-            Vec3::new(2.5, 0.0, 0.0),
-            &gt,
-            Vec3::new(1.0, 1.0, 1.0),
+    fn flipped_gate_forward() {
+        // Simulates gate_forward_flipped: normal is −Z instead of +Z.
+        // Drone must now approach from −Z side.
+        let plane = GatePlane {
+            gate_index: 0,
+            center: Vec3::ZERO,
+            normal: Vec3::NEG_Z,
+            right: Vec3::X,
+            up: Vec3::Y,
+            half_width: 2.0,
+            half_height: 1.5,
+        };
+        // Approach from −Z (front) to +Z (back)
+        assert!(plane_crossing_check(
+            Vec3::new(0.0, 0.0, -5.0),
+            Vec3::new(0.0, 0.0, 5.0),
+            &plane,
+            1.0,
+        ));
+        // Original +Z to −Z direction should now be rejected
+        assert!(!plane_crossing_check(
+            Vec3::new(0.0, 0.0, 5.0),
+            Vec3::new(0.0, 0.0, -5.0),
+            &plane,
+            1.0,
         ));
     }
 }

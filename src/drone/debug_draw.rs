@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use super::components::*;
 use super::paths::adaptive_approach_offset;
+use crate::race::gate::GatePlanes;
 
 /// Toggle resource for flight debug visualization. Press F3 during race to toggle.
 #[derive(Resource)]
@@ -208,6 +209,48 @@ pub fn draw_drone_state(
             }
             DronePhase::Idle | DronePhase::Crashed => {}
         }
+    }
+}
+
+/// Draw gate detection planes as cyan wireframe rectangles with a normal arrow.
+pub fn draw_gate_planes(
+    mut gizmos: Gizmos,
+    debug: Option<Res<FlightDebugDraw>>,
+    gate_planes: Option<Res<GatePlanes>>,
+) {
+    let Some(debug) = debug else { return };
+    if !debug.enabled {
+        return;
+    }
+    let Some(gate_planes) = gate_planes else {
+        return;
+    };
+
+    let plane_color = Color::srgba(0.0, 1.0, 1.0, 0.5);
+    let normal_color = Color::srgb(0.0, 1.0, 1.0);
+
+    for plane in &gate_planes.0 {
+        // Four corners of the gate opening
+        let r = plane.right * plane.half_width;
+        let u = plane.up * plane.half_height;
+        let corners = [
+            plane.center - r - u, // bottom-left
+            plane.center + r - u, // bottom-right
+            plane.center + r + u, // top-right
+            plane.center - r + u, // top-left
+        ];
+
+        // Wireframe rectangle
+        for i in 0..4 {
+            gizmos.line(corners[i], corners[(i + 1) % 4], plane_color);
+        }
+
+        // Cross lines for visibility
+        gizmos.line(corners[0], corners[2], plane_color);
+        gizmos.line(corners[1], corners[3], plane_color);
+
+        // Normal arrow (points toward approach side)
+        gizmos.arrow(plane.center, plane.center + plane.normal * 2.0, normal_color);
     }
 }
 

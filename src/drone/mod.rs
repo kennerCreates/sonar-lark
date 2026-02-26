@@ -73,6 +73,7 @@ impl Plugin for DronePlugin {
                     debug_draw::toggle_debug_draw,
                     debug_draw::draw_spline_path,
                     debug_draw::draw_gate_markers,
+                    debug_draw::draw_gate_planes,
                     debug_draw::draw_drone_state,
                     debug_draw::draw_progress_indicators,
                 )
