@@ -38,10 +38,20 @@ src/
 ├── editor/              Map editor
 │   ├── workshop/        Define new obstacle types from glb scenes
 │   │   ├── mod.rs       WorkshopPlugin, WorkshopState, preview spawning, gizmo
-│   │   └── ui.rs        Workshop UI layout, interaction handlers, text input
+│   │   └── ui/          Workshop UI
+│   │       ├── mod.rs   Re-exports
+│   │       ├── build.rs UI hierarchy construction, marker components, constants
+│   │       └── systems.rs Interaction handlers, text input, display updates
 │   └── course_editor/   Place obstacles and props, set gate order
-│       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, PlacedProp, EditorTab, placement/drag/gizmo systems
-│       └── ui.rs        Tabbed palette UI (Obstacles/Props), save/load, gate order mode, name field, prop color override
+│       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, PlacedProp, EditorTab, placement/selection
+│       ├── overlays.rs  Visualization gizmos (trigger volumes, gate sequence, spline preview, prop gizmos)
+│       ├── transform_gizmos.rs Move/rotate/scale widget systems
+│       └── ui/          Course editor UI
+│           ├── mod.rs   Re-exports
+│           ├── types.rs Marker components, resources, color constants
+│           ├── build.rs UI hierarchy construction (palette, panels)
+│           ├── file_ops.rs Save/load/delete, navigation, gate ordering
+│           └── systems.rs Interaction handlers, display updates, prop color
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
