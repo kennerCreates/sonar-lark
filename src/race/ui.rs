@@ -105,6 +105,7 @@ pub fn handle_start_race_button(
                 }
                 commands.remove_resource::<RaceProgress>();
                 commands.remove_resource::<RaceClock>();
+                commands.remove_resource::<super::lifecycle::ResultsTransitionTimer>();
                 *phase = RacePhase::WaitingToStart;
                 info!("Race reset — drones will respawn with new randomization");
             }
