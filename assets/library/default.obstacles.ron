@@ -15,7 +15,7 @@
         glb_node_name: "gate_ground",
         trigger_volume: Some((
             offset: (1.246052, 5.82578, 0.0),
-            half_extents: (8.800932, 5.9190426, 0.5),
+            half_extents: (8.800932, 5.9190426, 1.5),
             forward: (0.0, 0.0, -1.0),
         )),
         is_gate: true,
@@ -26,7 +26,7 @@
         glb_node_name: "gate_air",
         trigger_volume: Some((
             offset: (-0.79640806, 14.091407, 0.0),
-            half_extents: (4.1758404, 4.7085934, 0.5),
+            half_extents: (4.1758404, 4.7085934, 1.5),
             forward: (0.0, 0.0, -1.0),
         )),
         is_gate: true,

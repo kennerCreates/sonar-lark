@@ -52,7 +52,7 @@ src/
 │   ├── paths.rs         RacePath, spline generation (race/drone/return), compute_start_positions, adaptive_approach_offset
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, DRONE_COLORS/DRONE_NAMES
 ├── race/                Race mechanics
-│   ├── gate.rs          GateIndex, trigger volume overlap detection
+│   ├── gate.rs          GateIndex, GateForward, GatePlanes, plane-crossing gate detection
 │   ├── progress.rs      RaceProgress, per-drone state tracking
 │   ├── timing.rs        RaceClock
 │   └── lifecycle.rs     Countdown, finish detection
@@ -113,6 +113,7 @@ CourseData ──► spawn obstacles + firework emitters + drones
 | `TriggerVolume` | Component | obstacle/spawning | AABB hitbox on gate entities |
 | `GateIndex` | Component | race/gate | Gate sequence order |
 | `GateForward` | Component | race/gate | World-space forward direction for gate validation |
+| `GatePlanes` | Resource | race/gate | Cached per-gate plane data (center, normal, axes, half-extents) built once at race start for plane-crossing detection |
 | `RaceProgress` | Resource | race/progress | Per-drone gate/finish/crash tracking |
 | `DroneRaceState` | Data | race/progress | Per-drone state: next_gate, gates_passed, finished, finish_time, crashed, dnf_reason |
 | `RacePhase` | Resource | race/lifecycle | WaitingToStart → Countdown → Racing → Finished |
@@ -174,7 +175,7 @@ assets/
 ## Performance Design
 
 - All drone physics in `FixedUpdate` (64Hz default), `.chain()`-ed for correctness
-- Gate trigger checks: O(drones × gates) = O(12 × ~20) = O(240) AABB tests per frame
+- Gate trigger checks: O(drones) = O(12) plane-crossing tests per frame (each drone only checks its next expected gate)
 - AI spline sampling: O(12) per fixed tick (polynomial eval per drone, 5 curvature samples for speed limiting)
 - Dirty air perturbation: O(12²) = O(144) distance/dot-product checks per fixed tick (negligible)
 - Proximity avoidance: O(12²) = O(144) distance checks per fixed tick (negligible)
@@ -225,7 +226,7 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `drone::spawning` | 2 | Config randomization bounds (100-iteration stress test), PID variation application |
 | `drone::ai` | 13 | safe_speed_for_curvature (zero/tiny/high/moderate curvature, lateral accel scaling), return_speed_fraction (start/end/midpoint, monotonicity, clamping), cyclic_curvature (circle constancy, straight-line low) |
 | `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, is_active, standings sorting (finished by time, finished before crashed, crashed by gates passed) |
-| `race::gate` | 8 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside) |
+| `race::gate` | 16 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside). Plane-crossing: front-to-back pass, back-to-front rejection, horizontal/vertical out-of-bounds, same-side no-crossing, edge graze with margin, rotated gate, flipped gate |
 | `rendering::cel_material` | 3 | Hue-shift algorithm: highlight warmth, shadow coolness, color clamping |
 
 Functions used by tests:
