@@ -58,4 +58,60 @@
             gate_forward_flipped: true,
         ),
     ],
+    props: [
+        (
+            kind: ShellBurstEmitter,
+            translation: (17.353914, 0.0, 23.111057),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+        (
+            kind: ShellBurstEmitter,
+            translation: (21.821651, 0.0, 19.381481),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+        (
+            kind: ShellBurstEmitter,
+            translation: (39.818848, 1.6082274, 29.138683),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+        (
+            kind: ShellBurstEmitter,
+            translation: (36.048523, 0.0, 32.84929),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+        (
+            kind: ConfettiEmitter,
+            translation: (21.845602, 0.0, 23.126598),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+        (
+            kind: ConfettiEmitter,
+            translation: (24.232323, 0.0, 24.786804),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+        (
+            kind: ConfettiEmitter,
+            translation: (27.039278, 0.0, 25.931974),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+        (
+            kind: ConfettiEmitter,
+            translation: (29.697023, 0.0, 27.620195),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+        (
+            kind: ConfettiEmitter,
+            translation: (33.11011, 0.0, 28.844494),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+            color_override: None,
+        ),
+    ],
 )

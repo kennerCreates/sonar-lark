@@ -3,9 +3,11 @@ use std::path::Path;
 
 use bevy::prelude::*;
 
+use crate::drone::fireworks::FireworkEmitter;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{spawn_obstacle, ObstacleMarker, ObstaclesGltfHandle};
 use crate::rendering::{CelLightDir, CelMaterial};
+use crate::states::AppState;
 use super::data::CourseData;
 
 #[derive(Resource)]
@@ -99,6 +101,21 @@ pub fn spawn_course(
         }
     }
 
+    // Spawn firework emitter markers from course props
+    for prop in &course.props {
+        let color_override = prop.color_override.map(|rgba| Color::srgb(rgba[0], rgba[1], rgba[2]));
+        let transform =
+            Transform::from_translation(prop.translation).with_rotation(prop.rotation);
+        commands.spawn((
+            transform,
+            FireworkEmitter {
+                kind: prop.kind,
+                color_override,
+            },
+            DespawnOnExit(AppState::Race),
+        ));
+    }
+
     commands.insert_resource(CourseSpawned);
 }
 
@@ -183,6 +200,7 @@ mod tests {
                     gate_forward_flipped: false,
                 },
             ],
+            props: vec![],
         }
     }
 
@@ -210,6 +228,7 @@ mod tests {
         let course = CourseData {
             name: "Empty".to_string(),
             instances: vec![],
+            props: vec![],
         };
         let tmp = NamedTempFile::new().unwrap();
 
@@ -254,6 +273,7 @@ mod tests {
         let course = CourseData {
             name: "Nested".to_string(),
             instances: vec![],
+            props: vec![],
         };
         save_course(&course, &path).unwrap();
         assert!(path.exists());
@@ -272,6 +292,7 @@ mod tests {
                 gate_order: Some(7),
                 gate_forward_flipped: false,
             }],
+            props: vec![],
         };
         let tmp = NamedTempFile::new().unwrap();
 

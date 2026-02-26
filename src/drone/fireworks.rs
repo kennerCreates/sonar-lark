@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use rand::Rng;
 
+use crate::course::data::PropKind;
 use crate::drone::spawning::DRONE_COLORS;
 use crate::palette;
 use crate::race::gate::{GateForward, GateIndex};
@@ -77,6 +78,13 @@ pub struct PendingShell {
 #[derive(Resource)]
 pub struct FireworksTriggered;
 
+/// Marker for a firework emitter placed in the course. Spawned at race time from course props.
+#[derive(Component)]
+pub struct FireworkEmitter {
+    pub kind: PropKind,
+    pub color_override: Option<Color>,
+}
+
 pub fn load_firework_assets(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -100,6 +108,7 @@ pub fn detect_first_finish(
     firework_meshes: Option<Res<FireworkMeshes>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     gates: Query<(&GlobalTransform, &GateIndex, Option<&GateForward>)>,
+    emitters: Query<(&Transform, &FireworkEmitter)>,
 ) {
     if triggered.is_some() {
         return;
@@ -120,53 +129,99 @@ pub fn detect_first_finish(
         return;
     };
 
-    // Find gate 0 (finish line) position and forward
-    let finish_gate = gates.iter().find(|(_, idx, _)| idx.0 == 0);
-    let (gate_pos, gate_forward) = match finish_gate {
-        Some((gt, _, fwd)) => {
-            let forward = fwd.map(|f| f.0).unwrap_or(Vec3::NEG_Z).normalize_or(Vec3::NEG_Z);
-            (gt.translation(), forward)
-        }
-        None => return,
-    };
-
     let drone_color = DRONE_COLORS[winner_idx % DRONE_COLORS.len()];
     let accent_color = palette::SUNSHINE;
 
-    // Gate-perpendicular axis (horizontal, perpendicular to gate forward)
-    let lateral = gate_forward.cross(Vec3::Y).normalize_or(Vec3::X);
+    let has_emitters = !emitters.is_empty();
 
-    // --- Spawn gate-level confetti burst ---
-    spawn_confetti(
-        &mut commands,
-        &firework_meshes,
-        &mut materials,
-        gate_pos,
-        gate_forward,
-        lateral,
-        drone_color,
-        accent_color,
-    );
+    if has_emitters {
+        // Use placed emitters from the course
+        for (transform, emitter) in &emitters {
+            let color = emitter.color_override.unwrap_or(drone_color);
+            let pos = transform.translation;
+            let forward = (transform.rotation * Vec3::NEG_Z).normalize_or(Vec3::NEG_Z);
+            let lateral = forward.cross(Vec3::Y).normalize_or(Vec3::X);
 
-    // --- Spawn pending shell detonations above the gate ---
-    for i in 0..3 {
-        let shell_pos =
-            gate_pos + Vec3::Y * SHELL_HEIGHTS[i] + lateral * SHELL_LATERAL_OFFSETS[i];
-        commands.spawn((
-            PendingShell {
-                position: shell_pos,
-                delay: SHELL_DELAYS[i],
-                color: drone_color,
-                accent_color,
-            },
-            DespawnOnExit(AppState::Results),
-        ));
+            match emitter.kind {
+                PropKind::ConfettiEmitter => {
+                    spawn_confetti(
+                        &mut commands,
+                        &firework_meshes,
+                        &mut materials,
+                        pos,
+                        forward,
+                        lateral,
+                        color,
+                        accent_color,
+                    );
+                }
+                PropKind::ShellBurstEmitter => {
+                    for i in 0..3 {
+                        let shell_pos =
+                            pos + Vec3::Y * SHELL_HEIGHTS[i] + lateral * SHELL_LATERAL_OFFSETS[i];
+                        commands.spawn((
+                            PendingShell {
+                                position: shell_pos,
+                                delay: SHELL_DELAYS[i],
+                                color,
+                                accent_color,
+                            },
+                            DespawnOnExit(AppState::Results),
+                        ));
+                    }
+                }
+            }
+        }
+
+        info!(
+            "Fireworks triggered for drone {} using {} placed emitter(s)!",
+            winner_idx,
+            emitters.iter().count()
+        );
+    } else {
+        // Fallback: auto-fireworks at gate 0
+        let finish_gate = gates.iter().find(|(_, idx, _)| idx.0 == 0);
+        let (gate_pos, gate_forward) = match finish_gate {
+            Some((gt, _, fwd)) => {
+                let forward =
+                    fwd.map(|f| f.0).unwrap_or(Vec3::NEG_Z).normalize_or(Vec3::NEG_Z);
+                (gt.translation(), forward)
+            }
+            None => return,
+        };
+
+        let lateral = gate_forward.cross(Vec3::Y).normalize_or(Vec3::X);
+
+        spawn_confetti(
+            &mut commands,
+            &firework_meshes,
+            &mut materials,
+            gate_pos,
+            gate_forward,
+            lateral,
+            drone_color,
+            accent_color,
+        );
+
+        for i in 0..3 {
+            let shell_pos =
+                gate_pos + Vec3::Y * SHELL_HEIGHTS[i] + lateral * SHELL_LATERAL_OFFSETS[i];
+            commands.spawn((
+                PendingShell {
+                    position: shell_pos,
+                    delay: SHELL_DELAYS[i],
+                    color: drone_color,
+                    accent_color,
+                },
+                DespawnOnExit(AppState::Results),
+            ));
+        }
+
+        info!(
+            "Fireworks triggered for drone {} at finish gate!",
+            winner_idx
+        );
     }
-
-    info!(
-        "Fireworks triggered for drone {} at finish gate!",
-        winner_idx
-    );
 }
 
 fn spawn_confetti(

@@ -15,8 +15,25 @@ pub struct ObstacleInstance {
     pub gate_forward_flipped: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PropKind {
+    ConfettiEmitter,
+    ShellBurstEmitter,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PropInstance {
+    pub kind: PropKind,
+    pub translation: Vec3,
+    pub rotation: Quat,
+    /// RGBA override color. None = use winner's drone color at race time.
+    pub color_override: Option<[f32; 4]>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Resource)]
 pub struct CourseData {
     pub name: String,
     pub instances: Vec<ObstacleInstance>,
+    #[serde(default)]
+    pub props: Vec<PropInstance>,
 }

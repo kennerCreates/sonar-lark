@@ -8,13 +8,14 @@ use bevy::{
     prelude::*,
 };
 
-use crate::course::data::{CourseData, ObstacleInstance};
+use crate::course::data::{CourseData, ObstacleInstance, PropKind};
 use crate::drone::ai::{cyclic_curvature, safe_speed_for_curvature};
 use crate::drone::components::{AiTuningParams, POINTS_PER_GATE};
 use crate::drone::paths::generate_race_path;
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, TriggerVolume};
+use crate::palette;
 use crate::states::EditorMode;
 
 use super::gizmos::{
@@ -64,6 +65,8 @@ pub struct PlacementState {
     pub course_name: String,
     /// Whether the course name text field has keyboard focus.
     pub editing_name: bool,
+    /// Active tab in the left panel palette.
+    pub active_tab: EditorTab,
 }
 
 impl Default for PlacementState {
@@ -76,6 +79,7 @@ impl Default for PlacementState {
             next_gate_order: 0,
             course_name: "new_course".to_string(),
             editing_name: false,
+            active_tab: EditorTab::default(),
         }
     }
 }
@@ -115,6 +119,23 @@ pub struct PlacedObstacle {
     pub gate_forward_flipped: bool,
 }
 
+/// Marker on every prop entity spawned in the course editor.
+#[derive(Component, Clone)]
+pub struct PlacedProp {
+    pub kind: PropKind,
+    pub color_override: Option<[f32; 4]>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub enum EditorTab {
+    #[default]
+    Obstacles,
+    Props,
+}
+
+/// Query filter matching any editor-placed entity (obstacle or prop).
+type PlacedFilter = Or<(With<PlacedObstacle>, With<PlacedProp>)>;
+
 // --- Gizmo group ---
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
@@ -143,12 +164,18 @@ impl Plugin for CourseEditorPlugin {
         app.init_gizmo_group::<CourseGizmoGroup>()
             .add_systems(
                 OnEnter(EditorMode::CourseEditor),
-                (ensure_gltf_loaded, setup_course_editor),
+                (
+                    ensure_gltf_loaded,
+                    setup_course_editor,
+                    ui::setup_prop_editor_meshes,
+                ),
             )
             .add_systems(
                 Update,
                 (
                     ui::handle_palette_selection,
+                    ui::handle_prop_palette_selection,
+                    ui::handle_tab_switch,
                     ui::handle_back_to_workshop,
                     ui::handle_back_to_menu,
                     ui::handle_save_button,
@@ -158,8 +185,16 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_name_field_focus,
                     ui::handle_name_text_input,
                     ui::update_display_values,
+                )
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
+                (
                     ui::handle_button_hover,
                     ui::handle_transform_mode_buttons,
+                    ui::handle_prop_color_cycle,
+                    ui::update_prop_color_label,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -196,6 +231,7 @@ impl Plugin for CourseEditorPlugin {
                     draw_gate_forward_arrows,
                     draw_selection_highlight,
                     draw_flight_spline_preview,
+                    draw_prop_gizmos,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -246,7 +282,7 @@ fn setup_course_editor(
 
 fn cleanup_course_editor(
     mut commands: Commands,
-    placed_query: Query<Entity, With<PlacedObstacle>>,
+    placed_query: Query<Entity, PlacedFilter>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
     commands.remove_resource::<PlacementState>();
@@ -255,6 +291,7 @@ fn cleanup_course_editor(
     commands.remove_resource::<ScaleWidgetState>();
     commands.remove_resource::<PendingEditorCourse>();
     commands.remove_resource::<ui::PendingCourseDelete>();
+    commands.remove_resource::<ui::PropEditorMeshes>();
     for entity in &placed_query {
         commands.entity(entity).despawn();
     }
@@ -273,7 +310,8 @@ fn handle_placement_and_selection(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
-    mut placed_query: Query<(Entity, &mut PlacedObstacle)>,
+    mut obstacle_query: Query<(Entity, &mut PlacedObstacle)>,
+    prop_query: Query<Entity, With<PlacedProp>>,
     parent_query: Query<&ChildOf>,
     interaction_query: Query<&Interaction>,
     mut ray_cast: MeshRayCast,
@@ -311,13 +349,14 @@ fn handle_placement_and_selection(
     let nearest = find_placed_ancestor_from_ray(
         &mut ray_cast,
         ray,
-        &placed_query,
+        &obstacle_query,
+        &prop_query,
         &parent_query,
     );
 
     if state.gate_order_mode {
         if let Some(entity) = nearest {
-            if let Ok((_, mut placed)) = placed_query.get_mut(entity) {
+            if let Ok((_, mut placed)) = obstacle_query.get_mut(entity) {
                 let order = state.next_gate_order;
                 placed.gate_order = Some(order);
                 state.next_gate_order += 1;
@@ -388,7 +427,7 @@ fn draw_move_gizmo(
     mut gizmos: Gizmos,
     state: Res<PlacementState>,
     widget: Res<MoveWidgetState>,
-    placed_query: Query<&Transform, With<PlacedObstacle>>,
+    placed_query: Query<&Transform, PlacedFilter>,
 ) {
     if state.transform_mode != TransformMode::Move {
         return;
@@ -416,7 +455,7 @@ fn handle_move_gizmo(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     state: Res<PlacementState>,
     mut widget: ResMut<MoveWidgetState>,
-    mut placed_query: Query<&mut Transform, With<PlacedObstacle>>,
+    mut placed_query: Query<&mut Transform, PlacedFilter>,
     interaction_query: Query<&Interaction>,
 ) {
     if state.transform_mode != TransformMode::Move {
@@ -485,7 +524,7 @@ fn draw_rotate_gizmo(
     mut gizmos: Gizmos,
     state: Res<PlacementState>,
     widget: Res<RotateWidgetState>,
-    placed_query: Query<&Transform, With<PlacedObstacle>>,
+    placed_query: Query<&Transform, PlacedFilter>,
 ) {
     if state.transform_mode != TransformMode::Rotate {
         return;
@@ -520,7 +559,7 @@ fn handle_rotate_gizmo(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     state: Res<PlacementState>,
     mut widget: ResMut<RotateWidgetState>,
-    mut placed_query: Query<&mut Transform, With<PlacedObstacle>>,
+    mut placed_query: Query<&mut Transform, PlacedFilter>,
     interaction_query: Query<&Interaction>,
 ) {
     if state.transform_mode != TransformMode::Rotate {
@@ -601,7 +640,7 @@ fn draw_scale_gizmo(
     mut gizmos: Gizmos,
     state: Res<PlacementState>,
     widget: Res<ScaleWidgetState>,
-    placed_query: Query<&Transform, With<PlacedObstacle>>,
+    placed_query: Query<&Transform, PlacedFilter>,
 ) {
     if state.transform_mode != TransformMode::Scale {
         return;
@@ -632,7 +671,7 @@ fn handle_scale_gizmo(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     state: Res<PlacementState>,
     mut widget: ResMut<ScaleWidgetState>,
-    mut placed_query: Query<&mut Transform, With<PlacedObstacle>>,
+    mut placed_query: Query<&mut Transform, PlacedFilter>,
     interaction_query: Query<&Interaction>,
 ) {
     if state.transform_mode != TransformMode::Scale {
@@ -822,7 +861,7 @@ fn handle_flip_gate_key(
 fn draw_selection_highlight(
     mut gizmos: Gizmos<CourseGizmoGroup>,
     state: Res<PlacementState>,
-    placed_query: Query<&Transform, With<PlacedObstacle>>,
+    placed_query: Query<&Transform, PlacedFilter>,
 ) {
     let Some(entity) = state.selected_entity else {
         return;
@@ -907,6 +946,7 @@ fn draw_flight_spline_preview(
         let course = CourseData {
             name: String::new(),
             instances,
+            props: vec![],
         };
 
         let Some(race_path) = generate_race_path(&course, &library) else {
@@ -948,23 +988,60 @@ fn draw_flight_spline_preview(
     }
 }
 
+// --- Prop Gizmos ---
+
+fn draw_prop_gizmos(
+    mut gizmos: Gizmos<CourseGizmoGroup>,
+    prop_query: Query<(&PlacedProp, &Transform)>,
+) {
+    for (prop, transform) in &prop_query {
+        let pos = transform.translation;
+        let forward = transform.rotation * Vec3::NEG_Z;
+        let up = transform.rotation * Vec3::Y;
+
+        match prop.kind {
+            PropKind::ConfettiEmitter => {
+                let iso = Isometry3d::new(pos, Quat::IDENTITY);
+                gizmos.sphere(iso, 0.6, palette::SUNSHINE);
+                // Upward arrows showing burst direction
+                for offset in [-0.3f32, 0.0, 0.3] {
+                    let base = pos + forward * offset;
+                    gizmos.arrow(base, base + Vec3::Y * 1.5, palette::SUNSHINE);
+                }
+            }
+            PropKind::ShellBurstEmitter => {
+                let iso = Isometry3d::new(pos, Quat::IDENTITY);
+                gizmos.sphere(iso, 0.6, palette::TANGERINE);
+                // Starburst lines above showing detonation area
+                let burst_center = pos + up * 3.0;
+                for angle_deg in (0..360).step_by(45) {
+                    let angle = (angle_deg as f32).to_radians();
+                    let dir = Vec3::new(angle.cos(), 0.5, angle.sin()).normalize();
+                    gizmos.line(burst_center, burst_center + dir * 1.5, palette::TANGERINE);
+                }
+                gizmos.line(pos, burst_center, palette::DANDELION);
+            }
+        }
+    }
+}
+
 // --- Helpers ---
 
-/// Cast a ray into the scene and return the `PlacedObstacle` ancestor of the
+/// Cast a ray into the scene and return the placed entity ancestor of the
 /// nearest hit mesh, if any. Walks up the entity hierarchy from the hit child
-/// to find the parent that carries the `PlacedObstacle` component.
+/// to find the parent that carries `PlacedObstacle` or `PlacedProp`.
 fn find_placed_ancestor_from_ray(
     ray_cast: &mut MeshRayCast,
     ray: Ray3d,
-    placed_query: &Query<(Entity, &mut PlacedObstacle)>,
+    obstacle_query: &Query<(Entity, &mut PlacedObstacle)>,
+    prop_query: &Query<Entity, With<PlacedProp>>,
     parent_query: &Query<&ChildOf>,
 ) -> Option<Entity> {
     let hits = ray_cast.cast_ray(ray, &MeshRayCastSettings::default());
     for (hit_entity, _) in hits {
-        // Walk up the hierarchy from the hit mesh child to find the PlacedObstacle parent
         let mut current = *hit_entity;
         loop {
-            if placed_query.get(current).is_ok() {
+            if obstacle_query.get(current).is_ok() || prop_query.get(current).is_ok() {
                 return Some(current);
             }
             if let Ok(child_of) = parent_query.get(current) {

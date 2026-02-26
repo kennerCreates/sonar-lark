@@ -3,16 +3,19 @@ use bevy::prelude::*;
 use std::fs;
 use std::path::Path;
 
-use crate::course::data::{CourseData, ObstacleInstance};
+use crate::course::data::{CourseData, ObstacleInstance, PropInstance, PropKind};
 use crate::course::loader::{delete_course, load_course_from_file, save_course};
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
-use crate::rendering::{CelLightDir, CelMaterial};
+use crate::rendering::{cel_material_from_color, CelLightDir, CelMaterial};
 use crate::states::{AppState, EditorMode};
 
-use super::{LastEditedCourse, PendingEditorCourse, PlacedObstacle, PlacementState, TransformMode};
+use super::{
+    EditorTab, LastEditedCourse, PendingEditorCourse, PlacedObstacle, PlacedProp, PlacementState,
+    TransformMode,
+};
 
 const PANEL_BG: Color = palette::SMOKY_BLACK;
 const BUTTON_NORMAL: Color = palette::INDIGO;
@@ -80,6 +83,45 @@ pub struct PendingCourseDelete {
 
 #[derive(Component)]
 pub struct TransformModeButton(pub TransformMode);
+
+#[derive(Component)]
+pub struct ObstacleTabButton;
+
+#[derive(Component)]
+pub struct PropsTabButton;
+
+#[derive(Component)]
+pub struct ObstaclePaletteContent;
+
+#[derive(Component)]
+pub struct PropPaletteContent;
+
+#[derive(Component)]
+pub struct PropPaletteButton(pub PropKind);
+
+#[derive(Component)]
+pub struct PropColorButton;
+
+#[derive(Component)]
+pub struct PropColorLabel;
+
+#[derive(Resource)]
+pub struct PropEditorMeshes {
+    pub confetti_mesh: Handle<Mesh>,
+    pub shell_mesh: Handle<Mesh>,
+    pub confetti_material: Handle<CelMaterial>,
+    pub shell_material: Handle<CelMaterial>,
+}
+
+const COLOR_CYCLE: &[(&str, Option<[f32; 4]>)] = &[
+    ("Auto", None),
+    ("Gold", Some([1.0, 0.725, 0.220, 1.0])),
+    ("Red", Some([0.961, 0.192, 0.255, 1.0])),
+    ("Blue", Some([0.090, 0.576, 0.902, 1.0])),
+    ("Green", Some([0.090, 0.612, 0.263, 1.0])),
+    ("Purple", Some([0.792, 0.494, 0.949, 1.0])),
+    ("White", Some([0.949, 0.949, 0.855, 1.0])),
+];
 
 pub struct CourseEntry {
     pub display_name: String,
@@ -152,45 +194,118 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 TextColor(palette::VANILLA),
             ));
 
-            panel.spawn((
-                Text::new("Obstacle Palette"),
-                TextFont {
-                    font_size: 16.0,
-                    ..default()
-                },
-                TextColor(palette::SIDEWALK),
-                Node {
+            // --- Tab row ---
+            panel
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(4.0),
+                    width: Val::Percent(100.0),
                     margin: UiRect::top(Val::Px(8.0)),
                     ..default()
-                },
-            ));
+                })
+                .with_children(|row| {
+                    spawn_tab_button(row, "Obstacles", ObstacleTabButton, true);
+                    spawn_tab_button(row, "Props", PropsTabButton, false);
+                });
 
+            // --- Obstacle palette content (visible by default) ---
             panel
                 .spawn((
-                    PaletteContainer,
+                    ObstaclePaletteContent,
                     Node {
                         flex_direction: FlexDirection::Column,
                         row_gap: Val::Px(4.0),
                         ..default()
                     },
                 ))
-                .with_children(|container| {
-                    if library.definitions.is_empty() {
-                        container.spawn((
-                            Text::new("No obstacles in library.\nGo to Obstacle Workshop first."),
-                            TextFont {
-                                font_size: 13.0,
+                .with_children(|content| {
+                    content
+                        .spawn((
+                            PaletteContainer,
+                            Node {
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Px(4.0),
                                 ..default()
                             },
-                            TextColor(palette::CHAINMAIL),
-                        ));
-                    } else {
-                        let mut ids: Vec<_> = library.definitions.keys().collect();
-                        ids.sort_by(|a, b| a.0.cmp(&b.0));
-                        for id in ids {
-                            spawn_palette_button(container, id);
-                        }
-                    }
+                        ))
+                        .with_children(|container| {
+                            if library.definitions.is_empty() {
+                                container.spawn((
+                                    Text::new(
+                                        "No obstacles in library.\nGo to Obstacle Workshop first.",
+                                    ),
+                                    TextFont {
+                                        font_size: 13.0,
+                                        ..default()
+                                    },
+                                    TextColor(palette::CHAINMAIL),
+                                ));
+                            } else {
+                                let mut ids: Vec<_> = library.definitions.keys().collect();
+                                ids.sort_by(|a, b| a.0.cmp(&b.0));
+                                for id in ids {
+                                    spawn_palette_button(container, id);
+                                }
+                            }
+                        });
+                });
+
+            // --- Props palette content (hidden by default) ---
+            panel
+                .spawn((
+                    PropPaletteContent,
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(4.0),
+                        display: Display::None,
+                        ..default()
+                    },
+                ))
+                .with_children(|content| {
+                    spawn_prop_palette_button(content, "Confetti Emitter", PropKind::ConfettiEmitter);
+                    spawn_prop_palette_button(
+                        content,
+                        "Shell Burst Emitter",
+                        PropKind::ShellBurstEmitter,
+                    );
+
+                    spawn_divider(content);
+
+                    content.spawn((
+                        Text::new("Color: Auto"),
+                        TextFont {
+                            font_size: 13.0,
+                            ..default()
+                        },
+                        TextColor(palette::SUNSHINE),
+                        PropColorLabel,
+                    ));
+
+                    content
+                        .spawn((
+                            Button,
+                            PropColorButton,
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(28.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                border: UiRect::all(Val::Px(1.0)),
+                                ..default()
+                            },
+                            BackgroundColor(BUTTON_NORMAL),
+                            BorderColor::all(palette::STEEL),
+                        ))
+                        .with_children(|btn| {
+                            btn.spawn((
+                                Text::new("Cycle Color"),
+                                TextFont {
+                                    font_size: 12.0,
+                                    ..default()
+                                },
+                                TextColor(palette::SAND),
+                            ));
+                        });
                 });
 
             panel.spawn(Node {
@@ -201,6 +316,75 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
             spawn_divider(panel);
             spawn_small_button(panel, "Obstacle Workshop", BackToWorkshopButton);
             spawn_small_button(panel, "Back to Menu", BackToMenuButton);
+        });
+}
+
+fn spawn_tab_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    marker: impl Component,
+    active: bool,
+) {
+    parent
+        .spawn((
+            Button,
+            marker,
+            Node {
+                flex_grow: 1.0,
+                height: Val::Px(30.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(if active { BUTTON_SELECTED } else { BUTTON_NORMAL }),
+            BorderColor::all(palette::STEEL),
+        ))
+        .with_children(|btn| {
+            btn.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(palette::VANILLA),
+            ));
+        });
+}
+
+fn spawn_prop_palette_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    kind: PropKind,
+) {
+    let accent = match kind {
+        PropKind::ConfettiEmitter => palette::SUNSHINE,
+        PropKind::ShellBurstEmitter => palette::TANGERINE,
+    };
+    parent
+        .spawn((
+            Button,
+            PropPaletteButton(kind),
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(28.0),
+                padding: UiRect::horizontal(Val::Px(8.0)),
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(BUTTON_NORMAL),
+            BorderColor::all(palette::SAPPHIRE),
+        ))
+        .with_children(|btn| {
+            btn.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(accent),
+            ));
         });
 }
 
@@ -813,6 +997,7 @@ pub fn handle_save_button(
     query: Query<&Interaction, (Changed<Interaction>, With<SaveCourseButton>)>,
     state: Res<PlacementState>,
     placed_query: Query<(&PlacedObstacle, &Transform)>,
+    prop_query: Query<(&PlacedProp, &Transform), Without<PlacedObstacle>>,
     existing_courses_container: Query<Entity, With<ExistingCoursesContainer>>,
 ) {
     for interaction in &query {
@@ -837,9 +1022,20 @@ pub fn handle_save_button(
             })
             .collect();
 
+        let props: Vec<PropInstance> = prop_query
+            .iter()
+            .map(|(prop, transform)| PropInstance {
+                kind: prop.kind,
+                translation: transform.translation,
+                rotation: transform.rotation,
+                color_override: prop.color_override,
+            })
+            .collect();
+
         let course = CourseData {
             name: state.course_name.clone(),
             instances,
+            props,
         };
 
         let path_str = format!("assets/courses/{}.course.ron", state.course_name);
@@ -909,7 +1105,7 @@ pub fn handle_confirm_delete(
     query: Query<&Interaction, (Changed<Interaction>, With<ConfirmDeleteYesButton>)>,
     pending: Option<Res<PendingCourseDelete>>,
     mut state: ResMut<PlacementState>,
-    placed_query: Query<Entity, With<PlacedObstacle>>,
+    placed_query: Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
     existing_courses_container: Query<Entity, With<ExistingCoursesContainer>>,
     last_edited: Option<Res<LastEditedCourse>>,
 ) {
@@ -981,12 +1177,12 @@ pub fn handle_cancel_delete(
     }
 }
 
-/// Shared logic: despawn existing obstacles, load course data, spawn obstacles.
+/// Shared logic: despawn existing obstacles/props, load course data, spawn obstacles + props.
 #[allow(clippy::too_many_arguments)]
 fn load_course_into_editor(
     commands: &mut Commands,
     state: &mut PlacementState,
-    placed_query: &Query<Entity, With<PlacedObstacle>>,
+    placed_query: &Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
     library: &ObstacleLibrary,
     gltf_handle: &ObstaclesGltfHandle,
     gltf_assets: &Assets<bevy::gltf::Gltf>,
@@ -996,6 +1192,7 @@ fn load_course_into_editor(
     std_materials: &Assets<StandardMaterial>,
     light_dir: Vec3,
     course: &CourseData,
+    prop_meshes: Option<&PropEditorMeshes>,
 ) {
     for entity in placed_query {
         commands.entity(entity).despawn();
@@ -1059,10 +1256,37 @@ fn load_course_into_editor(
         }
     }
 
+    // Spawn props from course data
+    if let Some(meshes) = prop_meshes {
+        for prop in &course.props {
+            let (mesh, material) = match prop.kind {
+                PropKind::ConfettiEmitter => {
+                    (meshes.confetti_mesh.clone(), meshes.confetti_material.clone())
+                }
+                PropKind::ShellBurstEmitter => {
+                    (meshes.shell_mesh.clone(), meshes.shell_material.clone())
+                }
+            };
+            let transform =
+                Transform::from_translation(prop.translation).with_rotation(prop.rotation);
+            commands.spawn((
+                transform,
+                Visibility::default(),
+                Mesh3d(mesh),
+                MeshMaterial3d(material),
+                PlacedProp {
+                    kind: prop.kind,
+                    color_override: prop.color_override,
+                },
+            ));
+        }
+    }
+
     info!(
-        "Loaded course '{}' for editing ({} obstacles)",
+        "Loaded course '{}' for editing ({} obstacles, {} props)",
         course.name,
-        course.instances.len()
+        course.instances.len(),
+        course.props.len(),
     );
 }
 
@@ -1070,7 +1294,7 @@ pub fn handle_load_button(
     mut commands: Commands,
     query: Query<(&Interaction, &ExistingCourseButton), Changed<Interaction>>,
     mut state: ResMut<PlacementState>,
-    placed_query: Query<Entity, With<PlacedObstacle>>,
+    placed_query: Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
     library: Res<ObstacleLibrary>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
@@ -1079,6 +1303,7 @@ pub fn handle_load_button(
     mut cel_materials: ResMut<Assets<CelMaterial>>,
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
+    prop_meshes: Option<Res<PropEditorMeshes>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -1112,6 +1337,7 @@ pub fn handle_load_button(
             &std_materials,
             light_dir.0,
             &course,
+            prop_meshes.as_deref(),
         );
 
         commands.insert_resource(LastEditedCourse {
@@ -1125,7 +1351,7 @@ pub fn auto_load_pending_course(
     mut commands: Commands,
     pending: Option<Res<PendingEditorCourse>>,
     mut state: ResMut<PlacementState>,
-    placed_query: Query<Entity, With<PlacedObstacle>>,
+    placed_query: Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
     library: Res<ObstacleLibrary>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
@@ -1134,6 +1360,7 @@ pub fn auto_load_pending_course(
     mut cel_materials: ResMut<Assets<CelMaterial>>,
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
+    prop_meshes: Option<Res<PropEditorMeshes>>,
 ) {
     let Some(pending) = pending else { return };
     let Some(handle) = &gltf_handle else { return };
@@ -1165,6 +1392,7 @@ pub fn auto_load_pending_course(
         &std_materials,
         light_dir.0,
         &course,
+        prop_meshes.as_deref(),
     );
 
     commands.insert_resource(LastEditedCourse {
@@ -1395,5 +1623,203 @@ pub fn update_gate_count_display(
         } else {
             TextColor(palette::BRONZE)
         };
+    }
+}
+
+// --- Tab switching ---
+
+pub fn handle_tab_switch(
+    mut state: ResMut<PlacementState>,
+    obstacle_tab: Query<&Interaction, (Changed<Interaction>, With<ObstacleTabButton>)>,
+    props_tab: Query<&Interaction, (Changed<Interaction>, With<PropsTabButton>)>,
+    mut obstacle_content: Query<
+        &mut Node,
+        (With<ObstaclePaletteContent>, Without<PropPaletteContent>),
+    >,
+    mut prop_content: Query<
+        &mut Node,
+        (With<PropPaletteContent>, Without<ObstaclePaletteContent>),
+    >,
+    mut obstacle_tab_bg: Query<
+        &mut BackgroundColor,
+        (With<ObstacleTabButton>, Without<PropsTabButton>),
+    >,
+    mut props_tab_bg: Query<
+        &mut BackgroundColor,
+        (With<PropsTabButton>, Without<ObstacleTabButton>),
+    >,
+) {
+    let mut new_tab = None;
+
+    for interaction in &obstacle_tab {
+        if *interaction == Interaction::Pressed {
+            new_tab = Some(EditorTab::Obstacles);
+        }
+    }
+    for interaction in &props_tab {
+        if *interaction == Interaction::Pressed {
+            new_tab = Some(EditorTab::Props);
+        }
+    }
+
+    let Some(tab) = new_tab else { return };
+    if tab == state.active_tab {
+        return;
+    }
+    state.active_tab = tab;
+
+    let (obs_display, prop_display) = match tab {
+        EditorTab::Obstacles => (Display::Flex, Display::None),
+        EditorTab::Props => (Display::None, Display::Flex),
+    };
+
+    if let Ok(mut node) = obstacle_content.single_mut() {
+        node.display = obs_display;
+    }
+    if let Ok(mut node) = prop_content.single_mut() {
+        node.display = prop_display;
+    }
+
+    let (obs_bg, prop_bg) = match tab {
+        EditorTab::Obstacles => (BUTTON_SELECTED, BUTTON_NORMAL),
+        EditorTab::Props => (BUTTON_NORMAL, BUTTON_SELECTED),
+    };
+    if let Ok(mut bg) = obstacle_tab_bg.single_mut() {
+        *bg = BackgroundColor(obs_bg);
+    }
+    if let Ok(mut bg) = props_tab_bg.single_mut() {
+        *bg = BackgroundColor(prop_bg);
+    }
+}
+
+// --- Prop palette ---
+
+pub fn handle_prop_palette_selection(
+    mut commands: Commands,
+    mut state: ResMut<PlacementState>,
+    query: Query<(&Interaction, &PropPaletteButton), Changed<Interaction>>,
+    prop_meshes: Option<Res<PropEditorMeshes>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    light_dir: Res<CelLightDir>,
+) {
+    for (interaction, btn) in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        // Get or create prop meshes
+        let (mesh, material) = if let Some(ref pm) = prop_meshes {
+            match btn.0 {
+                PropKind::ConfettiEmitter => (pm.confetti_mesh.clone(), pm.confetti_material.clone()),
+                PropKind::ShellBurstEmitter => (pm.shell_mesh.clone(), pm.shell_material.clone()),
+            }
+        } else {
+            let cube = meshes.add(Cuboid::new(0.4, 0.4, 0.4));
+            let color = match btn.0 {
+                PropKind::ConfettiEmitter => palette::SUNSHINE,
+                PropKind::ShellBurstEmitter => palette::TANGERINE,
+            };
+            let mat = cel_materials.add(cel_material_from_color(color, light_dir.0));
+            commands.insert_resource(PropEditorMeshes {
+                confetti_mesh: cube.clone(),
+                shell_mesh: cube.clone(),
+                confetti_material: mat.clone(),
+                shell_material: mat.clone(),
+            });
+            (cube, mat)
+        };
+
+        let transform = Transform::from_translation(Vec3::ZERO);
+        let entity = commands
+            .spawn((
+                transform,
+                Visibility::default(),
+                Mesh3d(mesh),
+                MeshMaterial3d(material),
+                PlacedProp {
+                    kind: btn.0,
+                    color_override: None,
+                },
+            ))
+            .id();
+
+        state.selected_entity = Some(entity);
+        state.selected_palette_id = None;
+    }
+}
+
+pub fn setup_prop_editor_meshes(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    light_dir: Res<CelLightDir>,
+) {
+    let cube = meshes.add(Cuboid::new(0.4, 0.4, 0.4));
+    let confetti_mat = cel_materials.add(cel_material_from_color(palette::SUNSHINE, light_dir.0));
+    let shell_mat = cel_materials.add(cel_material_from_color(palette::TANGERINE, light_dir.0));
+    commands.insert_resource(PropEditorMeshes {
+        confetti_mesh: cube.clone(),
+        shell_mesh: cube,
+        confetti_material: confetti_mat,
+        shell_material: shell_mat,
+    });
+}
+
+// --- Prop color cycling ---
+
+pub fn handle_prop_color_cycle(
+    query: Query<&Interaction, (Changed<Interaction>, With<PropColorButton>)>,
+    state: Res<PlacementState>,
+    mut prop_query: Query<&mut PlacedProp>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let Some(entity) = state.selected_entity else {
+            continue;
+        };
+        let Ok(mut prop) = prop_query.get_mut(entity) else {
+            continue;
+        };
+
+        // Find current index in the cycle
+        let current_idx = COLOR_CYCLE
+            .iter()
+            .position(|(_, c)| *c == prop.color_override)
+            .unwrap_or(0);
+        let next_idx = (current_idx + 1) % COLOR_CYCLE.len();
+        prop.color_override = COLOR_CYCLE[next_idx].1;
+    }
+}
+
+pub fn update_prop_color_label(
+    state: Res<PlacementState>,
+    prop_query: Query<&PlacedProp>,
+    mut label_query: Query<(&mut Text, &mut TextColor), With<PropColorLabel>>,
+) {
+    let Ok((mut text, mut color)) = label_query.single_mut() else {
+        return;
+    };
+
+    let prop = state
+        .selected_entity
+        .and_then(|e| prop_query.get(e).ok());
+
+    if let Some(prop) = prop {
+        let (name, _) = COLOR_CYCLE
+            .iter()
+            .find(|(_, c)| *c == prop.color_override)
+            .unwrap_or(&COLOR_CYCLE[0]);
+        **text = format!("Color: {name}");
+        if let Some(rgba) = prop.color_override {
+            *color = TextColor(Color::srgb(rgba[0], rgba[1], rgba[2]));
+        } else {
+            *color = TextColor(palette::SUNSHINE);
+        }
+    } else {
+        **text = "Color: (select a prop)".to_string();
+        *color = TextColor(palette::CHAINMAIL);
     }
 }

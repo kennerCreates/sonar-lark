@@ -33,22 +33,22 @@ src/
 │   ├── library.rs       ObstacleLibrary resource, RON load/save
 │   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume component
 ├── course/              Course data layer
-│   ├── data.rs          CourseData, ObstacleInstance
+│   ├── data.rs          CourseData, ObstacleInstance, PropKind, PropInstance
 │   └── loader.rs        Load/save/spawn courses from RON
 ├── editor/              Map editor
 │   ├── workshop/        Define new obstacle types from glb scenes
 │   │   ├── mod.rs       WorkshopPlugin, WorkshopState, preview spawning, gizmo
 │   │   └── ui.rs        Workshop UI layout, interaction handlers, text input
-│   └── course_editor/   Place obstacles, set gate order
-│       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, placement/drag/gizmo systems
-│       └── ui.rs        Palette UI, save/load, gate order mode, name field
+│   └── course_editor/   Place obstacles and props, set gate order
+│       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, PlacedProp, EditorTab, placement/drag/gizmo systems
+│       └── ui.rs        Tabbed palette UI (Obstacles/Props), save/load, gate order mode, name field, prop color override
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
 │   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance (FixedUpdate, spline-based)
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
 │   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio (ExplosionParticle, ParticleKind, ExplosionSounds, ExplosionMeshes)
-│   ├── fireworks.rs     Victory fireworks on first finish: gate confetti + 3 staggered overhead shell bursts (FireworkParticle, FireworkMeshes, FireworkSounds, PendingShell)
+│   ├── fireworks.rs     Victory fireworks on first finish: placed emitter-based or auto gate 0 confetti + shell bursts (FireworkParticle, FireworkEmitter, FireworkMeshes, FireworkSounds, PendingShell)
 │   ├── paths.rs         RacePath, spline generation (race/drone/return), compute_start_positions, adaptive_approach_offset
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, DRONE_COLORS/DRONE_NAMES
 ├── race/                Race mechanics
@@ -88,11 +88,11 @@ ObstacleLibrary + Course Editor ──► *.course.ron
                                     spawn_course() ──► Obstacle entities + TriggerVolume children
 ```
 
-A course file stores obstacle references (by ObstacleId) with per-instance transforms and gate ordering. It does not duplicate obstacle definitions.
+A course file stores obstacle references (by ObstacleId) with per-instance transforms and gate ordering, plus an optional `props` list of firework emitter placements (`PropInstance`). It does not duplicate obstacle definitions.
 
 ### Race Pipeline
 ```
-CourseData ──► spawn obstacles + drones
+CourseData ──► spawn obstacles + firework emitters + drones
                       │
               FixedUpdate: AI targets → PID → forces → integration
                       │
@@ -133,8 +133,14 @@ CourseData ──► spawn obstacles + drones
 | `SelectedCourse` | Resource | course/loader | User's course selection for racing |
 | `WorkshopState` | Resource | editor/workshop | Current obstacle being edited (scene, trigger config, preview) |
 | `PreviewObstacle` | Component | editor/workshop | Marker on the 3D preview entity in the workshop |
-| `PlacementState` | Resource | editor/course_editor | Selected palette obstacle, dragging entity, drag height, gate order mode |
+| `PlacementState` | Resource | editor/course_editor | Selected palette obstacle/prop, active tab, dragging entity, drag height, gate order mode |
 | `PlacedObstacle` | Component | editor/course_editor | Marker on every obstacle entity spawned in the course editor; carries `obstacle_id` and `gate_order` |
+| `PlacedProp` | Component | editor/course_editor | Marker on every prop entity spawned in the course editor; carries `PropKind` and optional `color_override` |
+| `EditorTab` | Enum | editor/course_editor | Obstacles (default) or Props — switches the left-panel palette |
+| `PropEditorMeshes` | Resource | editor/course_editor/ui | Shared mesh+material handles for prop placeholder cubes in the editor |
+| `PropKind` | Enum | course/data | ConfettiEmitter or ShellBurstEmitter — firework emitter type |
+| `PropInstance` | Data | course/data | Per-prop placement: kind, translation, rotation, optional color_override |
+| `FireworkEmitter` | Component | drone/fireworks | Race-time marker entity spawned from course props; carries `PropKind` and optional `Color` override |
 | `DroneAssets` | Resource | drone/spawning | Shared mesh/material handles for all drone entities (from glTF or placeholder) |
 | `DroneGltfHandle` | Resource | drone/spawning | Handle to the loaded drone glTF asset |
 | `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint + curvature-aware speed limit |
