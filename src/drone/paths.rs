@@ -295,6 +295,7 @@ mod tests {
             }),
             is_gate: true,
             model_offset: Vec3::ZERO,
+            collision_volume: None,
         });
         lib
     }

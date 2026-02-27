@@ -2,10 +2,11 @@ use bevy::prelude::*;
 
 use crate::drone::ai::FINISH_EXTENSION;
 use crate::drone::components::{AIController, Drone, DroneDynamics, DronePhase, POINTS_PER_GATE};
-use crate::drone::explosion::{self, ExplosionMeshes, ExplosionSounds};
+use crate::drone::explosion::{ExplosionMeshes, ExplosionSounds};
 use crate::drone::interpolation::PreviousTranslation;
-use crate::drone::spawning::DRONE_COLORS;
 use crate::obstacle::spawning::TriggerVolume;
+
+use super::collision::crash_drone;
 
 use super::progress::{DnfReason, RaceProgress};
 use super::timing::RaceClock;
@@ -221,22 +222,22 @@ pub fn miss_detection(
         };
 
         if ai.spline_t > miss_threshold {
-            progress.record_crash(drone_idx, DnfReason::MissedGate(expected));
             let crash_velocity = dynamics.velocity;
-            *phase = DronePhase::Crashed;
-            dynamics.velocity = Vec3::ZERO;
-            dynamics.angular_velocity = Vec3::ZERO;
-            *visibility = Visibility::Hidden;
 
             if let Some(ref meshes) = explosion_meshes {
-                explosion::spawn_explosion(
+                crash_drone(
                     &mut commands,
-                    meshes,
-                    &mut materials,
+                    &mut phase,
+                    &mut dynamics,
+                    &mut visibility,
+                    drone_idx,
                     transform.translation,
                     crash_velocity,
-                    DRONE_COLORS[drone_idx],
+                    Some(&mut *progress),
+                    meshes,
+                    &mut materials,
                     explosion_sounds.as_deref(),
+                    DnfReason::MissedGate(expected),
                 );
             }
 

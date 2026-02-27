@@ -17,6 +17,12 @@ fn default_forward() -> Vec3 {
     Vec3::NEG_Z
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollisionVolumeConfig {
+    pub offset: Vec3,
+    pub half_extents: Vec3,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ObstacleDef {
     pub id: ObstacleId,
@@ -25,4 +31,6 @@ pub struct ObstacleDef {
     pub is_gate: bool,
     #[serde(default)]
     pub model_offset: Vec3,
+    #[serde(default)]
+    pub collision_volume: Option<CollisionVolumeConfig>,
 }

@@ -6,6 +6,7 @@ use crate::drone::components::{AIController, Drone, DronePhase};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DnfReason {
     MissedGate(u32),
+    ObstacleCollision,
 }
 
 #[derive(Clone, Debug)]
@@ -92,6 +93,7 @@ impl RaceProgress {
             standings: entries,
             total_time,
             course_name,
+            total_gates: self.total_gates,
         }
     }
 
@@ -144,6 +146,7 @@ pub struct RaceResults {
     pub standings: Vec<RaceResultEntry>,
     pub total_time: f32,
     pub course_name: String,
+    pub total_gates: u32,
 }
 
 pub struct RaceResultEntry {
@@ -151,7 +154,6 @@ pub struct RaceResultEntry {
     pub finished: bool,
     pub finish_time: Option<f32>,
     pub crashed: bool,
-    #[allow(dead_code)]
     pub gates_passed: u32,
 }
 

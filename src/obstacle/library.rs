@@ -96,6 +96,7 @@ mod tests {
             },
             is_gate: gate,
             model_offset: Vec3::ZERO,
+            collision_volume: None,
         }
     }
 

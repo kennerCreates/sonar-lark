@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::definition::{ObstacleId, TriggerVolumeConfig};
+use super::definition::{CollisionVolumeConfig, ObstacleId, TriggerVolumeConfig};
 use crate::palette;
 use crate::rendering::{CelMaterial, cel_material_from_color};
 
@@ -13,6 +13,13 @@ pub struct ObstacleMarker {
 #[derive(Component)]
 pub struct TriggerVolume {
     pub half_extents: Vec3,
+}
+
+#[derive(Component)]
+pub struct ObstacleCollisionVolume {
+    pub offset: Vec3,
+    pub half_extents: Vec3,
+    pub is_gate: bool,
 }
 
 /// Handle to the loaded obstacles glTF asset.
@@ -61,6 +68,7 @@ pub fn spawn_obstacle(
     trigger_config: Option<&TriggerVolumeConfig>,
     gate_index: Option<u32>,
     gate_forward_flipped: bool,
+    collision_config: Option<&CollisionVolumeConfig>,
 ) -> Option<Entity> {
     let gltf = gltf_assets.get(&gltf_handle.0)?;
     let node_handle = gltf.named_nodes.get(node_name)?;
@@ -112,6 +120,14 @@ pub fn spawn_obstacle(
             let world_fwd = transform.rotation * local_fwd;
             entity_commands.insert(crate::race::gate::GateForward(world_fwd));
         }
+    }
+
+    if let Some(config) = collision_config {
+        entity_commands.insert(ObstacleCollisionVolume {
+            offset: config.offset,
+            half_extents: config.half_extents,
+            is_gate: trigger_config.is_some(),
+        });
     }
 
     // Spawn children directly via with_children so their local Transform is never adjusted

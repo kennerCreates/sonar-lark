@@ -1,3 +1,4 @@
+pub mod collision;
 pub mod gate;
 pub mod lifecycle;
 pub mod progress;
@@ -23,6 +24,13 @@ impl Plugin for RacePlugin {
                     .run_if(in_state(AppState::Race))
                     .run_if(not(resource_exists::<gate::GatePlanes>)),
             )
+            // Build ObstacleCollisionCache once obstacle entities are spawned
+            .add_systems(
+                Update,
+                collision::build_obstacle_collision_cache
+                    .run_if(in_state(AppState::Race))
+                    .run_if(not(resource_exists::<collision::ObstacleCollisionCache>)),
+            )
             // Race logic chain: ordering matters for correctness
             .add_systems(
                 Update,
@@ -30,6 +38,7 @@ impl Plugin for RacePlugin {
                     lifecycle::tick_countdown,
                     timing::tick_race_clock,
                     gate::gate_trigger_check,
+                    collision::obstacle_collision_check,
                     gate::miss_detection,
                     progress::sync_spline_progress,
                     lifecycle::check_race_finished,
@@ -75,6 +84,7 @@ fn cleanup_race(mut commands: Commands) {
     commands.remove_resource::<lifecycle::CountdownTimer>();
     commands.remove_resource::<lifecycle::ResultsTransitionTimer>();
     commands.remove_resource::<gate::GatePlanes>();
+    commands.remove_resource::<collision::ObstacleCollisionCache>();
 }
 
 fn cleanup_race_progress(mut commands: Commands) {

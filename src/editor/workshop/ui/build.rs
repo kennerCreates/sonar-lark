@@ -31,10 +31,16 @@ pub struct LibraryButton(pub String);
 pub struct HasTriggerToggle;
 
 #[derive(Component)]
+pub struct HasCollisionToggle;
+
+#[derive(Component)]
 pub struct EditTargetRadioModel;
 
 #[derive(Component)]
 pub struct EditTargetRadioTrigger;
+
+#[derive(Component)]
+pub struct EditTargetRadioCollision;
 
 #[derive(Component)]
 pub struct SaveButton;
@@ -59,6 +65,9 @@ pub struct NameDisplayText;
 
 #[derive(Component)]
 pub struct HasTriggerText;
+
+#[derive(Component)]
+pub struct HasCollisionText;
 
 pub fn build_workshop_ui(commands: &mut Commands, library: &ObstacleLibrary) {
     commands
@@ -254,6 +263,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             spawn_divider(panel);
 
             spawn_toggle_row(panel, "Trigger Volume", HasTriggerToggle, HasTriggerText, true);
+            spawn_toggle_row(panel, "Collision Volume", HasCollisionToggle, HasCollisionText, false);
 
             panel.spawn(Node {
                 flex_grow: 1.0,
@@ -414,6 +424,7 @@ fn spawn_edit_target_row(parent: &mut ChildSpawnerCommands) {
         .with_children(|row| {
             spawn_radio_option(row, "Model", EditTargetRadioModel, true);
             spawn_radio_option(row, "Trigger", EditTargetRadioTrigger, false);
+            spawn_radio_option(row, "Collision", EditTargetRadioCollision, false);
         });
 }
 

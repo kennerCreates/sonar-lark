@@ -29,9 +29,9 @@ src/
 ├── common/              Environment setup (light, ground, skybox)
 ├── menu/                Menu UI, state navigation
 ├── obstacle/            Obstacle data layer
-│   ├── definition.rs    ObstacleId, ObstacleDef, TriggerVolumeConfig
+│   ├── definition.rs    ObstacleId, ObstacleDef, TriggerVolumeConfig, CollisionVolumeConfig
 │   ├── library.rs       ObstacleLibrary resource, RON load/save
-│   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume component
+│   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume/ObstacleCollisionVolume components
 ├── course/              Course data layer
 │   ├── data.rs          CourseData, ObstacleInstance, PropKind, PropInstance
 │   └── loader.rs        Load/save/spawn courses from RON
@@ -63,6 +63,7 @@ src/
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, DRONE_COLORS/DRONE_NAMES
 ├── race/                Race mechanics
 │   ├── gate.rs          GateIndex, GateForward, GatePlanes, plane-crossing gate detection
+│   ├── collision.rs     ObstacleCollisionCache, swept segment vs OBB collision, crash_drone helper
 │   ├── progress.rs      RaceProgress, per-drone state tracking
 │   ├── timing.rs        RaceClock
 │   └── lifecycle.rs     Countdown, finish detection
@@ -107,7 +108,8 @@ CourseData ──► spawn obstacles + firework emitters + drones
               FixedUpdate: AI targets → PID → forces → integration
                       │
               Update (chained): tick_countdown → tick_race_clock
-                  → gate_trigger_check → miss_detection → check_race_finished
+                  → gate_trigger_check → obstacle_collision_check
+                  → miss_detection → check_race_finished
                       │
               All finished/crashed → RacePhase::Finished
 ```
@@ -124,6 +126,9 @@ CourseData ──► spawn obstacles + firework emitters + drones
 | `GateIndex` | Component | race/gate | Gate sequence order |
 | `GateForward` | Component | race/gate | World-space forward direction for gate validation |
 | `GatePlanes` | Resource | race/gate | Cached per-gate plane data (center, normal, axes, half-extents) built once at race start for plane-crossing detection |
+| `CollisionVolumeConfig` | Data | obstacle/definition | Local-space AABB (offset + half_extents) for obstacle collision volumes |
+| `ObstacleCollisionVolume` | Component | obstacle/spawning | Runtime collision volume on obstacle entities (offset, half_extents, is_gate) |
+| `ObstacleCollisionCache` | Resource | race/collision | Cached world-space OBBs for all obstacles with collision volumes, built once at race start |
 | `RaceProgress` | Resource | race/progress | Per-drone gate/finish/crash tracking |
 | `DroneRaceState` | Data | race/progress | Per-drone state: next_gate, gates_passed, finished, finish_time, crashed, dnf_reason |
 | `RacePhase` | Resource | race/lifecycle | WaitingToStart → Countdown → Racing → Finished |
@@ -186,6 +191,7 @@ assets/
 
 - All drone physics in `FixedUpdate` (64Hz default), `.chain()`-ed for correctness
 - Gate trigger checks: O(drones) = O(12) plane-crossing tests per frame (each drone only checks its next expected gate)
+- Obstacle collision checks: O(drones × obstacles) = O(12 × ~15) = ~180 slab tests/frame (~2000 flops, negligible)
 - AI spline sampling: O(12) per fixed tick (polynomial eval per drone, 5 curvature samples for speed limiting)
 - Dirty air perturbation: O(12²) = O(144) distance/dot-product checks per fixed tick (negligible)
 - Proximity avoidance: O(12²) = O(144) distance checks per fixed tick (negligible)
@@ -237,6 +243,7 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `drone::ai` | 13 | safe_speed_for_curvature (zero/tiny/high/moderate curvature, lateral accel scaling), return_speed_fraction (start/end/midpoint, monotonicity, clamping), cyclic_curvature (circle constancy, straight-line low) |
 | `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, is_active, standings sorting (finished by time, finished before crashed, crashed by gates passed) |
 | `race::gate` | 16 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside). Plane-crossing: front-to-back pass, back-to-front rejection, horizontal/vertical out-of-bounds, same-side no-crossing, edge graze with margin, rotated gate, flipped gate |
+| `race::collision` | 15 | segment_obb_intersection (through center, miss, parallel inside/outside, starts inside, too short, rotated OBB hit/miss, expansion widens hit, hit point on surface), point_in_gate_opening (center, inside bounds, outside width/height, different depth, rotated axes), integration (gate opening exempted, frame not exempted, miss entirely) |
 | `rendering::cel_material` | 3 | Hue-shift algorithm: highlight warmth, shadow coolness, color clamping |
 
 Functions used by tests:

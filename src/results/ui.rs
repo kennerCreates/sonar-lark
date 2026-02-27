@@ -146,6 +146,23 @@ pub fn setup_results_ui(mut commands: Commands, results: Option<Res<RaceResults>
                                         ..default()
                                     },
                                     TextColor(time_color),
+                                    Node {
+                                        width: Val::Px(72.0),
+                                        ..default()
+                                    },
+                                ));
+
+                                // Gates passed
+                                row.spawn((
+                                    Text::new(format!(
+                                        "{}/{}",
+                                        entry.gates_passed, results.total_gates
+                                    )),
+                                    TextFont {
+                                        font_size: 15.0,
+                                        ..default()
+                                    },
+                                    TextColor(palette::STONE),
                                 ));
                             });
                     }

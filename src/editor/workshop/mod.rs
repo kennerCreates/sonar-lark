@@ -21,6 +21,9 @@ pub struct WorkshopState {
     pub has_trigger: bool,
     pub trigger_offset: Vec3,
     pub trigger_half_extents: Vec3,
+    pub has_collision: bool,
+    pub collision_offset: Vec3,
+    pub collision_half_extents: Vec3,
     pub preview_entity: Option<Entity>,
     pub available_nodes: Vec<String>,
     pub nodes_loaded: bool,
@@ -38,6 +41,9 @@ impl Default for WorkshopState {
             has_trigger: true,
             trigger_offset: Vec3::new(0.0, 1.0, 0.0),
             trigger_half_extents: Vec3::new(2.0, 2.0, 0.5),
+            has_collision: false,
+            collision_offset: Vec3::ZERO,
+            collision_half_extents: Vec3::new(3.0, 3.0, 1.5),
             preview_entity: None,
             available_nodes: Vec::new(),
             nodes_loaded: false,
@@ -53,6 +59,7 @@ pub enum EditTarget {
     #[default]
     Model,
     Trigger,
+    Collision,
 }
 
 #[derive(Component)]
@@ -112,6 +119,7 @@ impl Plugin for WorkshopPlugin {
                 ui::handle_node_selection,
                 ui::handle_library_selection,
                 ui::handle_trigger_toggle,
+                ui::handle_collision_toggle,
                 ui::handle_save_button,
                 ui::handle_new_button,
                 ui::handle_delete_button,
@@ -130,6 +138,7 @@ impl Plugin for WorkshopPlugin {
                 ui::handle_button_hover,
                 spawn_placeholder_preview,
                 draw_trigger_gizmo,
+                draw_collision_gizmo,
             )
                 .run_if(in_state(EditorMode::ObstacleWorkshop)),
         )
@@ -374,6 +383,30 @@ fn draw_trigger_gizmo(
     gizmos.cube(transform, color);
 }
 
+fn draw_collision_gizmo(
+    mut gizmos: Gizmos<TriggerGizmoGroup>,
+    state: Res<WorkshopState>,
+    preview_query: Query<&Transform, With<PreviewObstacle>>,
+) {
+    if !state.has_collision || state.node_name.is_empty() {
+        return;
+    }
+
+    let preview_pos = state
+        .preview_entity
+        .and_then(|e| preview_query.get(e).ok())
+        .map(|t| t.translation)
+        .unwrap_or(Vec3::ZERO);
+
+    let color = Color::srgb(1.0, 0.4, 0.1);
+
+    let center = preview_pos + state.collision_offset;
+    let size = state.collision_half_extents * 2.0;
+    let transform = Transform::from_translation(center).with_scale(size);
+
+    gizmos.cube(transform, color);
+}
+
 // --- Ground Center Gizmo ---
 
 fn draw_ground_gizmo(mut gizmos: Gizmos, state: Res<WorkshopState>) {
@@ -412,6 +445,13 @@ fn move_arrow_origin(state: &WorkshopState, preview_query: &Query<&Transform, Wi
         EditTarget::Trigger => {
             if state.has_trigger {
                 Some(transform.translation + state.trigger_offset)
+            } else {
+                None
+            }
+        }
+        EditTarget::Collision => {
+            if state.has_collision {
+                Some(transform.translation + state.collision_offset)
             } else {
                 None
             }
@@ -477,6 +517,14 @@ fn handle_move_widget(
             }
             preview_transform.translation + state.trigger_offset
         }
+        EditTarget::Collision => {
+            if !state.has_collision {
+                widget.hovered_axis = None;
+                widget.active_axis = None;
+                return;
+            }
+            preview_transform.translation + state.collision_offset
+        }
     };
 
     let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
@@ -499,6 +547,9 @@ fn handle_move_widget(
                 }
                 EditTarget::Trigger => {
                     state.trigger_offset += axis_dir * delta;
+                }
+                EditTarget::Collision => {
+                    state.collision_offset += axis_dir * delta;
                 }
             }
         } else {
@@ -539,12 +590,24 @@ fn handle_move_widget(
     }
 }
 
-// --- Resize Handles for Trigger Volume ---
+// --- Resize Handles for Trigger / Collision Volume ---
 
-fn trigger_box_center(state: &WorkshopState, preview_query: &Query<&Transform, With<PreviewObstacle>>) -> Option<Vec3> {
+/// Returns the world-space center and half-extents for the active volume edit target.
+fn volume_box_params(
+    state: &WorkshopState,
+    preview_query: &Query<&Transform, With<PreviewObstacle>>,
+) -> Option<(Vec3, Vec3)> {
     let entity = state.preview_entity?;
     let transform = preview_query.get(entity).ok()?;
-    Some(transform.translation + state.trigger_offset)
+    match state.edit_target {
+        EditTarget::Trigger if state.has_trigger => {
+            Some((transform.translation + state.trigger_offset, state.trigger_half_extents))
+        }
+        EditTarget::Collision if state.has_collision => {
+            Some((transform.translation + state.collision_offset, state.collision_half_extents))
+        }
+        _ => None,
+    }
 }
 
 fn draw_resize_handles(
@@ -553,14 +616,12 @@ fn draw_resize_handles(
     resize: Res<ResizeWidgetState>,
     preview_query: Query<&Transform, With<PreviewObstacle>>,
 ) {
-    if state.edit_target != EditTarget::Trigger || !state.has_trigger {
+    if !matches!(state.edit_target, EditTarget::Trigger | EditTarget::Collision) {
         return;
     }
-    let Some(center) = trigger_box_center(&state, &preview_query) else {
+    let Some((center, he)) = volume_box_params(&state, &preview_query) else {
         return;
     };
-
-    let he = state.trigger_half_extents;
 
     for axis in [Axis::X, Axis::Y, Axis::Z] {
         for sign in [Sign::Positive, Sign::Negative] {
@@ -605,13 +666,13 @@ fn handle_resize_widget(
     preview_query: Query<&Transform, With<PreviewObstacle>>,
     interaction_query: Query<&Interaction>,
 ) {
-    if state.edit_target != EditTarget::Trigger || !state.has_trigger {
+    if !matches!(state.edit_target, EditTarget::Trigger | EditTarget::Collision) {
         resize.hovered_handle = None;
         resize.active_handle = None;
         return;
     }
 
-    let Some(center) = trigger_box_center(&state, &preview_query) else {
+    let Some((center, he)) = volume_box_params(&state, &preview_query) else {
         resize.hovered_handle = None;
         resize.active_handle = None;
         return;
@@ -623,7 +684,6 @@ fn handle_resize_widget(
     let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else { return };
 
     let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
-    let he = state.trigger_half_extents;
 
     if let Some((active_axis, active_sign)) = resize.active_handle {
         if mouse_buttons.pressed(MouseButton::Left) {
@@ -635,10 +695,14 @@ fn handle_resize_widget(
             // Project cursor ray onto the axis to get new extent
             let t = closest_point_on_axis(ray, center, axis_dir);
             let new_extent = (t * sign_f).max(0.1);
+            let target_he = match state.edit_target {
+                EditTarget::Collision => &mut state.collision_half_extents,
+                _ => &mut state.trigger_half_extents,
+            };
             match active_axis {
-                Axis::X => state.trigger_half_extents.x = new_extent,
-                Axis::Y => state.trigger_half_extents.y = new_extent,
-                Axis::Z => state.trigger_half_extents.z = new_extent,
+                Axis::X => target_he.x = new_extent,
+                Axis::Y => target_he.y = new_extent,
+                Axis::Z => target_he.z = new_extent,
             }
         } else {
             resize.active_handle = None;

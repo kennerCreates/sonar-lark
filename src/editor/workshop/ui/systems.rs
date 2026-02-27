@@ -1,7 +1,7 @@
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 
-use crate::obstacle::definition::{ObstacleDef, ObstacleId, TriggerVolumeConfig};
+use crate::obstacle::definition::{CollisionVolumeConfig, ObstacleDef, ObstacleId, TriggerVolumeConfig};
 use crate::obstacle::library::{save_obstacle_library, ObstacleLibrary};
 use crate::palette;
 use crate::states::{AppState, EditorMode};
@@ -61,6 +61,11 @@ pub fn handle_library_selection(
             state.trigger_offset = trigger.offset - def.model_offset;
             state.trigger_half_extents = trigger.half_extents;
         }
+        state.has_collision = def.collision_volume.is_some();
+        if let Some(collision) = &def.collision_volume {
+            state.collision_offset = collision.offset - def.model_offset;
+            state.collision_half_extents = collision.half_extents;
+        }
 
         for entity in &preview_query {
             commands.entity(entity).despawn();
@@ -76,6 +81,20 @@ pub fn handle_trigger_toggle(
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             state.has_trigger = !state.has_trigger;
+        }
+    }
+}
+
+pub fn handle_collision_toggle(
+    mut state: ResMut<WorkshopState>,
+    query: Query<&Interaction, (Changed<Interaction>, With<HasCollisionToggle>)>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            state.has_collision = !state.has_collision;
+            if state.has_collision && state.collision_half_extents == Vec3::ZERO {
+                state.collision_half_extents = Vec3::new(3.0, 3.0, 1.5);
+            }
         }
     }
 }
@@ -109,12 +128,23 @@ pub fn handle_save_button(
             None
         };
 
+        let collision_volume = if state.has_collision {
+            Some(CollisionVolumeConfig {
+                // Store offset in ground-anchor space (model-relative + model_offset).
+                offset: state.model_offset + state.collision_offset,
+                half_extents: state.collision_half_extents,
+            })
+        } else {
+            None
+        };
+
         let def = ObstacleDef {
             id: ObstacleId(state.obstacle_name.clone()),
             glb_node_name: state.node_name.clone(),
             trigger_volume,
             is_gate: state.is_gate,
             model_offset: state.model_offset,
+            collision_volume,
         };
 
         library.insert(def);
@@ -269,6 +299,7 @@ pub fn handle_edit_target_toggle(
     mut state: ResMut<WorkshopState>,
     model_query: Query<&Interaction, (Changed<Interaction>, With<EditTargetRadioModel>)>,
     trigger_query: Query<&Interaction, (Changed<Interaction>, With<EditTargetRadioTrigger>)>,
+    collision_query: Query<&Interaction, (Changed<Interaction>, With<EditTargetRadioCollision>)>,
 ) {
     for interaction in &model_query {
         if *interaction == Interaction::Pressed {
@@ -280,15 +311,27 @@ pub fn handle_edit_target_toggle(
             state.edit_target = EditTarget::Trigger;
         }
     }
+    for interaction in &collision_query {
+        if *interaction == Interaction::Pressed {
+            state.edit_target = EditTarget::Collision;
+        }
+    }
 }
 
 pub fn update_display_values(
     state: Res<WorkshopState>,
-    mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>)>,
-    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>)>,
-    mut trigger_bg: Query<&mut BackgroundColor, (With<HasTriggerToggle>, Without<EditTargetRadioModel>, Without<EditTargetRadioTrigger>)>,
-    mut model_radio_bg: Query<&mut BackgroundColor, (With<EditTargetRadioModel>, Without<HasTriggerToggle>, Without<EditTargetRadioTrigger>)>,
-    mut trigger_radio_bg: Query<&mut BackgroundColor, (With<EditTargetRadioTrigger>, Without<HasTriggerToggle>, Without<EditTargetRadioModel>)>,
+    mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>)>,
+    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>, Without<HasCollisionText>)>,
+    mut collision_text: Query<&mut Text, (With<HasCollisionText>, Without<NameDisplayText>, Without<HasTriggerText>)>,
+    mut toggle_bgs: ParamSet<(
+        Query<&mut BackgroundColor, With<HasTriggerToggle>>,
+        Query<&mut BackgroundColor, With<HasCollisionToggle>>,
+    )>,
+    mut radio_bgs: ParamSet<(
+        Query<&mut BackgroundColor, With<EditTargetRadioModel>>,
+        Query<&mut BackgroundColor, With<EditTargetRadioTrigger>>,
+        Query<&mut BackgroundColor, With<EditTargetRadioCollision>>,
+    )>,
 ) {
     if !state.is_changed() {
         return;
@@ -312,15 +355,25 @@ pub fn update_display_values(
     if let Ok(mut text) = trigger_text.single_mut() {
         **text = if state.has_trigger { "ON" } else { "OFF" }.to_string();
     }
-    if let Ok(mut bg) = trigger_bg.single_mut() {
-        *bg = BackgroundColor(if state.has_trigger { TOGGLE_ON } else { TOGGLE_OFF });
+    if let Ok(mut text) = collision_text.single_mut() {
+        **text = if state.has_collision { "ON" } else { "OFF" }.to_string();
     }
 
-    if let Ok(mut bg) = model_radio_bg.single_mut() {
+    if let Ok(mut bg) = toggle_bgs.p0().single_mut() {
+        *bg = BackgroundColor(if state.has_trigger { TOGGLE_ON } else { TOGGLE_OFF });
+    }
+    if let Ok(mut bg) = toggle_bgs.p1().single_mut() {
+        *bg = BackgroundColor(if state.has_collision { TOGGLE_ON } else { TOGGLE_OFF });
+    }
+
+    if let Ok(mut bg) = radio_bgs.p0().single_mut() {
         *bg = BackgroundColor(if state.edit_target == EditTarget::Model { RADIO_ACTIVE } else { RADIO_INACTIVE });
     }
-    if let Ok(mut bg) = trigger_radio_bg.single_mut() {
+    if let Ok(mut bg) = radio_bgs.p1().single_mut() {
         *bg = BackgroundColor(if state.edit_target == EditTarget::Trigger { RADIO_ACTIVE } else { RADIO_INACTIVE });
+    }
+    if let Ok(mut bg) = radio_bgs.p2().single_mut() {
+        *bg = BackgroundColor(if state.edit_target == EditTarget::Collision { RADIO_ACTIVE } else { RADIO_INACTIVE });
     }
 }
 
