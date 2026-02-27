@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::drone::spawning::{DRONE_COLORS, DRONE_NAMES};
 use crate::palette;
+use crate::pilot::SelectedPilots;
 use crate::race::progress::RaceResults;
 use crate::states::AppState;
 
@@ -15,7 +16,11 @@ pub(crate) struct RaceAgainButton;
 #[derive(Component)]
 pub(crate) struct MainMenuButton;
 
-pub fn setup_results_ui(mut commands: Commands, results: Option<Res<RaceResults>>) {
+pub fn setup_results_ui(
+    mut commands: Commands,
+    results: Option<Res<RaceResults>>,
+    selected: Option<Res<SelectedPilots>>,
+) {
     let Some(results) = results else {
         warn!("No RaceResults resource found, skipping results UI.");
         return;
@@ -79,11 +84,21 @@ pub fn setup_results_ui(mut commands: Commands, results: Option<Res<RaceResults>
                 .with_children(|container| {
                     for (pos, entry) in results.standings.iter().enumerate() {
                         let drone_idx = entry.drone_index;
-                        let name = DRONE_NAMES.get(drone_idx).copied().unwrap_or("???");
-                        let color = DRONE_COLORS
-                            .get(drone_idx)
-                            .copied()
-                            .unwrap_or(palette::VANILLA);
+                        let (name, color) = if let Some(ref pilots) = selected {
+                            pilots
+                                .pilots
+                                .get(drone_idx)
+                                .map(|p| (p.gamertag.as_str(), p.color))
+                                .unwrap_or(("???", palette::VANILLA))
+                        } else {
+                            (
+                                DRONE_NAMES.get(drone_idx).copied().unwrap_or("???"),
+                                DRONE_COLORS
+                                    .get(drone_idx)
+                                    .copied()
+                                    .unwrap_or(palette::VANILLA),
+                            )
+                        };
 
                         let is_winner = pos == 0 && entry.finished;
 

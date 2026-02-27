@@ -11,6 +11,15 @@ pub struct Drone {
     pub index: u8,
 }
 
+/// Per-drone identity info, set during spawn from SelectedPilots.
+/// Decouples drone identity from array-index lookups into DRONE_NAMES/DRONE_COLORS.
+#[derive(Component)]
+#[allow(dead_code)]
+pub struct DroneIdentity {
+    pub name: String,
+    pub color: Color,
+}
+
 /// Outer-loop position PID: position error → desired acceleration.
 /// Uses derivative-on-measurement (-velocity) instead of d(error)/dt to avoid derivative kick.
 #[derive(Component)]
@@ -94,7 +103,7 @@ impl Default for DroneDynamics {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct DroneConfig {
     pub pid_variation: Vec3,
     pub line_offset: f32,

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::drone::ai::FINISH_EXTENSION;
-use crate::drone::components::{AIController, Drone, DroneDynamics, DronePhase, POINTS_PER_GATE};
+use crate::drone::components::{AIController, Drone, DroneDynamics, DroneIdentity, DronePhase, POINTS_PER_GATE};
 use crate::drone::explosion::{CrashSounds, ExplosionMeshes};
 use crate::drone::interpolation::PreviousTranslation;
 use crate::obstacle::spawning::TriggerVolume;
@@ -193,6 +193,7 @@ pub fn miss_detection(
         &Drone,
         &Transform,
         &AIController,
+        &DroneIdentity,
         &mut DronePhase,
         &mut DroneDynamics,
         &mut Visibility,
@@ -202,7 +203,7 @@ pub fn miss_detection(
         return;
     };
 
-    for (drone, transform, ai, mut phase, mut dynamics, mut visibility) in &mut drone_query {
+    for (drone, transform, ai, identity, mut phase, mut dynamics, mut visibility) in &mut drone_query {
         if *phase != DronePhase::Racing {
             continue;
         }
@@ -241,6 +242,7 @@ pub fn miss_detection(
                     meshes,
                     &mut materials,
                     crash_sounds.as_deref(),
+                    identity.color,
                     DnfReason::MissedGate(expected),
                 );
             }

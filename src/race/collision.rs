@@ -2,10 +2,9 @@ use bevy::prelude::*;
 
 use rand::Rng;
 
-use crate::drone::components::{Drone, DroneDynamics, DronePhase};
+use crate::drone::components::{Drone, DroneDynamics, DroneIdentity, DronePhase};
 use crate::drone::explosion::{self, CrashSounds, ExplosionMeshes};
 use crate::drone::interpolation::PreviousTranslation;
-use crate::drone::spawning::DRONE_COLORS;
 use crate::obstacle::spawning::{ObstacleCollisionVolume, TriggerVolume};
 use crate::states::AppState;
 use super::progress::{DnfReason, RaceProgress};
@@ -193,6 +192,7 @@ pub fn crash_drone(
     explosion_meshes: &ExplosionMeshes,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     crash_sounds: Option<&CrashSounds>,
+    drone_color: Color,
     reason: DnfReason,
 ) {
     *phase = DronePhase::Crashed;
@@ -210,7 +210,7 @@ pub fn crash_drone(
         materials,
         position,
         crash_velocity,
-        DRONE_COLORS[drone_index],
+        drone_color,
     );
 
     if let Some(sounds) = crash_sounds
@@ -244,6 +244,7 @@ pub fn obstacle_collision_check(
         &Drone,
         &Transform,
         &PreviousTranslation,
+        &DroneIdentity,
         &mut DronePhase,
         &mut DroneDynamics,
         &mut Visibility,
@@ -254,7 +255,7 @@ pub fn obstacle_collision_check(
         return;
     };
 
-    for (drone, transform, prev_translation, mut phase, mut dynamics, mut visibility) in
+    for (drone, transform, prev_translation, identity, mut phase, mut dynamics, mut visibility) in
         &mut drone_query
     {
         if *phase != DronePhase::Racing && *phase != DronePhase::VictoryLap {
@@ -292,6 +293,7 @@ pub fn obstacle_collision_check(
                 meshes,
                 &mut materials,
                 crash_sounds.as_deref(),
+                identity.color,
                 DnfReason::ObstacleCollision,
             );
 

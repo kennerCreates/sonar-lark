@@ -5,6 +5,7 @@ use rand::seq::SliceRandom;
 use crate::course::data::CourseData;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
+use crate::pilot::{PilotConfigs, SelectedPilots};
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::AppState;
 use super::components::*;
@@ -119,6 +120,8 @@ pub fn spawn_drones(
     no_gates: Option<Res<NoGatesCourse>>,
     mut cel_materials: ResMut<Assets<CelMaterial>>,
     light_dir: Res<CelLightDir>,
+    selected_pilots: Option<Res<SelectedPilots>>,
+    pilot_configs: Option<Res<PilotConfigs>>,
 ) {
     if !existing_drones.is_empty() || no_gates.is_some() {
         return;
@@ -162,7 +165,11 @@ pub fn spawn_drones(
     grid_slots.shuffle(&mut rng);
 
     for i in 0..DRONE_COUNT {
-        let config = randomize_drone_config(&mut rng);
+        let config = if let Some(ref configs) = pilot_configs {
+            configs.configs[i as usize].clone()
+        } else {
+            randomize_drone_config(&mut rng)
+        };
 
         // Generate per-drone unique spline path
         let drone_path = generate_drone_race_path(&course, &library, &config, i, race_seed)
@@ -234,7 +241,18 @@ pub fn spawn_drones(
             PhysicsRotation(rotation),
         ));
 
-        let drone_color = DRONE_COLORS[i as usize];
+        let (drone_name, drone_color) = if let Some(ref pilots) = selected_pilots {
+            let p = &pilots.pilots[i as usize];
+            (p.gamertag.clone(), p.color)
+        } else {
+            (DRONE_NAMES[i as usize].to_string(), DRONE_COLORS[i as usize])
+        };
+
+        entity_cmd.insert(DroneIdentity {
+            name: drone_name,
+            color: drone_color,
+        });
+
         let drone_mat =
             cel_materials.add(cel_material_from_color(drone_color, light_dir.0));
         entity_cmd.with_children(|children| {

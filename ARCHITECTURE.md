@@ -53,8 +53,14 @@ src/
 │           ├── build.rs UI hierarchy construction (palette, panels)
 │           ├── file_ops.rs Save/load/delete, navigation, gate ordering
 │           └── systems.rs Interaction handlers, display updates, prop color
+├── pilot/               Procedural pilot system
+│   ├── mod.rs           PilotPlugin, Pilot, PilotId, SelectedPilots, PilotConfigs, ColorScheme
+│   ├── personality.rs   PersonalityTrait enum, trait modifiers, catchphrase pools
+│   ├── skill.rs         SkillProfile, skill+personality → DroneConfig mapping
+│   ├── gamertag.rs      Combinatorial gamertag generation
+│   └── roster.rs        PilotRoster resource, RON persistence, initial generation
 ├── drone/               Drone simulation
-│   ├── components.rs    Drone, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
+│   ├── components.rs    Drone, DroneIdentity, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
 │   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance, update_wander_targets (FixedUpdate, spline-based)
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
@@ -191,6 +197,14 @@ CourseData ──► spawn obstacles + firework emitters + drones + build Course
 | `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
 | `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (14 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength, proximity avoidance radius/strength, velocity feedforward blend). Persists across race restarts. Exposed via dev dashboard (F4) |
 | `LeaderboardRoot` | Component | race/ui | Marker on the race leaderboard panel (top-left standings display, 12 rows with color bars, names, times) |
+| `Pilot` | Data | pilot/mod | Persistent pilot identity: gamertag, personality traits, skill profile, color scheme, stats |
+| `PilotId` | Data | pilot/mod | Unique u64 identifier for a pilot |
+| `PilotRoster` | Resource | pilot/roster | All generated pilots, persisted to `assets/pilots/roster.pilots.ron` |
+| `SelectedPilots` | Resource | pilot/mod | 12 pilots chosen for the current race, indexed by drone slot |
+| `PilotConfigs` | Resource | pilot/mod | Pre-computed DroneConfigs from selected pilots' skill+personality |
+| `DroneIdentity` | Component | drone/components | Per-drone name and color, set from SelectedPilots at spawn |
+| `PersonalityTrait` | Enum | pilot/personality | Aggressive, Cautious, Flashy, Methodical, Reckless, Smooth, Technical, Hotdog |
+| `SkillProfile` | Data | pilot/skill | Per-pilot skill: level + speed/cornering/consistency axes |
 
 ## Assets
 
@@ -203,7 +217,8 @@ assets/
 ├── sounds/explosion_{1..4}.wav       Crash explosion audio variants
 ├── sounds/firework.wav               Victory firework burst audio
 ├── library/default.obstacles.ron     Obstacle type definitions
-└── courses/*.course.ron              Saved race courses
+├── courses/*.course.ron              Saved race courses
+└── pilots/roster.pilots.ron          Pilot roster (auto-generated on first run)
 ```
 
 ## Performance Design
@@ -272,6 +287,11 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, is_active, standings sorting (finished by time, finished before crashed, crashed by gates passed) |
 | `race::gate` | 16 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside). Plane-crossing: front-to-back pass, back-to-front rejection, horizontal/vertical out-of-bounds, same-side no-crossing, edge graze with margin, rotated gate, flipped gate |
 | `race::collision` | 15 | segment_obb_intersection (through center, miss, parallel inside/outside, starts inside, too short, rotated OBB hit/miss, expansion widens hit, hit point on surface), point_in_gate_opening (center, inside bounds, outside width/height, different depth, rotated axes), integration (gate opening exempted, frame not exempted, miss entirely) |
+| `pilot::gamertag` | 4 | 100 unique tags generation, non-empty, reasonable length, leetspeak |
+| `pilot::personality` | 5 | Catchphrase pools, modifier bounds, incompatibility symmetry, specific pairs |
+| `pilot::skill` | 4 | Config within bounds (100 iterations), high skill tighter ranges, extreme levels valid, traits modify config |
+| `pilot::roster` | 6 | Save/load roundtrip, roster size, unique IDs, load error, backward compat, incompatible filter |
+| `pilot::mod` | 1 | ColorScheme roundtrip |
 | `rendering::cel_material` | 3 | Hue-shift algorithm: highlight warmth, shadow coolness, color clamping |
 
 Functions used by tests:

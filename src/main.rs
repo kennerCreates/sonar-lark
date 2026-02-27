@@ -8,6 +8,7 @@ mod editor;
 mod menu;
 mod obstacle;
 pub mod palette;
+mod pilot;
 mod race;
 mod rendering;
 mod results;
@@ -28,6 +29,7 @@ fn main() {
             obstacle::ObstaclePlugin,
             course::CoursePlugin,
             editor::EditorPlugin,
+            pilot::PilotPlugin,
             drone::DronePlugin,
             race::RacePlugin,
             camera::CameraPlugin,

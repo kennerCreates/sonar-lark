@@ -4,6 +4,7 @@ use crate::camera::switching::{CameraMode, CameraState, CourseCameras};
 use crate::course::loader::SelectedCourse;
 use crate::drone::components::*;
 use crate::drone::spawning::{DRONE_COLORS, DRONE_NAMES, NoGatesCourse};
+use crate::pilot::SelectedPilots;
 use crate::editor::course_editor::PendingEditorCourse;
 use crate::palette;
 use crate::states::AppState;
@@ -444,7 +445,7 @@ pub(crate) struct LbNameText(usize);
 #[derive(Component)]
 pub(crate) struct LbTimeText(usize);
 
-pub fn setup_leaderboard(mut commands: Commands) {
+pub fn setup_leaderboard(mut commands: Commands, selected: Option<Res<SelectedPilots>>) {
     commands
         .spawn((
             LeaderboardRoot,
@@ -475,6 +476,15 @@ pub fn setup_leaderboard(mut commands: Commands) {
                         ..default()
                     })
                     .with_children(|row| {
+                        let (init_name, init_color) =
+                            if let Some(ref pilots) = selected {
+                                (
+                                    pilots.pilots[i].gamertag.as_str(),
+                                    pilots.pilots[i].color,
+                                )
+                            } else {
+                                (DRONE_NAMES[i], DRONE_COLORS[i])
+                            };
                         // Colored accent bar
                         row.spawn((
                             LbColorBar(i),
@@ -483,12 +493,12 @@ pub fn setup_leaderboard(mut commands: Commands) {
                                 height: Val::Percent(100.0),
                                 ..default()
                             },
-                            BackgroundColor(DRONE_COLORS[i]),
+                            BackgroundColor(init_color),
                         ));
                         // Position + name
                         row.spawn((
                             LbNameText(i),
-                            Text::new(format!("{:>2}  {}", i + 1, DRONE_NAMES[i])),
+                            Text::new(format!("{:>2}  {}", i + 1, init_name)),
                             TextFont {
                                 font_size: LB_FONT,
                                 ..default()
@@ -518,6 +528,7 @@ pub fn update_leaderboard(
     phase: Res<RacePhase>,
     progress: Option<Res<RaceProgress>>,
     clock: Option<Res<RaceClock>>,
+    selected: Option<Res<SelectedPilots>>,
     mut root_vis: Query<&mut Visibility, With<LeaderboardRoot>>,
     mut color_bars: Query<(&LbColorBar, &mut BackgroundColor)>,
     mut name_texts: Query<
@@ -555,14 +566,25 @@ pub fn update_leaderboard(
     for (bar, mut bg) in &mut color_bars {
         let pos = bar.0;
         if pos < 12 && row_data[pos].1 {
-            *bg = BackgroundColor(DRONE_COLORS[row_data[pos].0]);
+            let drone_idx = row_data[pos].0;
+            let color = selected
+                .as_ref()
+                .and_then(|s| s.pilots.get(drone_idx))
+                .map(|p| p.color)
+                .unwrap_or(DRONE_COLORS[drone_idx]);
+            *bg = BackgroundColor(color);
         }
     }
     for (nt, mut text, mut tc) in &mut name_texts {
         let pos = nt.0;
         if pos < 12 && row_data[pos].1 {
             let (drone_idx, _, _, crashed, _) = row_data[pos];
-            text.0 = format!("{:>2}  {}", pos + 1, DRONE_NAMES[drone_idx]);
+            let name = selected
+                .as_ref()
+                .and_then(|s| s.pilots.get(drone_idx))
+                .map(|p| p.gamertag.as_str())
+                .unwrap_or(DRONE_NAMES[drone_idx]);
+            text.0 = format!("{:>2}  {}", pos + 1, name);
             *tc = if crashed {
                 TextColor(palette::STONE)
             } else {
@@ -646,6 +668,7 @@ pub fn update_camera_hud(
     camera_state: Res<CameraState>,
     progress: Option<Res<RaceProgress>>,
     course_cameras: Option<Res<CourseCameras>>,
+    selected: Option<Res<SelectedPilots>>,
     mut mode_text: Query<&mut Text, (With<CameraHudModeText>, Without<CameraHudHintText>)>,
     mut hint_text: Query<&mut Text, (With<CameraHudHintText>, Without<CameraHudModeText>)>,
 ) {
@@ -672,11 +695,15 @@ pub fn update_camera_hud(
                     let idx = camera_state
                         .target_standings_index
                         .min(standings.len().saturating_sub(1));
-                    standings
-                        .get(idx)
-                        .map(|&(drone_idx, _)| {
-                            DRONE_NAMES.get(drone_idx).copied().unwrap_or("???")
-                        })
+                    standings.get(idx).map(|&(drone_idx, _)| {
+                        selected
+                            .as_ref()
+                            .and_then(|s| s.pilots.get(drone_idx))
+                            .map(|p| p.gamertag.as_str())
+                            .unwrap_or(
+                                DRONE_NAMES.get(drone_idx).copied().unwrap_or("???"),
+                            )
+                    })
                 })
                 .unwrap_or("---");
             format!("FPV: {drone_name}")

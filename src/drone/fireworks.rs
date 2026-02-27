@@ -4,6 +4,7 @@ use rand::Rng;
 use crate::course::data::PropKind;
 use crate::drone::spawning::DRONE_COLORS;
 use crate::palette;
+use crate::pilot::SelectedPilots;
 use crate::race::gate::{GateForward, GateIndex};
 use crate::race::progress::RaceProgress;
 use crate::states::AppState;
@@ -107,6 +108,7 @@ pub fn detect_first_finish(
     triggered: Option<Res<FireworksTriggered>>,
     firework_meshes: Option<Res<FireworkMeshes>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    selected_pilots: Option<Res<SelectedPilots>>,
     gates: Query<(&GlobalTransform, &GateIndex, Option<&GateForward>)>,
     emitters: Query<(&Transform, &FireworkEmitter)>,
 ) {
@@ -129,7 +131,11 @@ pub fn detect_first_finish(
         return;
     };
 
-    let drone_color = DRONE_COLORS[winner_idx % DRONE_COLORS.len()];
+    let drone_color = selected_pilots
+        .as_ref()
+        .and_then(|s| s.pilots.get(winner_idx))
+        .map(|p| p.color)
+        .unwrap_or(DRONE_COLORS[winner_idx % DRONE_COLORS.len()]);
     let accent_color = palette::SUNSHINE;
 
     let has_emitters = !emitters.is_empty();
