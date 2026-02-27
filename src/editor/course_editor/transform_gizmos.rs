@@ -400,8 +400,71 @@ fn sample_ring_screen_dist(
     min_dist
 }
 
-fn angle_in_ring_plane(point: Vec3, center: Vec3, axis: Axis) -> f32 {
+pub(crate) fn angle_in_ring_plane(point: Vec3, center: Vec3, axis: Axis) -> f32 {
     let local = point - center;
     let (ref1, ref2) = perpendicular_basis(axis);
     local.dot(ref2).atan2(local.dot(ref1))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f32::consts::{FRAC_PI_2, PI};
+
+    #[test]
+    fn angle_along_ref1_is_zero() {
+        // For Y axis, ref1=X, ref2=Z. Point along +X → atan2(0, 1) = 0
+        let angle = angle_in_ring_plane(Vec3::new(5.0, 0.0, 0.0), Vec3::ZERO, Axis::Y);
+        assert!(angle.abs() < 1e-5);
+    }
+
+    #[test]
+    fn angle_along_ref2_is_half_pi() {
+        // For Y axis, ref1=X, ref2=Z. Point along +Z → atan2(1, 0) = π/2
+        let angle = angle_in_ring_plane(Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO, Axis::Y);
+        assert!((angle - FRAC_PI_2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn angle_along_neg_ref1_is_pi() {
+        // For Y axis, point along -X → atan2(0, -1) = π
+        let angle = angle_in_ring_plane(Vec3::new(-5.0, 0.0, 0.0), Vec3::ZERO, Axis::Y);
+        assert!((angle - PI).abs() < 1e-5);
+    }
+
+    #[test]
+    fn angle_with_offset_center() {
+        let center = Vec3::new(10.0, 20.0, 30.0);
+        let point = center + Vec3::new(5.0, 0.0, 0.0);
+        let angle = angle_in_ring_plane(point, center, Axis::Y);
+        assert!(angle.abs() < 1e-5);
+    }
+
+    #[test]
+    fn angle_x_axis_uses_yz_plane() {
+        // For X axis, ref1=Y, ref2=Z. Point along +Y → atan2(0, 1) = 0
+        let angle = angle_in_ring_plane(Vec3::new(0.0, 3.0, 0.0), Vec3::ZERO, Axis::X);
+        assert!(angle.abs() < 1e-5);
+        // Point along +Z → atan2(1, 0) = π/2
+        let angle = angle_in_ring_plane(Vec3::new(0.0, 0.0, 3.0), Vec3::ZERO, Axis::X);
+        assert!((angle - FRAC_PI_2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn angle_z_axis_uses_xy_plane() {
+        // For Z axis, ref1=X, ref2=Y. Point along +X → 0
+        let angle = angle_in_ring_plane(Vec3::new(3.0, 0.0, 0.0), Vec3::ZERO, Axis::Z);
+        assert!(angle.abs() < 1e-5);
+        // Point along +Y → π/2
+        let angle = angle_in_ring_plane(Vec3::new(0.0, 3.0, 0.0), Vec3::ZERO, Axis::Z);
+        assert!((angle - FRAC_PI_2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn angle_ignores_axis_component() {
+        // Moving point along the Y axis (the rotation axis) shouldn't change the angle
+        let a1 = angle_in_ring_plane(Vec3::new(5.0, 0.0, 0.0), Vec3::ZERO, Axis::Y);
+        let a2 = angle_in_ring_plane(Vec3::new(5.0, 100.0, 0.0), Vec3::ZERO, Axis::Y);
+        assert!((a1 - a2).abs() < 1e-5);
+    }
 }

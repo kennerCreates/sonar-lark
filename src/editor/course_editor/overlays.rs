@@ -126,36 +126,10 @@ pub(super) fn draw_selection_highlight(
 
 const SPLINE_PREVIEW_STEP: f32 = 0.1;
 
-#[derive(Resource, Default)]
+#[derive(Default)]
 pub(super) struct CachedSplinePreview {
-    generation: u64,
+    obstacle_count: usize,
     segments: Vec<(Vec3, Vec3, Color)>,
-}
-
-fn compute_obstacle_generation(
-    placed_query: &Query<(&PlacedObstacle, &Transform)>,
-) -> u64 {
-    let mut hash = 0u64;
-    for (placed, transform) in placed_query.iter() {
-        let t = transform.translation;
-        hash = hash.wrapping_add(
-            (t.x.to_bits() as u64)
-                .wrapping_mul(2654435761)
-                .wrapping_add((t.y.to_bits() as u64).wrapping_mul(1640531527))
-                .wrapping_add((t.z.to_bits() as u64).wrapping_mul(2246822519)),
-        );
-        let r = transform.rotation;
-        hash = hash.wrapping_add(
-            (r.x.to_bits() as u64)
-                .wrapping_mul(3266489917)
-                .wrapping_add((r.w.to_bits() as u64).wrapping_mul(1503267967)),
-        );
-        let s = transform.scale;
-        hash = hash.wrapping_add((s.x.to_bits() as u64).wrapping_mul(2891336453));
-        hash = hash.wrapping_add(placed.gate_order.unwrap_or(u32::MAX) as u64);
-        hash = hash.wrapping_add(if placed.gate_forward_flipped { 1 } else { 0 });
-    }
-    hash
 }
 
 pub(super) fn draw_flight_spline_preview(
@@ -164,13 +138,22 @@ pub(super) fn draw_flight_spline_preview(
     library: Res<ObstacleLibrary>,
     tuning: Res<AiTuningParams>,
     mut cache: Local<CachedSplinePreview>,
+    changed_query: Query<
+        (),
+        (
+            Or<(Changed<Transform>, Changed<PlacedObstacle>)>,
+            With<PlacedObstacle>,
+        ),
+    >,
 ) {
-    let generation = compute_obstacle_generation(&placed_query);
+    let obstacle_count = placed_query.iter().count();
+    let needs_rebuild = cache.segments.is_empty()
+        || cache.obstacle_count != obstacle_count
+        || !changed_query.is_empty()
+        || tuning.is_changed();
 
-    // Rebuild cached segments only when obstacles or tuning change
-    let tuning_changed = tuning.is_changed();
-    if generation != cache.generation || tuning_changed || cache.segments.is_empty() {
-        cache.generation = generation;
+    if needs_rebuild {
+        cache.obstacle_count = obstacle_count;
         cache.segments.clear();
 
         let instances: Vec<ObstacleInstance> = placed_query

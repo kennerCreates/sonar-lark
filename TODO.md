@@ -25,8 +25,8 @@
 ## Backlog (Code Health)
 - [x] Split `editor/course_editor/ui.rs` → `ui/` directory (types.rs, build.rs, file_ops.rs, systems.rs). Split `editor/course_editor/mod.rs` → extract `overlays.rs` and `transform_gizmos.rs`. Split `editor/workshop/ui.rs` → `ui/` directory (build.rs, systems.rs).
 - [x] Replace async poll loading pattern (drone/obstacle glTF) with `AssetServer::is_loaded_with_dependencies()` run conditions — removes per-frame early-return guards.
-- [ ] Add unit tests for pure editor utility functions: `CourseData` construction from placed entities, transform gizmo math in `editor/gizmos.rs`, course discovery.
-- [ ] Add change detection to `draw_flight_spline_preview` — skip spline rebuild when no obstacles have moved/added/removed (e.g., dirty flag or `Changed<Transform>` on placed obstacles).
+- [x] Add unit tests for pure editor utility functions: `CourseData` construction from placed entities, transform gizmo math in `editor/gizmos.rs`, course discovery.
+- [x] Add change detection to `draw_flight_spline_preview` — skip spline rebuild when no obstacles have moved/added/removed (e.g., dirty flag or `Changed<Transform>` on placed obstacles).
 
 ## Future (Post-MVP)
 - [ ] Player-controlled drone (same throttle/pitch/roll/yaw interface as AI)

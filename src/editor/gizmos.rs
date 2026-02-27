@@ -105,3 +105,180 @@ pub(crate) fn perpendicular_basis(axis: Axis) -> (Vec3, Vec3) {
         Axis::Z => (Vec3::X, Vec3::Y),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // --- perpendicular_basis ---
+
+    #[test]
+    fn perpendicular_basis_x() {
+        let (a, b) = perpendicular_basis(Axis::X);
+        assert_eq!(a, Vec3::Y);
+        assert_eq!(b, Vec3::Z);
+    }
+
+    #[test]
+    fn perpendicular_basis_y() {
+        let (a, b) = perpendicular_basis(Axis::Y);
+        assert_eq!(a, Vec3::X);
+        assert_eq!(b, Vec3::Z);
+    }
+
+    #[test]
+    fn perpendicular_basis_z() {
+        let (a, b) = perpendicular_basis(Axis::Z);
+        assert_eq!(a, Vec3::X);
+        assert_eq!(b, Vec3::Y);
+    }
+
+    #[test]
+    fn perpendicular_basis_orthogonal_to_axis() {
+        for axis in [Axis::X, Axis::Y, Axis::Z] {
+            let (a, b) = perpendicular_basis(axis);
+            let dir = axis.direction();
+            assert!(a.dot(dir).abs() < 1e-6, "ref1 not perpendicular to {dir}");
+            assert!(b.dot(dir).abs() < 1e-6, "ref2 not perpendicular to {dir}");
+            assert!(a.dot(b).abs() < 1e-6, "ref1 and ref2 not orthogonal");
+        }
+    }
+
+    // --- point_to_segment_distance ---
+
+    #[test]
+    fn point_to_segment_at_midpoint() {
+        let dist = point_to_segment_distance(
+            Vec2::new(5.0, 3.0),
+            Vec2::new(0.0, 0.0),
+            Vec2::new(10.0, 0.0),
+        );
+        assert!((dist - 3.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn point_to_segment_at_start() {
+        let dist = point_to_segment_distance(
+            Vec2::new(-1.0, 0.0),
+            Vec2::new(0.0, 0.0),
+            Vec2::new(10.0, 0.0),
+        );
+        assert!((dist - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn point_to_segment_at_end() {
+        let dist = point_to_segment_distance(
+            Vec2::new(11.0, 0.0),
+            Vec2::new(0.0, 0.0),
+            Vec2::new(10.0, 0.0),
+        );
+        assert!((dist - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn point_to_segment_degenerate() {
+        let dist = point_to_segment_distance(
+            Vec2::new(3.0, 4.0),
+            Vec2::new(0.0, 0.0),
+            Vec2::new(0.0, 0.0),
+        );
+        assert!((dist - 5.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn point_to_segment_on_segment() {
+        let dist = point_to_segment_distance(
+            Vec2::new(5.0, 0.0),
+            Vec2::new(0.0, 0.0),
+            Vec2::new(10.0, 0.0),
+        );
+        assert!(dist < 1e-5);
+    }
+
+    // --- ray_intersect_plane ---
+
+    fn ray(origin: Vec3, direction: Vec3) -> Ray3d {
+        Ray3d {
+            origin,
+            direction: Dir3::new(direction).unwrap(),
+        }
+    }
+
+    #[test]
+    fn ray_plane_perpendicular_hit() {
+        let r = ray(Vec3::new(0.0, 5.0, 0.0), Vec3::NEG_Y);
+        let hit = ray_intersect_plane(r, Vec3::ZERO, Vec3::Y).unwrap();
+        assert!((hit - Vec3::ZERO).length() < 1e-5);
+    }
+
+    #[test]
+    fn ray_plane_offset_hit() {
+        let r = ray(Vec3::new(3.0, 10.0, 7.0), Vec3::NEG_Y);
+        let hit = ray_intersect_plane(r, Vec3::ZERO, Vec3::Y).unwrap();
+        assert!((hit.x - 3.0).abs() < 1e-5);
+        assert!(hit.y.abs() < 1e-5);
+        assert!((hit.z - 7.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn ray_plane_parallel_returns_none() {
+        let r = ray(Vec3::new(0.0, 5.0, 0.0), Vec3::X);
+        assert!(ray_intersect_plane(r, Vec3::ZERO, Vec3::Y).is_none());
+    }
+
+    #[test]
+    fn ray_plane_behind_returns_none() {
+        let r = ray(Vec3::new(0.0, 5.0, 0.0), Vec3::Y);
+        assert!(ray_intersect_plane(r, Vec3::ZERO, Vec3::Y).is_none());
+    }
+
+    #[test]
+    fn ray_plane_angled_plane() {
+        let r = ray(Vec3::ZERO, Vec3::X);
+        let plane_pt = Vec3::new(10.0, 0.0, 0.0);
+        let plane_normal = Vec3::NEG_X;
+        let hit = ray_intersect_plane(r, plane_pt, plane_normal).unwrap();
+        assert!((hit.x - 10.0).abs() < 1e-5);
+    }
+
+    // --- closest_point_on_axis ---
+
+    #[test]
+    fn closest_point_on_axis_direct() {
+        // Ray pointing at the Y axis from the side
+        let r = ray(Vec3::new(5.0, 3.0, 0.0), Vec3::NEG_X);
+        let t = closest_point_on_axis(r, Vec3::ZERO, Vec3::Y);
+        // Closest point on Y axis to this ray should be at y=3
+        assert!((t - 3.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn closest_point_on_axis_at_origin() {
+        let r = ray(Vec3::new(5.0, 0.0, 0.0), Vec3::NEG_X);
+        let t = closest_point_on_axis(r, Vec3::ZERO, Vec3::Y);
+        assert!(t.abs() < 1e-4);
+    }
+
+    #[test]
+    fn closest_point_on_axis_parallel_returns_zero() {
+        let r = ray(Vec3::new(0.0, 5.0, 0.0), Vec3::Y);
+        let t = closest_point_on_axis(r, Vec3::ZERO, Vec3::Y);
+        assert_eq!(t, 0.0);
+    }
+
+    #[test]
+    fn closest_point_on_axis_with_offset_origin() {
+        let r = ray(Vec3::new(10.0, 7.0, 0.0), Vec3::NEG_X);
+        let origin = Vec3::new(0.0, 2.0, 0.0);
+        let t = closest_point_on_axis(r, origin, Vec3::Y);
+        // Ray is at y=7, axis origin at y=2, so closest on axis is at t=5
+        assert!((t - 5.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn closest_point_on_axis_z_axis() {
+        let r = ray(Vec3::new(3.0, 0.0, 8.0), Vec3::NEG_X);
+        let t = closest_point_on_axis(r, Vec3::ZERO, Vec3::Z);
+        assert!((t - 8.0).abs() < 1e-4);
+    }
+}
