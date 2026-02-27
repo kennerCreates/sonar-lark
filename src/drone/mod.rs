@@ -2,6 +2,7 @@ pub mod ai;
 pub mod components;
 pub mod debug_draw;
 pub mod dev_dashboard;
+pub mod droning;
 pub mod explosion;
 pub mod fireworks;
 pub mod interpolation;
@@ -33,6 +34,7 @@ impl Plugin for DronePlugin {
                 spawning::load_drone_gltf,
                 explosion::load_explosion_assets,
                 fireworks::load_firework_assets,
+                droning::load_droning_sounds,
             ))
             // Restore authoritative physics transforms before snapshotting
             .add_systems(
@@ -120,6 +122,12 @@ impl Plugin for DronePlugin {
                 )
                     .run_if(in_state(AppState::Race)),
             )
+            // Ambient droning sound (overlapping crossfade)
+            .add_systems(
+                Update,
+                droning::update_droning
+                    .run_if(in_race_or_results),
+            )
             // Explosion particle update
             .add_systems(
                 Update,
@@ -147,6 +155,7 @@ impl Plugin for DronePlugin {
                 spawning::cleanup_drone_resources,
                 explosion::cleanup_explosion_assets,
                 fireworks::cleanup_firework_assets,
+                droning::cleanup_droning,
                 cleanup_wander_bounds,
             ));
     }

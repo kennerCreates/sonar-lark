@@ -60,6 +60,7 @@ src/
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
 │   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio (ExplosionParticle, ParticleKind, ExplosionSounds, ExplosionMeshes)
 │   ├── fireworks.rs     Victory fireworks on first finish: placed emitter-based or auto gate 0 confetti + shell bursts (FireworkParticle, FireworkEmitter, FireworkMeshes, FireworkSounds, PendingShell)
+│   ├── interpolation.rs PreviousTranslation/PreviousRotation, PhysicsTranslation/PhysicsRotation, visual transform interpolation (FixedFirst restore, FixedPostUpdate save, PostUpdate interpolate)
 │   ├── paths.rs         RacePath, spline generation (race/drone/return), compute_start_positions, adaptive_approach_offset
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, DRONE_COLORS/DRONE_NAMES
 ├── race/                Race mechanics
@@ -106,12 +107,16 @@ A course file stores obstacle references (by ObstacleId) with per-instance trans
 ```
 CourseData ──► spawn obstacles + firework emitters + drones + build CourseCameras
                       │
+              FixedFirst: restore authoritative transforms
+              FixedPreUpdate: snapshot Previous* transforms
               FixedUpdate: AI targets → PID → forces → integration
+              FixedPostUpdate: save authoritative Physics* transforms
                       │
               Update (chained): tick_countdown → tick_race_clock
                   → gate_trigger_check → obstacle_collision_check
                   → miss_detection → check_race_finished
                       │
+              PostUpdate: interpolate drone transforms (Previous* → Physics*, alpha)
               All finished/crashed → RacePhase::Finished
 ```
 
@@ -165,6 +170,10 @@ CourseData ──► spawn obstacles + firework emitters + drones + build Course
 | `PropKind` | Enum | course/data | ConfettiEmitter or ShellBurstEmitter — firework emitter type |
 | `PropInstance` | Data | course/data | Per-prop placement: kind, translation, rotation, optional color_override |
 | `FireworkEmitter` | Component | drone/fireworks | Race-time marker entity spawned from course props; carries `PropKind` and optional `Color` override |
+| `PreviousTranslation` | Component | drone/interpolation | Drone translation from previous FixedUpdate tick (for visual interpolation) |
+| `PreviousRotation` | Component | drone/interpolation | Drone rotation from previous FixedUpdate tick (for visual interpolation) |
+| `PhysicsTranslation` | Component | drone/interpolation | Authoritative physics translation saved after each FixedUpdate tick |
+| `PhysicsRotation` | Component | drone/interpolation | Authoritative physics rotation saved after each FixedUpdate tick |
 | `DroneAssets` | Resource | drone/spawning | Shared mesh/material handles for all drone entities (from glTF or placeholder) |
 | `DroneGltfHandle` | Resource | drone/spawning | Handle to the loaded drone glTF asset |
 | `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint + curvature-aware speed limit |
@@ -199,7 +208,7 @@ assets/
 
 ## Performance Design
 
-- All drone physics in `FixedUpdate` (64Hz default), `.chain()`-ed for correctness
+- All drone physics in `FixedUpdate` (64Hz default), `.chain()`-ed for correctness. Visual rendering decoupled via PostUpdate transform interpolation (Previous* → Physics* slerp/lerp) for smooth motion between ticks without compromising physics determinism
 - Gate trigger checks: O(drones) = O(12) plane-crossing tests per frame (each drone only checks its next expected gate)
 - Obstacle collision checks: O(drones × obstacles) = O(12 × ~15) = ~180 slab tests/frame (~2000 flops, negligible)
 - AI spline sampling: O(12) per fixed tick (polynomial eval per drone, 5 curvature samples for speed limiting)
@@ -222,12 +231,16 @@ CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve 
                                                                    │
                                                         spawn_drones() ──► 12 Drone entities
                                                                    │
+                                                        FixedFirst: restore_physics_transforms (undo visual interp)
+                                                        FixedPreUpdate: save_previous_transforms
                                                         FixedUpdate chain (11-system, thrust-through-body):
                                                         update_ai_targets → compute_racing_line
                                                         → proximity_avoidance → update_wander_targets
                                                         → hover_target → position_pid
                                                         → attitude_controller → dirty_air_perturbation → motor_lag
                                                         → apply_forces → integrate_motion → clamp_transform
+                                                        FixedPostUpdate: save_physics_transforms
+                                                        PostUpdate: interpolate_visual_transforms
 
                                                         Post-race: Racing → Returning (per-drone)
                                                         → generate_return_path() → non-cyclic spline
