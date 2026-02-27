@@ -6,7 +6,7 @@ use bevy::{
 };
 
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::ObstaclesGltfHandle;
+use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
 use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::EditorMode;
@@ -98,10 +98,17 @@ impl Plugin for WorkshopPlugin {
             OnEnter(EditorMode::ObstacleWorkshop),
             (load_gltf_for_workshop, setup_workshop),
         )
+        // Populate node list once glTF is loaded (runs at most once per workshop entry)
+        .add_systems(
+            Update,
+            populate_node_list
+                .run_if(in_state(EditorMode::ObstacleWorkshop))
+                .run_if(workshop_nodes_pending)
+                .run_if(obstacles_gltf_ready),
+        )
         .add_systems(
             Update,
             (
-                populate_node_list,
                 ui::handle_node_selection,
                 ui::handle_library_selection,
                 ui::handle_trigger_toggle,
@@ -183,20 +190,21 @@ fn cleanup_workshop(
     config.depth_bias = 0.0;
 }
 
+/// Run condition: true when `WorkshopState` exists but nodes haven't been loaded yet.
+fn workshop_nodes_pending(state: Option<Res<WorkshopState>>) -> bool {
+    state.is_some_and(|s| !s.nodes_loaded)
+}
+
+/// Populates the workshop node list from the loaded glTF asset.
+/// Gated by `run_if(workshop_nodes_pending)` and `run_if(obstacles_gltf_ready)`.
 fn populate_node_list(
     mut commands: Commands,
     mut state: ResMut<WorkshopState>,
-    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
+    gltf_handle: Res<ObstaclesGltfHandle>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     container_query: Query<Entity, With<ui::NodeListContainer>>,
 ) {
-    if state.nodes_loaded {
-        return;
-    }
-    let Some(handle) = gltf_handle else { return };
-    let Some(gltf) = gltf_assets.get(&handle.0) else {
-        return;
-    };
+    let gltf = gltf_assets.get(&gltf_handle.0).expect("run condition guarantees loaded");
 
     let Ok(container) = container_query.single() else {
         return;

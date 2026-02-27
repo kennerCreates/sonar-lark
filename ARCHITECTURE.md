@@ -197,7 +197,7 @@ assets/
 ```
 Blender ──► drone.glb ──► DroneGltfHandle (OnEnter(Race) load)
                                 │
-                          DroneAssets (Update poll until loaded)
+                          DroneAssets (run_if drone_gltf_ready)
                                 │
 CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve (editor preview)
         (paths.rs)  │
@@ -220,7 +220,7 @@ CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve 
 
 The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior. Aerodynamic perturbations (dirty air from leading drones, prop wash on descent) add angular wobble that the PD must fight, producing visible instability in dirty air. Battery sag linearly reduces max thrust over the race duration.
 
-Drone spawning uses an async polling pattern: `setup_drone_assets` and `spawn_drones` run every `Update` frame, returning early until the glTF asset and `CourseData` are both available. Once drones spawn, the early-return guards make them no-ops.
+Drone spawning uses `run_if` conditions with `AssetServer::is_loaded_with_dependencies()`: `setup_drone_assets` only runs when the glTF is fully loaded and `DroneAssets` doesn't yet exist; `spawn_drones` only runs when both `DroneAssets` and `CourseData` are available. The same pattern applies to course obstacle spawning (`obstacles_gltf_ready`) and workshop node list population.
 
 ## Testing
 

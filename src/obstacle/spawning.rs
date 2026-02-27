@@ -24,6 +24,14 @@ pub fn load_obstacles_gltf(mut commands: Commands, asset_server: Res<AssetServer
     commands.insert_resource(ObstaclesGltfHandle(handle));
 }
 
+/// Run condition: true when the obstacles glTF and all its dependencies are loaded.
+pub fn obstacles_gltf_ready(
+    handle: Option<Res<ObstaclesGltfHandle>>,
+    asset_server: Res<AssetServer>,
+) -> bool {
+    handle.is_some_and(|h| asset_server.is_loaded_with_dependencies(&h.0))
+}
+
 fn gate_color(obstacle_id: &ObstacleId) -> Option<Color> {
     match obstacle_id.0.as_str() {
         "gate_loop"   => Some(palette::DANDELION),

@@ -14,10 +14,14 @@ impl Plugin for CoursePlugin {
             OnEnter(AppState::Race),
             (spawning::load_obstacles_gltf, loader::load_course).chain(),
         )
-        // Poll each frame until glTF is loaded, then spawn obstacles once
+        // Spawn course obstacles once glTF is loaded and course data is available
         .add_systems(
             Update,
-            loader::spawn_course.run_if(in_state(AppState::Race)),
+            loader::spawn_course
+                .run_if(in_state(AppState::Race))
+                .run_if(spawning::obstacles_gltf_ready)
+                .run_if(resource_exists::<data::CourseData>)
+                .run_if(not(resource_exists::<loader::CourseSpawned>)),
         )
         // Reset spawn guard so obstacles can be re-spawned on next Race entry
         .add_systems(OnExit(AppState::Race), loader::cleanup_course_spawned)

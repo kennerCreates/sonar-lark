@@ -40,28 +40,21 @@ pub fn load_course(mut commands: Commands, selected: Option<Res<SelectedCourse>>
     }
 }
 
+/// Spawns course obstacles and prop emitters from `CourseData`.
+/// Gated by `run_if(obstacles_gltf_ready)`, `run_if(resource_exists::<CourseData>)`,
+/// and `run_if(not(resource_exists::<CourseSpawned>))`.
 pub fn spawn_course(
     mut commands: Commands,
-    course: Option<Res<CourseData>>,
+    course: Res<CourseData>,
     library: Res<ObstacleLibrary>,
-    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
+    gltf_handle: Res<ObstaclesGltfHandle>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
     mut cel_materials: ResMut<Assets<CelMaterial>>,
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
-    already_spawned: Option<Res<CourseSpawned>>,
 ) {
-    if already_spawned.is_some() {
-        return;
-    }
-    let Some(course) = course else { return };
-    let Some(gltf_handle) = gltf_handle else { return };
-    // Poll until the glTF asset is actually loaded (async)
-    if gltf_assets.get(&gltf_handle.0).is_none() {
-        return;
-    }
 
     for instance in &course.instances {
         let Some(def) = library.get(&instance.obstacle_id) else {

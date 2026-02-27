@@ -11,6 +11,7 @@ pub mod spawning;
 
 use bevy::prelude::*;
 
+use crate::course::data::CourseData;
 use crate::race::lifecycle::drones_are_active;
 use crate::states::AppState;
 use components::AiTuningParams;
@@ -39,12 +40,21 @@ impl Plugin for DronePlugin {
                 interpolation::save_previous_transforms
                     .run_if(in_race_or_results),
             )
-            // Poll for asset readiness and spawn drones once ready
+            // Extract drone meshes once glTF is loaded
             .add_systems(
                 Update,
-                (spawning::setup_drone_assets, spawning::spawn_drones)
-                    .chain()
-                    .run_if(in_state(AppState::Race)),
+                spawning::setup_drone_assets
+                    .run_if(in_state(AppState::Race))
+                    .run_if(spawning::drone_gltf_ready)
+                    .run_if(not(resource_exists::<spawning::DroneAssets>)),
+            )
+            // Spawn drones once assets and course data are available
+            .add_systems(
+                Update,
+                spawning::spawn_drones
+                    .run_if(in_state(AppState::Race))
+                    .run_if(resource_exists::<spawning::DroneAssets>)
+                    .run_if(resource_exists::<CourseData>),
             )
             // Physics chain in FixedUpdate.
             // AI systems only run when racing; physics always runs so drones hover at start.

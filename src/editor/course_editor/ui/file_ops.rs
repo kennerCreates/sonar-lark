@@ -484,14 +484,15 @@ pub fn handle_load_button(
     }
 }
 
-/// Polls for a `PendingEditorCourse` and loads it once glTF assets are ready.
+/// Loads a `PendingEditorCourse` once glTF assets are ready.
+/// Gated by `run_if(resource_exists::<PendingEditorCourse>)` and `run_if(obstacles_gltf_ready)`.
 pub fn auto_load_pending_course(
     mut commands: Commands,
-    pending: Option<Res<PendingEditorCourse>>,
+    pending: Res<PendingEditorCourse>,
     mut state: ResMut<PlacementState>,
     placed_query: Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
     library: Res<ObstacleLibrary>,
-    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
+    gltf_handle: Res<ObstaclesGltfHandle>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
@@ -500,12 +501,6 @@ pub fn auto_load_pending_course(
     light_dir: Res<CelLightDir>,
     prop_meshes: Option<Res<PropEditorMeshes>>,
 ) {
-    let Some(pending) = pending else { return };
-    let Some(handle) = &gltf_handle else { return };
-    // Wait until the glTF asset is actually loaded
-    if gltf_assets.get(&handle.0).is_none() {
-        return;
-    }
 
     let path = std::path::Path::new(&pending.path);
     let course = match load_course_from_file(path) {
@@ -522,7 +517,7 @@ pub fn auto_load_pending_course(
         &mut state,
         &placed_query,
         &library,
-        handle,
+        &gltf_handle,
         &gltf_assets,
         &node_assets,
         &mesh_assets,

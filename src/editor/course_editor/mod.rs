@@ -12,7 +12,7 @@ use bevy::{
 use crate::course::data::PropKind;
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::ObstaclesGltfHandle;
+use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
 use crate::states::EditorMode;
 
 use transform_gizmos::{MoveWidgetState, RotateWidgetState, ScaleWidgetState};
@@ -159,7 +159,10 @@ impl Plugin for CourseEditorPlugin {
             )
             .add_systems(
                 Update,
-                ui::auto_load_pending_course.run_if(in_state(EditorMode::CourseEditor)),
+                ui::auto_load_pending_course
+                    .run_if(in_state(EditorMode::CourseEditor))
+                    .run_if(resource_exists::<PendingEditorCourse>)
+                    .run_if(obstacles_gltf_ready),
             )
             .add_systems(
                 Update,

@@ -59,22 +59,25 @@ pub fn load_drone_gltf(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(DroneGltfHandle(handle));
 }
 
+/// Run condition: true when the drone glTF and all its dependencies are loaded.
+pub fn drone_gltf_ready(
+    handle: Option<Res<DroneGltfHandle>>,
+    asset_server: Res<AssetServer>,
+) -> bool {
+    handle.is_some_and(|h| asset_server.is_loaded_with_dependencies(&h.0))
+}
+
+/// Extracts mesh primitives from the loaded drone glTF into `DroneAssets`.
+/// Gated by `run_if(drone_gltf_ready)` and `run_if(not(resource_exists::<DroneAssets>))`.
 pub fn setup_drone_assets(
     mut commands: Commands,
-    gltf_handle: Option<Res<DroneGltfHandle>>,
+    gltf_handle: Res<DroneGltfHandle>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     node_assets: Res<Assets<bevy::gltf::GltfNode>>,
     mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    existing: Option<Res<DroneAssets>>,
 ) {
-    if existing.is_some() {
-        return;
-    }
-    let Some(handle) = gltf_handle else { return };
-    let Some(gltf) = gltf_assets.get(&handle.0) else {
-        return;
-    };
+    let gltf = gltf_assets.get(&gltf_handle.0).expect("run condition guarantees loaded");
 
     let node_name: Box<str> = "Drone".into();
     if let Some(node_handle) = gltf.named_nodes.get(&node_name) {
@@ -107,10 +110,12 @@ pub fn setup_drone_assets(
     });
 }
 
+/// Spawns 12 AI drones once `DroneAssets` and `CourseData` are ready.
+/// Gated by `run_if(resource_exists::<DroneAssets>)` and `run_if(resource_exists::<CourseData>)`.
 pub fn spawn_drones(
     mut commands: Commands,
-    drone_assets: Option<Res<DroneAssets>>,
-    course: Option<Res<CourseData>>,
+    assets: Res<DroneAssets>,
+    course: Res<CourseData>,
     library: Res<ObstacleLibrary>,
     existing_drones: Query<(), With<Drone>>,
     no_gates: Option<Res<NoGatesCourse>>,
@@ -120,8 +125,6 @@ pub fn spawn_drones(
     if !existing_drones.is_empty() || no_gates.is_some() {
         return;
     }
-    let Some(assets) = drone_assets else { return };
-    let Some(course) = course else { return };
 
     let Some(race_path) = generate_race_path(&course, &library) else {
         warn!("Not enough gates for a race path — drones will not spawn");
