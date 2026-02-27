@@ -102,6 +102,28 @@ pub struct PropEditorMeshes {
     pub shell_material: Handle<CelMaterial>,
 }
 
+#[derive(Component)]
+pub struct CamerasTabButton;
+
+#[derive(Component)]
+pub struct CameraPaletteContent;
+
+#[derive(Component)]
+pub struct PlaceCameraButton;
+
+#[derive(Component)]
+pub struct CameraPrimaryToggle;
+
+#[derive(Component)]
+pub struct CameraPrimaryLabel;
+
+#[derive(Resource)]
+pub struct CameraEditorMeshes {
+    pub mesh: Handle<Mesh>,
+    pub material: Handle<CelMaterial>,
+    pub primary_material: Handle<CelMaterial>,
+}
+
 pub const COLOR_CYCLE: &[(&str, Option<[f32; 4]>)] = &[
     ("Auto", None),
     ("Gold", Some([1.0, 0.725, 0.220, 1.0])),

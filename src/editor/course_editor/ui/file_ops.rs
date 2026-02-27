@@ -1,10 +1,11 @@
 use bevy::prelude::*;
 use std::path::Path;
 
-use crate::course::data::{CourseData, ObstacleInstance, PropInstance, PropKind};
+use crate::course::data::{CameraInstance, CourseData, ObstacleInstance, PropInstance, PropKind};
 use crate::course::loader::{delete_course, load_course_from_file, save_course};
 use crate::editor::course_editor::{
-    LastEditedCourse, PendingEditorCourse, PlacedObstacle, PlacedProp, PlacementState,
+    LastEditedCourse, PendingEditorCourse, PlacedCamera, PlacedObstacle, PlacedProp,
+    PlacementState,
 };
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
@@ -21,6 +22,7 @@ pub fn build_course_data<'a>(
     name: String,
     obstacles: impl IntoIterator<Item = (&'a PlacedObstacle, &'a Transform)>,
     props: impl IntoIterator<Item = (&'a PlacedProp, &'a Transform)>,
+    cameras: impl IntoIterator<Item = (&'a PlacedCamera, &'a Transform)>,
 ) -> CourseData {
     let instances = obstacles
         .into_iter()
@@ -44,10 +46,21 @@ pub fn build_course_data<'a>(
         })
         .collect();
 
+    let cameras = cameras
+        .into_iter()
+        .map(|(cam, transform)| CameraInstance {
+            translation: transform.translation,
+            rotation: transform.rotation,
+            is_primary: cam.is_primary,
+            label: cam.label.clone(),
+        })
+        .collect();
+
     CourseData {
         name,
         instances,
         props,
+        cameras,
     }
 }
 
@@ -182,7 +195,11 @@ pub fn handle_save_button(
     query: Query<&Interaction, (Changed<Interaction>, With<SaveCourseButton>)>,
     state: Res<PlacementState>,
     placed_query: Query<(&PlacedObstacle, &Transform)>,
-    prop_query: Query<(&PlacedProp, &Transform), Without<PlacedObstacle>>,
+    prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
+    camera_placed_query: Query<
+        (&PlacedCamera, &Transform),
+        (Without<PlacedObstacle>, Without<PlacedProp>),
+    >,
     existing_courses_container: Query<Entity, With<ExistingCoursesContainer>>,
 ) {
     for interaction in &query {
@@ -195,10 +212,18 @@ pub fn handle_save_button(
             continue;
         }
 
+        let camera_count = camera_placed_query.iter().count();
+        if camera_count > 9 {
+            warn!(
+                "Course has {camera_count} cameras (soft cap is 9). Consider reducing."
+            );
+        }
+
         let course = build_course_data(
             state.course_name.clone(),
             placed_query.iter(),
             prop_query.iter(),
+            camera_placed_query.iter(),
         );
 
         let path_str = format!("assets/courses/{}.course.ron", state.course_name);
@@ -268,7 +293,10 @@ pub fn handle_confirm_delete(
     query: Query<&Interaction, (Changed<Interaction>, With<ConfirmDeleteYesButton>)>,
     pending: Option<Res<PendingCourseDelete>>,
     mut state: ResMut<PlacementState>,
-    placed_query: Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
+    placed_query: Query<
+        Entity,
+        Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
+    >,
     existing_courses_container: Query<Entity, With<ExistingCoursesContainer>>,
     last_edited: Option<Res<LastEditedCourse>>,
 ) {
@@ -340,12 +368,15 @@ pub fn handle_cancel_delete(
     }
 }
 
-/// Shared logic: despawn existing obstacles/props, load course data, spawn obstacles + props.
+/// Shared logic: despawn existing obstacles/props/cameras, load course data, spawn all.
 #[allow(clippy::too_many_arguments)]
 fn load_course_into_editor(
     commands: &mut Commands,
     state: &mut PlacementState,
-    placed_query: &Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
+    placed_query: &Query<
+        Entity,
+        Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
+    >,
     library: &ObstacleLibrary,
     gltf_handle: &ObstaclesGltfHandle,
     gltf_assets: &Assets<bevy::gltf::Gltf>,
@@ -356,6 +387,7 @@ fn load_course_into_editor(
     light_dir: Vec3,
     course: &CourseData,
     prop_meshes: Option<&PropEditorMeshes>,
+    camera_meshes: Option<&CameraEditorMeshes>,
 ) {
     for entity in placed_query {
         commands.entity(entity).despawn();
@@ -440,19 +472,47 @@ fn load_course_into_editor(
         }
     }
 
+    // Spawn cameras from course data
+    if let Some(meshes) = camera_meshes {
+        for cam in &course.cameras {
+            let material = if cam.is_primary {
+                meshes.primary_material.clone()
+            } else {
+                meshes.material.clone()
+            };
+            let transform =
+                Transform::from_translation(cam.translation).with_rotation(cam.rotation);
+            commands.spawn((
+                transform,
+                Visibility::default(),
+                Mesh3d(meshes.mesh.clone()),
+                MeshMaterial3d(material),
+                PlacedCamera {
+                    is_primary: cam.is_primary,
+                    label: cam.label.clone(),
+                },
+            ));
+        }
+    }
+
     info!(
-        "Loaded course '{}' for editing ({} obstacles, {} props)",
+        "Loaded course '{}' for editing ({} obstacles, {} props, {} cameras)",
         course.name,
         course.instances.len(),
         course.props.len(),
+        course.cameras.len(),
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn handle_load_button(
     mut commands: Commands,
     query: Query<(&Interaction, &ExistingCourseButton), Changed<Interaction>>,
     mut state: ResMut<PlacementState>,
-    placed_query: Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
+    placed_query: Query<
+        Entity,
+        Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
+    >,
     library: Res<ObstacleLibrary>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
@@ -462,6 +522,7 @@ pub fn handle_load_button(
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
     prop_meshes: Option<Res<PropEditorMeshes>>,
+    camera_meshes: Option<Res<CameraEditorMeshes>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -496,6 +557,7 @@ pub fn handle_load_button(
             light_dir.0,
             &course,
             prop_meshes.as_deref(),
+            camera_meshes.as_deref(),
         );
 
         commands.insert_resource(LastEditedCourse {
@@ -506,11 +568,15 @@ pub fn handle_load_button(
 
 /// Loads a `PendingEditorCourse` once glTF assets are ready.
 /// Gated by `run_if(resource_exists::<PendingEditorCourse>)` and `run_if(obstacles_gltf_ready)`.
+#[allow(clippy::too_many_arguments)]
 pub fn auto_load_pending_course(
     mut commands: Commands,
     pending: Res<PendingEditorCourse>,
     mut state: ResMut<PlacementState>,
-    placed_query: Query<Entity, Or<(With<PlacedObstacle>, With<PlacedProp>)>>,
+    placed_query: Query<
+        Entity,
+        Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
+    >,
     library: Res<ObstacleLibrary>,
     gltf_handle: Res<ObstaclesGltfHandle>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
@@ -520,6 +586,7 @@ pub fn auto_load_pending_course(
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
     prop_meshes: Option<Res<PropEditorMeshes>>,
+    camera_meshes: Option<Res<CameraEditorMeshes>>,
 ) {
 
     let path = std::path::Path::new(&pending.path);
@@ -546,6 +613,7 @@ pub fn auto_load_pending_course(
         light_dir.0,
         &course,
         prop_meshes.as_deref(),
+        camera_meshes.as_deref(),
     );
 
     commands.insert_resource(LastEditedCourse {
@@ -608,6 +676,7 @@ mod tests {
             "empty".to_string(),
             Vec::<(&PlacedObstacle, &Transform)>::new(),
             Vec::<(&PlacedProp, &Transform)>::new(),
+            Vec::<(&PlacedCamera, &Transform)>::new(),
         );
         assert_eq!(course.name, "empty");
         assert!(course.instances.is_empty());
@@ -631,6 +700,7 @@ mod tests {
             "test".to_string(),
             vec![(&placed, &transform)],
             Vec::<(&PlacedProp, &Transform)>::new(),
+            Vec::<(&PlacedCamera, &Transform)>::new(),
         );
 
         assert_eq!(course.instances.len(), 1);
@@ -654,6 +724,7 @@ mod tests {
             "props_test".to_string(),
             Vec::<(&PlacedObstacle, &Transform)>::new(),
             vec![(&prop, &transform)],
+            Vec::<(&PlacedCamera, &Transform)>::new(),
         );
 
         assert_eq!(course.props.len(), 1);
@@ -688,6 +759,7 @@ mod tests {
             "mixed".to_string(),
             vec![(&obs1, &t1), (&obs2, &t2)],
             vec![(&prop, &tp)],
+            Vec::<(&PlacedCamera, &Transform)>::new(),
         );
 
         assert_eq!(course.instances.len(), 2);

@@ -8,7 +8,7 @@ use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::TriggerVolume;
 use crate::palette;
 
-use super::{PlacedFilter, PlacedObstacle, PlacedProp, PlacementState};
+use super::{PlacedCamera, PlacedFilter, PlacedObstacle, PlacedProp, PlacementState};
 
 // --- Gizmo group ---
 
@@ -172,6 +172,7 @@ pub(super) fn draw_flight_spline_preview(
             name: String::new(),
             instances,
             props: vec![],
+            cameras: vec![],
         };
 
         let Some(race_path) = generate_race_path(&course, &library) else {
@@ -210,6 +211,51 @@ pub(super) fn draw_flight_spline_preview(
     // Draw cached segments
     for &(start, end, color) in &cache.segments {
         gizmos.line(start, end, color);
+    }
+}
+
+// --- Camera Gizmos ---
+
+pub(super) fn draw_camera_gizmos(
+    mut gizmos: Gizmos<CourseGizmoGroup>,
+    camera_query: Query<(&PlacedCamera, &Transform)>,
+) {
+    for (camera, transform) in &camera_query {
+        let pos = transform.translation;
+        let forward = transform.rotation * Vec3::NEG_Z;
+        let right = transform.rotation * Vec3::X;
+        let up = transform.rotation * Vec3::Y;
+
+        let color = if camera.is_primary {
+            palette::SUNSHINE
+        } else {
+            palette::SKY
+        };
+
+        // Camera body sphere
+        let iso = Isometry3d::new(pos, Quat::IDENTITY);
+        gizmos.sphere(iso, 0.35, color);
+
+        // Frustum wireframe
+        let dist = 2.0;
+        let half_h = 0.6;
+        let half_w = half_h * 1.778; // 16:9
+
+        let center = pos + forward * dist;
+        let corners = [
+            center + right * half_w + up * half_h,
+            center - right * half_w + up * half_h,
+            center - right * half_w - up * half_h,
+            center + right * half_w - up * half_h,
+        ];
+
+        for i in 0..4 {
+            gizmos.line(corners[i], corners[(i + 1) % 4], color);
+            gizmos.line(pos, corners[i], color);
+        }
+
+        // Up indicator
+        gizmos.arrow(pos, pos + up * 0.8, color);
     }
 }
 

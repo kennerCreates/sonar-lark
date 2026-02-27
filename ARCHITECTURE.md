@@ -33,7 +33,7 @@ src/
 │   ├── library.rs       ObstacleLibrary resource, RON load/save
 │   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume/ObstacleCollisionVolume components
 ├── course/              Course data layer
-│   ├── data.rs          CourseData, ObstacleInstance, PropKind, PropInstance
+│   ├── data.rs          CourseData, ObstacleInstance, PropKind, PropInstance, CameraInstance
 │   └── loader.rs        Load/save/spawn courses from RON
 ├── editor/              Map editor
 │   ├── workshop/        Define new obstacle types from glb scenes
@@ -43,8 +43,8 @@ src/
 │   │       ├── build.rs UI hierarchy construction, marker components, constants
 │   │       └── systems.rs Interaction handlers, text input, display updates
 │   └── course_editor/   Place obstacles and props, set gate order
-│       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, PlacedProp, EditorTab, placement/selection
-│       ├── overlays.rs  Visualization gizmos (trigger volumes, gate sequence, spline preview, prop gizmos)
+│       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, PlacedProp, PlacedCamera, EditorTab, placement/selection
+│       ├── overlays.rs  Visualization gizmos (trigger volumes, gate sequence, spline preview, prop gizmos, camera frustums)
 │       ├── transform_gizmos.rs Move/rotate/scale widget systems
 │       └── ui/          Course editor UI
 │           ├── mod.rs   Re-exports
@@ -55,7 +55,7 @@ src/
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
-│   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance (FixedUpdate, spline-based)
+│   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance, update_wander_targets (FixedUpdate, spline-based)
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
 │   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio (ExplosionParticle, ParticleKind, ExplosionSounds, ExplosionMeshes)
 │   ├── fireworks.rs     Victory fireworks on first finish: placed emitter-based or auto gate 0 confetti + shell bursts (FireworkParticle, FireworkEmitter, FireworkMeshes, FireworkSounds, PendingShell)
@@ -71,7 +71,7 @@ src/
 │   ├── chase.rs         Broadcast-style pack-follow camera (Chase mode, default in Race)
 │   ├── fpv.rs           Stabilized close-follow camera on target drone (FPV mode)
 │   ├── spectator.rs     RTS-style orbit controls: middle-mouse orbit, scroll zoom, WASD pan
-│   ├── switching.rs     CameraMode/CameraState, number key switching (1=Chase, 2=Spectator, 3=FPV cycles target)
+│   ├── switching.rs     CameraMode/CameraState/CourseCameras, key switching (1-0=CourseCamera, 2=Chase, Shift+F=FPV, Shift+S=Spectator)
 │   ├── orbit.rs         Orbit math (shared between Spectator and Course Editor)
 │   └── settings.rs      CameraSettings resource (FOV, sensitivity, zoom)
 └── results/             Race results display
@@ -99,11 +99,11 @@ ObstacleLibrary + Course Editor ──► *.course.ron
                                     spawn_course() ──► Obstacle entities + TriggerVolume children
 ```
 
-A course file stores obstacle references (by ObstacleId) with per-instance transforms and gate ordering, plus an optional `props` list of firework emitter placements (`PropInstance`). It does not duplicate obstacle definitions.
+A course file stores obstacle references (by ObstacleId) with per-instance transforms and gate ordering, plus optional `props` (firework emitter placements) and `cameras` (placed camera positions with primary flag and labels). It does not duplicate obstacle definitions.
 
 ### Race Pipeline
 ```
-CourseData ──► spawn obstacles + firework emitters + drones
+CourseData ──► spawn obstacles + firework emitters + drones + build CourseCameras
                       │
               FixedUpdate: AI targets → PID → forces → integration
                       │
@@ -138,8 +138,11 @@ CourseData ──► spawn obstacles + firework emitters + drones
 | `SkyboxMaterial` | Asset | rendering/skybox | Procedural TRON night sky (stars, moon, neon horizon glow) |
 | `CelLightDir` | Resource | rendering/mod | World-space light direction shared by all CelMaterial instances |
 | `SkyboxEntity` | Component | rendering/skybox | Marker on the skybox sphere entity |
-| `CameraState` | Resource | camera/switching | Current camera mode (Chase/FPV/Spectator) + FPV target drone standings index |
-| `CameraMode` | Enum | camera/switching | Chase (pack follow, default), Fpv (drone-mounted), Spectator (free-fly) |
+| `CameraState` | Resource | camera/switching | Current camera mode + FPV target drone standings index |
+| `CameraMode` | Enum | camera/switching | Chase (pack follow), Fpv (drone-mounted), Spectator (free-fly), CourseCamera(usize) (placed cameras) |
+| `CourseCameras` | Resource | camera/switching | Course camera entries built from CourseData at race start (primary first) |
+| `CourseCameraEntry` | Data | camera/switching | Pre-computed Transform + optional label for a placed course camera |
+| `CameraInstance` | Data | course/data | Serialized camera placement: translation, rotation, is_primary, optional label |
 | `ChaseState` | Resource | camera/chase | Smoothed center/velocity for broadcast-style pack-follow camera |
 | `SpectatorSettings` | Resource | camera/spectator | Movement speed + mouse sensitivity |
 | `RaceResults` | Resource | race/progress | Snapshot of final standings, persists Race→Results state transition |
@@ -152,15 +155,19 @@ CourseData ──► spawn obstacles + firework emitters + drones
 | `PlacementState` | Resource | editor/course_editor | Selected palette obstacle/prop, active tab, dragging entity, drag height, gate order mode |
 | `PlacedObstacle` | Component | editor/course_editor | Marker on every obstacle entity spawned in the course editor; carries `obstacle_id` and `gate_order` |
 | `PlacedProp` | Component | editor/course_editor | Marker on every prop entity spawned in the course editor; carries `PropKind` and optional `color_override` |
-| `EditorTab` | Enum | editor/course_editor | Obstacles (default) or Props — switches the left-panel palette |
+| `PlacedCamera` | Component | editor/course_editor | Marker on every camera entity spawned in the course editor; carries `is_primary` and optional `label` |
+| `EditorTab` | Enum | editor/course_editor | Obstacles (default), Props, or Cameras — switches the left-panel palette |
 | `PropEditorMeshes` | Resource | editor/course_editor/ui | Shared mesh+material handles for prop placeholder cubes in the editor |
+| `CameraEditorMeshes` | Resource | editor/course_editor/ui | Shared mesh+material handles for camera placeholder cubes in the editor (sky/sunshine colors) |
 | `PropKind` | Enum | course/data | ConfettiEmitter or ShellBurstEmitter — firework emitter type |
 | `PropInstance` | Data | course/data | Per-prop placement: kind, translation, rotation, optional color_override |
 | `FireworkEmitter` | Component | drone/fireworks | Race-time marker entity spawned from course props; carries `PropKind` and optional `Color` override |
 | `DroneAssets` | Resource | drone/spawning | Shared mesh/material handles for all drone entities (from glTF or placeholder) |
 | `DroneGltfHandle` | Resource | drone/spawning | Handle to the loaded drone glTF asset |
 | `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint + curvature-aware speed limit |
-| `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning, Crashed |
+| `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning, Wandering, Crashed |
+| `WanderState` | Component | drone/components | Per-drone wandering state: target position, dwell timer, step counter |
+| `WanderBounds` | Resource | drone/ai | Bounding box for post-race wandering area (computed from course obstacle positions + padding) |
 | `ExplosionParticle` | Component | drone/explosion | Velocity, lifetime, remaining time, and `ParticleKind` (Debris/HotSmoke/DarkSmoke) for crash particles |
 | `ExplosionSounds` | Resource | drone/explosion | 4 handles to explosion audio variants (assets/sounds/explosion_{1..4}.wav) |
 | `ExplosionMeshes` | Resource | drone/explosion | Pre-allocated mesh handles for debris (3 sizes), hot smoke, dark smoke — shared across all explosions |
@@ -214,7 +221,8 @@ CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve 
                                                                    │
                                                         FixedUpdate chain (11-system, thrust-through-body):
                                                         update_ai_targets → compute_racing_line
-                                                        → proximity_avoidance → hover_target → position_pid
+                                                        → proximity_avoidance → update_wander_targets
+                                                        → hover_target → position_pid
                                                         → attitude_controller → dirty_air_perturbation → motor_lag
                                                         → apply_forces → integrate_motion → clamp_transform
 
@@ -222,6 +230,10 @@ CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve 
                                                         → generate_return_path() → non-cyclic spline
                                                         → smoothstep deceleration → return to start
                                                         → Returning → Idle (hover)
+
+                                                        Results state: VictoryLap → Wandering
+                                                        → deterministic waypoint generation (Fibonacci hash)
+                                                        → dwell at waypoint → pick next → continuous flight
 ```
 
 The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior. Aerodynamic perturbations (dirty air from leading drones, prop wash on descent) add angular wobble that the PD must fight, producing visible instability in dirty air. Battery sag linearly reduces max thrust over the race duration.
@@ -235,12 +247,12 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | Module | Tests | What's covered |
 |--------|-------|----------------|
 | `obstacle::library` | 8 | Insert/get, overwrite, save/load roundtrip, error cases, existing RON format |
-| `course::loader` | 9 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course |
+| `course::loader` | 11 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course, camera roundtrip, backward compat (no cameras field) |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
 | `drone::paths` | 25 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero/alignment, flipped gate), per-drone path generation (paths differ, passes near gates, tangent alignment, gate offset 2D spread, neutral matches base), start positions (count, behind gate, hover height, gate width, no overlap, rotation), return path generation (valid spline, per-drone variation) |
 | `drone::spawning` | 2 | Config randomization bounds (100-iteration stress test), PID variation application |
-| `drone::ai` | 13 | safe_speed_for_curvature (zero/tiny/high/moderate curvature, lateral accel scaling), return_speed_fraction (start/end/midpoint, monotonicity, clamping), cyclic_curvature (circle constancy, straight-line low) |
+| `drone::ai` | 8 | safe_speed_for_curvature (zero/tiny/high/moderate curvature, lateral accel scaling), cyclic_curvature (circle constancy, straight-line low) |
 | `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, is_active, standings sorting (finished by time, finished before crashed, crashed by gates passed) |
 | `race::gate` | 16 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside). Plane-crossing: front-to-back pass, back-to-front rejection, horizontal/vertical out-of-bounds, same-side no-crossing, edge graze with margin, rotated gate, flipped gate |
 | `race::collision` | 15 | segment_obb_intersection (through center, miss, parallel inside/outside, starts inside, too short, rotated OBB hit/miss, expansion widens hit, hit point on surface), point_in_gate_opening (center, inside bounds, outside width/height, different depth, rotated axes), integration (gate opening exempted, frame not exempted, miss entirely) |

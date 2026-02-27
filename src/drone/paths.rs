@@ -311,6 +311,7 @@ mod tests {
                 gate_instance(Vec3::new(5.0, 0.0, 0.0), 1),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("3 gates should produce a path");
@@ -332,6 +333,7 @@ mod tests {
                 gate_instance(Vec3::new(10.0, 0.0, 0.0), 1),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
@@ -346,6 +348,7 @@ mod tests {
             name: "Test".to_string(),
             instances: vec![gate_instance(Vec3::new(1.0, 0.0, 0.0), 0)],
             props: vec![],
+            cameras: vec![],
         };
         assert!(generate_race_path(&course, &lib).is_none());
     }
@@ -357,6 +360,7 @@ mod tests {
             name: "Empty".to_string(),
             instances: vec![],
             props: vec![],
+            cameras: vec![],
         };
         assert!(generate_race_path(&course, &lib).is_none());
     }
@@ -374,6 +378,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, 0.0), 1),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
@@ -393,6 +398,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
@@ -422,6 +428,7 @@ mod tests {
                 gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("3 gates should produce a path");
@@ -450,6 +457,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
@@ -481,6 +489,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("4 gates should produce a path");
@@ -512,6 +521,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, 0.0), 1),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
@@ -534,6 +544,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, 0.0), 1),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
@@ -556,6 +567,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, 0.0), 1),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let path = generate_race_path(&course, &lib).expect("2 gates should produce a path");
@@ -700,6 +712,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let config_a = DroneConfig {
@@ -744,6 +757,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let config = DroneConfig {
@@ -778,6 +792,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let config = DroneConfig {
@@ -812,6 +827,7 @@ mod tests {
                 gate_instance(Vec3::new(20.0, 0.0, -20.0), 3),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         // Generate paths for several drones with gate offset enabled
@@ -860,6 +876,7 @@ mod tests {
                 gate_instance(Vec3::new(40.0, 0.0, 0.0), 2),
             ],
             props: vec![],
+            cameras: vec![],
         };
 
         let base = generate_race_path(&course, &lib).unwrap();

@@ -30,10 +30,22 @@ pub struct PropInstance {
     pub color_override: Option<[f32; 4]>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CameraInstance {
+    pub translation: Vec3,
+    pub rotation: Quat,
+    #[serde(default)]
+    pub is_primary: bool,
+    #[serde(default)]
+    pub label: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Resource)]
 pub struct CourseData {
     pub name: String,
     pub instances: Vec<ObstacleInstance>,
     #[serde(default)]
     pub props: Vec<PropInstance>,
+    #[serde(default)]
+    pub cameras: Vec<CameraInstance>,
 }

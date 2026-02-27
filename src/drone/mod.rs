@@ -64,6 +64,7 @@ impl Plugin for DronePlugin {
                     ai::update_ai_targets.run_if(drones_are_active),
                     ai::compute_racing_line.run_if(drones_are_active),
                     ai::proximity_avoidance.run_if(drones_are_active),
+                    ai::update_wander_targets.run_if(drones_are_active),
                     physics::hover_target.run_if(not(drones_are_active)),
                     physics::position_pid,
                     physics::attitude_controller,
@@ -118,11 +119,21 @@ impl Plugin for DronePlugin {
                 (fireworks::tick_firework_shells, fireworks::update_firework_particles)
                     .run_if(in_race_or_results),
             )
+            // Transition drones to wandering on Results entry
+            .add_systems(
+                OnEnter(AppState::Results),
+                (ai::build_wander_bounds, ai::transition_to_wandering).chain(),
+            )
             // Cleanup resources when leaving Results (drones persist Race → Results)
             .add_systems(OnExit(AppState::Results), (
                 spawning::cleanup_drone_resources,
                 explosion::cleanup_explosion_assets,
                 fireworks::cleanup_firework_assets,
+                cleanup_wander_bounds,
             ));
     }
+}
+
+fn cleanup_wander_bounds(mut commands: Commands) {
+    commands.remove_resource::<ai::WanderBounds>();
 }

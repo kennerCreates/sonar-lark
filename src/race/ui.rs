@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::camera::switching::{CameraMode, CameraState};
+use crate::camera::switching::{CameraMode, CameraState, CourseCameras};
 use crate::course::loader::SelectedCourse;
 use crate::drone::components::*;
 use crate::drone::spawning::{DRONE_COLORS, DRONE_NAMES, NoGatesCourse};
@@ -638,15 +638,21 @@ pub fn setup_camera_hud(mut commands: Commands) {
 pub fn update_camera_hud(
     camera_state: Res<CameraState>,
     progress: Option<Res<RaceProgress>>,
+    course_cameras: Option<Res<CourseCameras>>,
     mut mode_text: Query<&mut Text, (With<CameraHudModeText>, Without<CameraHudHintText>)>,
     mut hint_text: Query<&mut Text, (With<CameraHudHintText>, Without<CameraHudModeText>)>,
 ) {
-    if !camera_state.is_changed() {
-        // Also update when progress changes (drone names shift in FPV)
-        if camera_state.mode != CameraMode::Fpv || progress.as_ref().is_none_or(|p| !p.is_changed()) {
-            return;
-        }
+    if !camera_state.is_changed()
+        && (camera_state.mode != CameraMode::Fpv
+            || progress.as_ref().is_none_or(|p| !p.is_changed()))
+    {
+        return;
     }
+
+    let cam_count = course_cameras
+        .as_ref()
+        .map(|cc| cc.cameras.len())
+        .unwrap_or(0);
 
     let mode_label = match camera_state.mode {
         CameraMode::Chase => "CHASE CAM".to_string(),
@@ -656,13 +662,28 @@ pub fn update_camera_hud(
                 .as_ref()
                 .and_then(|p| {
                     let standings = p.standings();
-                    let idx = camera_state.target_standings_index.min(standings.len().saturating_sub(1));
-                    standings.get(idx).map(|&(drone_idx, _)| {
-                        DRONE_NAMES.get(drone_idx).copied().unwrap_or("???")
-                    })
+                    let idx = camera_state
+                        .target_standings_index
+                        .min(standings.len().saturating_sub(1));
+                    standings
+                        .get(idx)
+                        .map(|&(drone_idx, _)| {
+                            DRONE_NAMES.get(drone_idx).copied().unwrap_or("???")
+                        })
                 })
                 .unwrap_or("---");
-            format!("FPV: {}", drone_name)
+            format!("FPV: {drone_name}")
+        }
+        CameraMode::CourseCamera(idx) => {
+            let label = course_cameras
+                .as_ref()
+                .and_then(|cc| cc.cameras.get(idx))
+                .and_then(|entry| entry.label.as_deref());
+            if let Some(name) = label {
+                format!("CAM {}: {name}", idx + 1)
+            } else {
+                format!("CAM {}", idx + 1)
+            }
         }
     };
 
@@ -670,11 +691,25 @@ pub fn update_camera_hud(
         text.0 = mode_label.clone();
     }
 
-    let hint = match camera_state.mode {
-        CameraMode::Fpv => "[1] Chase  [2] Spectator  [3] Next drone",
-        _ => "[1] Chase  [2] Spectator  [3] FPV",
+    let hint = if cam_count > 0 {
+        let cam_keys = if cam_count == 1 {
+            "[1] Cam".to_string()
+        } else {
+            format!("[1-{}] Cams", cam_count.min(9))
+        };
+        match camera_state.mode {
+            CameraMode::Fpv => format!("{cam_keys}  [2] Chase  [Shift+F] Next  [Shift+S] Spec"),
+            _ => format!("{cam_keys}  [2] Chase  [Shift+F] FPV  [Shift+S] Spec"),
+        }
+    } else {
+        match camera_state.mode {
+            CameraMode::Fpv => {
+                "[1] Chase  [2] Chase  [Shift+F] Next  [Shift+S] Spec".to_string()
+            }
+            _ => "[1] Chase  [Shift+F] FPV  [Shift+S] Spectator".to_string(),
+        }
     };
     for mut text in &mut hint_text {
-        text.0 = hint.to_string();
+        text.0 = hint.clone();
     }
 }

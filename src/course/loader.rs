@@ -160,7 +160,7 @@ pub fn save_course(course: &CourseData, path: &Path) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::obstacle::definition::ObstacleId;
-    use crate::course::data::ObstacleInstance;
+    use crate::course::data::{CameraInstance, ObstacleInstance};
     use bevy::math::{Quat, Vec3};
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -195,6 +195,7 @@ mod tests {
                 },
             ],
             props: vec![],
+            cameras: vec![],
         }
     }
 
@@ -223,6 +224,7 @@ mod tests {
             name: "Empty".to_string(),
             instances: vec![],
             props: vec![],
+            cameras: vec![],
         };
         let tmp = NamedTempFile::new().unwrap();
 
@@ -268,6 +270,7 @@ mod tests {
             name: "Nested".to_string(),
             instances: vec![],
             props: vec![],
+            cameras: vec![],
         };
         save_course(&course, &path).unwrap();
         assert!(path.exists());
@@ -287,6 +290,7 @@ mod tests {
                 gate_forward_flipped: false,
             }],
             props: vec![],
+            cameras: vec![],
         };
         let tmp = NamedTempFile::new().unwrap();
 
@@ -315,5 +319,51 @@ mod tests {
     #[test]
     fn delete_nonexistent_course_returns_error() {
         assert!(delete_course(Path::new("no_such_course.ron")).is_err());
+    }
+
+    #[test]
+    fn camera_roundtrip() {
+        let course = CourseData {
+            name: "Camera Test".to_string(),
+            instances: vec![],
+            props: vec![],
+            cameras: vec![
+                CameraInstance {
+                    translation: Vec3::new(10.0, 5.0, -15.0),
+                    rotation: Quat::from_rotation_y(1.0),
+                    is_primary: true,
+                    label: Some("Main".to_string()),
+                },
+                CameraInstance {
+                    translation: Vec3::new(-5.0, 8.0, 0.0),
+                    rotation: Quat::IDENTITY,
+                    is_primary: false,
+                    label: None,
+                },
+            ],
+        };
+        let tmp = NamedTempFile::new().unwrap();
+        save_course(&course, tmp.path()).unwrap();
+        let loaded = load_course_from_file(tmp.path()).unwrap();
+
+        assert_eq!(loaded.cameras.len(), 2);
+        assert_eq!(loaded.cameras[0].translation, Vec3::new(10.0, 5.0, -15.0));
+        assert!(loaded.cameras[0].is_primary);
+        assert_eq!(loaded.cameras[0].label.as_deref(), Some("Main"));
+        assert!(!loaded.cameras[1].is_primary);
+        assert!(loaded.cameras[1].label.is_none());
+    }
+
+    #[test]
+    fn backward_compat_no_cameras_field() {
+        let ron_content = r#"CourseData(
+    name: "Old Course",
+    instances: [],
+    props: [],
+)"#;
+        let mut tmp = NamedTempFile::new().unwrap();
+        write!(tmp, "{ron_content}").unwrap();
+        let loaded = load_course_from_file(tmp.path()).unwrap();
+        assert!(loaded.cameras.is_empty());
     }
 }

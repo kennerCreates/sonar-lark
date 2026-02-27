@@ -96,4 +96,12 @@
             color_override: None,
         ),
     ],
+    cameras: [
+        (
+            translation: (24.28654, 7.2852206, 48.47949),
+            rotation: (0.0, -0.053253483, 0.0, 0.99858105),
+            is_primary: true,
+            label: None,
+        ),
+    ],
 )

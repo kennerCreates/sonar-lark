@@ -2,7 +2,9 @@ use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 
 use crate::course::data::PropKind;
-use crate::editor::course_editor::{EditorTab, PlacedObstacle, PlacedProp, PlacementState};
+use crate::editor::course_editor::{
+    EditorTab, PlacedCamera, PlacedObstacle, PlacedProp, PlacementState,
+};
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
@@ -266,21 +268,54 @@ pub fn handle_tab_switch(
     mut state: ResMut<PlacementState>,
     obstacle_tab: Query<&Interaction, (Changed<Interaction>, With<ObstacleTabButton>)>,
     props_tab: Query<&Interaction, (Changed<Interaction>, With<PropsTabButton>)>,
+    cameras_tab: Query<&Interaction, (Changed<Interaction>, With<CamerasTabButton>)>,
     mut obstacle_content: Query<
         &mut Node,
-        (With<ObstaclePaletteContent>, Without<PropPaletteContent>),
+        (
+            With<ObstaclePaletteContent>,
+            Without<PropPaletteContent>,
+            Without<CameraPaletteContent>,
+        ),
     >,
     mut prop_content: Query<
         &mut Node,
-        (With<PropPaletteContent>, Without<ObstaclePaletteContent>),
+        (
+            With<PropPaletteContent>,
+            Without<ObstaclePaletteContent>,
+            Without<CameraPaletteContent>,
+        ),
+    >,
+    mut camera_content: Query<
+        &mut Node,
+        (
+            With<CameraPaletteContent>,
+            Without<ObstaclePaletteContent>,
+            Without<PropPaletteContent>,
+        ),
     >,
     mut obstacle_tab_bg: Query<
         &mut BackgroundColor,
-        (With<ObstacleTabButton>, Without<PropsTabButton>),
+        (
+            With<ObstacleTabButton>,
+            Without<PropsTabButton>,
+            Without<CamerasTabButton>,
+        ),
     >,
     mut props_tab_bg: Query<
         &mut BackgroundColor,
-        (With<PropsTabButton>, Without<ObstacleTabButton>),
+        (
+            With<PropsTabButton>,
+            Without<ObstacleTabButton>,
+            Without<CamerasTabButton>,
+        ),
+    >,
+    mut cameras_tab_bg: Query<
+        &mut BackgroundColor,
+        (
+            With<CamerasTabButton>,
+            Without<ObstacleTabButton>,
+            Without<PropsTabButton>,
+        ),
     >,
 ) {
     let mut new_tab = None;
@@ -295,6 +330,11 @@ pub fn handle_tab_switch(
             new_tab = Some(EditorTab::Props);
         }
     }
+    for interaction in &cameras_tab {
+        if *interaction == Interaction::Pressed {
+            new_tab = Some(EditorTab::Cameras);
+        }
+    }
 
     let Some(tab) = new_tab else { return };
     if tab == state.active_tab {
@@ -302,9 +342,10 @@ pub fn handle_tab_switch(
     }
     state.active_tab = tab;
 
-    let (obs_display, prop_display) = match tab {
-        EditorTab::Obstacles => (Display::Flex, Display::None),
-        EditorTab::Props => (Display::None, Display::Flex),
+    let (obs_display, prop_display, cam_display) = match tab {
+        EditorTab::Obstacles => (Display::Flex, Display::None, Display::None),
+        EditorTab::Props => (Display::None, Display::Flex, Display::None),
+        EditorTab::Cameras => (Display::None, Display::None, Display::Flex),
     };
 
     if let Ok(mut node) = obstacle_content.single_mut() {
@@ -313,16 +354,23 @@ pub fn handle_tab_switch(
     if let Ok(mut node) = prop_content.single_mut() {
         node.display = prop_display;
     }
+    if let Ok(mut node) = camera_content.single_mut() {
+        node.display = cam_display;
+    }
 
-    let (obs_bg, prop_bg) = match tab {
-        EditorTab::Obstacles => (BUTTON_SELECTED, BUTTON_NORMAL),
-        EditorTab::Props => (BUTTON_NORMAL, BUTTON_SELECTED),
+    let (obs_bg, prop_bg, cam_bg) = match tab {
+        EditorTab::Obstacles => (BUTTON_SELECTED, BUTTON_NORMAL, BUTTON_NORMAL),
+        EditorTab::Props => (BUTTON_NORMAL, BUTTON_SELECTED, BUTTON_NORMAL),
+        EditorTab::Cameras => (BUTTON_NORMAL, BUTTON_NORMAL, BUTTON_SELECTED),
     };
     if let Ok(mut bg) = obstacle_tab_bg.single_mut() {
         *bg = BackgroundColor(obs_bg);
     }
     if let Ok(mut bg) = props_tab_bg.single_mut() {
         *bg = BackgroundColor(prop_bg);
+    }
+    if let Ok(mut bg) = cameras_tab_bg.single_mut() {
+        *bg = BackgroundColor(cam_bg);
     }
 }
 
@@ -454,6 +502,131 @@ pub fn update_prop_color_label(
         }
     } else {
         **text = "Color: (select a prop)".to_string();
+        *color = TextColor(palette::CHAINMAIL);
+    }
+}
+
+// --- Camera placement ---
+
+pub fn setup_camera_editor_meshes(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    light_dir: Res<CelLightDir>,
+) {
+    let mesh = meshes.add(Cuboid::new(0.3, 0.3, 0.5));
+    let material = cel_materials.add(cel_material_from_color(palette::SKY, light_dir.0));
+    let primary_material =
+        cel_materials.add(cel_material_from_color(palette::SUNSHINE, light_dir.0));
+    commands.insert_resource(CameraEditorMeshes {
+        mesh,
+        material,
+        primary_material,
+    });
+}
+
+pub fn handle_camera_placement(
+    mut commands: Commands,
+    mut state: ResMut<PlacementState>,
+    query: Query<&Interaction, (Changed<Interaction>, With<PlaceCameraButton>)>,
+    camera_meshes: Option<Res<CameraEditorMeshes>>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        let Some(ref meshes) = camera_meshes else {
+            continue;
+        };
+
+        let transform = Transform::from_translation(Vec3::ZERO);
+        let entity = commands
+            .spawn((
+                transform,
+                Visibility::default(),
+                Mesh3d(meshes.mesh.clone()),
+                MeshMaterial3d(meshes.material.clone()),
+                PlacedCamera {
+                    is_primary: false,
+                    label: None,
+                },
+            ))
+            .id();
+
+        state.selected_entity = Some(entity);
+        state.selected_palette_id = None;
+    }
+}
+
+pub fn handle_camera_primary_toggle(
+    query: Query<&Interaction, (Changed<Interaction>, With<CameraPrimaryToggle>)>,
+    state: Res<PlacementState>,
+    mut camera_query: Query<(Entity, &mut PlacedCamera, &mut MeshMaterial3d<CelMaterial>)>,
+    camera_meshes: Option<Res<CameraEditorMeshes>>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let Some(entity) = state.selected_entity else {
+            continue;
+        };
+        let Some(ref meshes) = camera_meshes else {
+            continue;
+        };
+
+        // Toggle the selected camera's primary status
+        let Ok((_, mut cam, _)) = camera_query.get_mut(entity) else {
+            continue;
+        };
+        let new_primary = !cam.is_primary;
+        cam.is_primary = new_primary;
+
+        // If becoming primary, clear all others
+        if new_primary {
+            for (e, mut other_cam, mut other_mat) in &mut camera_query {
+                if e != entity && other_cam.is_primary {
+                    other_cam.is_primary = false;
+                    other_mat.0 = meshes.material.clone();
+                }
+            }
+        }
+
+        // Update the toggled camera's material
+        if let Ok((_, _, mut mat)) = camera_query.get_mut(entity) {
+            mat.0 = if new_primary {
+                meshes.primary_material.clone()
+            } else {
+                meshes.material.clone()
+            };
+        }
+    }
+}
+
+pub fn update_camera_primary_label(
+    state: Res<PlacementState>,
+    camera_query: Query<&PlacedCamera>,
+    mut label_query: Query<(&mut Text, &mut TextColor), With<CameraPrimaryLabel>>,
+) {
+    let Ok((mut text, mut color)) = label_query.single_mut() else {
+        return;
+    };
+
+    let cam = state
+        .selected_entity
+        .and_then(|e| camera_query.get(e).ok());
+
+    if let Some(cam) = cam {
+        if cam.is_primary {
+            **text = "Primary: Yes".to_string();
+            *color = TextColor(palette::SUNSHINE);
+        } else {
+            **text = "Primary: No".to_string();
+            *color = TextColor(palette::SKY);
+        }
+    } else {
+        **text = "Primary: (select a camera)".to_string();
         *color = TextColor(palette::CHAINMAIL);
     }
 }

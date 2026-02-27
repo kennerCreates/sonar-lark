@@ -95,15 +95,23 @@ pub struct PlacedProp {
     pub color_override: Option<[f32; 4]>,
 }
 
+/// Marker on every camera entity spawned in the course editor.
+#[derive(Component, Clone)]
+pub struct PlacedCamera {
+    pub is_primary: bool,
+    pub label: Option<String>,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub enum EditorTab {
     #[default]
     Obstacles,
     Props,
+    Cameras,
 }
 
-/// Query filter matching any editor-placed entity (obstacle or prop).
-type PlacedFilter = Or<(With<PlacedObstacle>, With<PlacedProp>)>;
+/// Query filter matching any editor-placed entity (obstacle, prop, or camera).
+type PlacedFilter = Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>;
 
 // --- Plugin ---
 
@@ -118,6 +126,7 @@ impl Plugin for CourseEditorPlugin {
                     ensure_gltf_loaded,
                     setup_course_editor,
                     ui::setup_prop_editor_meshes,
+                    ui::setup_camera_editor_meshes,
                 ),
             )
             .add_systems(
@@ -145,6 +154,9 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_transform_mode_buttons,
                     ui::handle_prop_color_cycle,
                     ui::update_prop_color_label,
+                    ui::handle_camera_placement,
+                    ui::handle_camera_primary_toggle,
+                    ui::update_camera_primary_label,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -185,6 +197,7 @@ impl Plugin for CourseEditorPlugin {
                     overlays::draw_selection_highlight,
                     overlays::draw_flight_spline_preview,
                     overlays::draw_prop_gizmos,
+                    overlays::draw_camera_gizmos,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -245,6 +258,7 @@ fn cleanup_course_editor(
     commands.remove_resource::<PendingEditorCourse>();
     commands.remove_resource::<ui::PendingCourseDelete>();
     commands.remove_resource::<ui::PropEditorMeshes>();
+    commands.remove_resource::<ui::CameraEditorMeshes>();
     for entity in &placed_query {
         commands.entity(entity).despawn();
     }
@@ -265,6 +279,7 @@ fn handle_placement_and_selection(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut obstacle_query: Query<(Entity, &mut PlacedObstacle)>,
     prop_query: Query<Entity, With<PlacedProp>>,
+    camera_entity_query: Query<Entity, With<PlacedCamera>>,
     parent_query: Query<&ChildOf>,
     interaction_query: Query<&Interaction>,
     mut ray_cast: MeshRayCast,
@@ -304,6 +319,7 @@ fn handle_placement_and_selection(
         ray,
         &obstacle_query,
         &prop_query,
+        &camera_entity_query,
         &parent_query,
     );
 
@@ -411,13 +427,17 @@ fn find_placed_ancestor_from_ray(
     ray: Ray3d,
     obstacle_query: &Query<(Entity, &mut PlacedObstacle)>,
     prop_query: &Query<Entity, With<PlacedProp>>,
+    camera_query: &Query<Entity, With<PlacedCamera>>,
     parent_query: &Query<&ChildOf>,
 ) -> Option<Entity> {
     let hits = ray_cast.cast_ray(ray, &MeshRayCastSettings::default());
     for (hit_entity, _) in hits {
         let mut current = *hit_entity;
         loop {
-            if obstacle_query.get(current).is_ok() || prop_query.get(current).is_ok() {
+            if obstacle_query.get(current).is_ok()
+                || prop_query.get(current).is_ok()
+                || camera_query.get(current).is_ok()
+            {
                 return Some(current);
             }
             if let Ok(child_of) = parent_query.get(current) {

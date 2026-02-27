@@ -180,7 +180,7 @@ pub fn draw_drone_state(
                     gizmos.arrow(curve_pos, curve_pos + tangent, Color::srgb(1.0, 1.0, 0.0));
                 }
             }
-            DronePhase::Idle | DronePhase::Crashed => {}
+            DronePhase::Idle | DronePhase::Crashed | DronePhase::Wandering => {}
         }
     }
 }

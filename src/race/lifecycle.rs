@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::camera::switching::{CameraMode, CameraState, CourseCameras};
 use crate::course::loader::SelectedCourse;
 use crate::drone::components::{AIController, Drone, DronePhase};
 use crate::states::AppState;
@@ -44,7 +45,7 @@ pub fn drones_are_active(
     }
     drones
         .iter()
-        .any(|dp| matches!(*dp, DronePhase::VictoryLap))
+        .any(|dp| matches!(*dp, DronePhase::VictoryLap | DronePhase::Wandering))
 }
 
 /// Ticks the countdown timer each frame, then transitions to Racing when it expires.
@@ -104,6 +105,8 @@ pub fn check_race_finished(
     progress: Option<Res<RaceProgress>>,
     mut clock: Option<ResMut<RaceClock>>,
     mut commands: Commands,
+    mut camera_state: ResMut<CameraState>,
+    course_cameras: Option<Res<CourseCameras>>,
 ) {
     if *phase != RacePhase::Racing {
         return;
@@ -123,6 +126,10 @@ pub fn check_race_finished(
             clock.running = false;
         }
         commands.insert_resource(ResultsTransitionTimer { remaining: 3.0 });
+        // Switch to primary course camera if available
+        if course_cameras.is_some_and(|cc| !cc.cameras.is_empty()) {
+            camera_state.mode = CameraMode::CourseCamera(0);
+        }
         info!("Race finished! All drones completed or crashed.");
     }
 }

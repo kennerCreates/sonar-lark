@@ -16,7 +16,7 @@ use fpv::FpvFollowState;
 use orbit::MainCamera;
 use settings::CameraSettings;
 use spectator::SpectatorOrbitState;
-use switching::{CameraMode, CameraState};
+use switching::{CameraMode, CameraState, CourseCameras};
 
 /// Run condition: true during Race or Results (camera follows drones in both).
 fn in_race_or_results(state: Res<State<AppState>>) -> bool {
@@ -34,7 +34,14 @@ impl Plugin for CameraPlugin {
             .init_resource::<SpectatorOrbitState>()
             .add_systems(Startup, spawn_camera)
             // Race camera lifecycle
-            .add_systems(OnEnter(AppState::Race), switching::reset_camera_for_race)
+            .add_systems(
+                OnEnter(AppState::Race),
+                (
+                    switching::build_course_cameras,
+                    switching::reset_camera_for_race,
+                )
+                    .chain(),
+            )
             .add_systems(OnExit(AppState::Results), switching::reset_camera_on_exit)
             // Race camera mode switching (active during Race and Results)
             .add_systems(
@@ -59,6 +66,12 @@ impl Plugin for CameraPlugin {
                 fpv::fpv_camera_update
                     .run_if(in_race_or_results)
                     .run_if(camera_mode_is(CameraMode::Fpv)),
+            )
+            .add_systems(
+                Update,
+                course_camera_update
+                    .run_if(in_race_or_results)
+                    .run_if(camera_mode_is_course_camera),
             )
             // Editor camera rig lifecycle
             .add_systems(OnEnter(AppState::Editor), orbit::setup_editor_camera)
@@ -87,6 +100,31 @@ impl Plugin for CameraPlugin {
 
 fn camera_mode_is(mode: CameraMode) -> impl Fn(Res<CameraState>) -> bool {
     move |state: Res<CameraState>| state.mode == mode
+}
+
+fn camera_mode_is_course_camera(state: Res<CameraState>) -> bool {
+    matches!(state.mode, CameraMode::CourseCamera(_))
+}
+
+/// Snaps the camera to the stored course camera transform.
+fn course_camera_update(
+    state: Res<CameraState>,
+    course_cameras: Option<Res<CourseCameras>>,
+    settings: Res<CameraSettings>,
+    mut camera: Query<(&mut Transform, &mut Projection), With<MainCamera>>,
+) {
+    let CameraMode::CourseCamera(idx) = state.mode else {
+        return;
+    };
+    let Some(cc) = course_cameras else { return };
+    let Some(entry) = cc.cameras.get(idx) else { return };
+
+    if let Ok((mut transform, mut projection)) = camera.single_mut() {
+        *transform = entry.transform;
+        if let Projection::Perspective(ref mut persp) = *projection {
+            persp.fov = settings.fov_degrees.to_radians();
+        }
+    }
 }
 
 fn spawn_camera(mut commands: Commands) {

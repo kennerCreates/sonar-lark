@@ -168,7 +168,17 @@ pub enum DronePhase {
     Racing,
     /// Drone has finished the race and is continuing to lap the course.
     VictoryLap,
+    /// Drone wanders freely in the Results screen.
+    Wandering,
     Crashed,
+}
+
+/// Wandering state: drone picks random waypoints within the course bounding box.
+#[derive(Component)]
+pub struct WanderState {
+    pub target: Vec3,
+    pub dwell_timer: f32,
+    pub step: u32,
 }
 
 /// Runtime-tunable AI and physics parameters. Exposed via the dev dashboard (F4).
