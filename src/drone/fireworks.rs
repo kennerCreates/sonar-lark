@@ -6,6 +6,7 @@ use crate::drone::spawning::DRONE_COLORS;
 use crate::palette;
 use crate::pilot::SelectedPilots;
 use crate::race::gate::{GateForward, GateIndex};
+use crate::race::lifecycle::RaceEndSound;
 use crate::race::progress::RaceProgress;
 use crate::states::AppState;
 
@@ -111,6 +112,7 @@ pub fn detect_first_finish(
     selected_pilots: Option<Res<SelectedPilots>>,
     gates: Query<(&GlobalTransform, &GateIndex, Option<&GateForward>)>,
     emitters: Query<(&Transform, &FireworkEmitter)>,
+    race_end_sound: Option<Res<RaceEndSound>>,
 ) {
     if triggered.is_some() {
         return;
@@ -126,6 +128,13 @@ pub fn detect_first_finish(
     let Some((winner_idx, _)) = winner else { return };
 
     commands.insert_resource(FireworksTriggered);
+
+    if let Some(ref sound) = race_end_sound {
+        commands.spawn((
+            AudioPlayer::new(sound.0.clone()),
+            PlaybackSettings::DESPAWN,
+        ));
+    }
 
     let Some(firework_meshes) = firework_meshes else {
         return;
@@ -441,16 +450,8 @@ pub fn tick_firework_shells(
                 shell.accent_color,
             );
 
-            // Play sound
-            if let Some(ref sounds) = firework_sounds
-                && !sounds.0.is_empty()
-            {
-                commands.spawn((
-                    AudioPlayer::new(sounds.0[0].clone()),
-                    PlaybackSettings::DESPAWN,
-                    DespawnOnExit(AppState::Results),
-                ));
-            }
+            // TODO: firework sound temporarily disconnected
+            let _ = &firework_sounds;
 
             commands.entity(entity).despawn();
         }

@@ -69,7 +69,7 @@ pub fn load_explosion_assets(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     let handles: Vec<Handle<bevy::audio::AudioSource>> = (1..=CRASH_SOUND_COUNT)
-        .map(|i| asset_server.load(format!("sounds/drone_crash_pole_hit_{i}.wav")))
+        .map(|i| asset_server.load(format!("sounds/drone_crash/drone_crash_pole_hit_{i}.wav")))
         .collect();
     commands.insert_resource(CrashSounds(handles));
     commands.insert_resource(ExplosionMeshes {

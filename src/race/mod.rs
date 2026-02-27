@@ -84,6 +84,7 @@ fn cleanup_race(mut commands: Commands) {
     commands.remove_resource::<lifecycle::CountdownTimer>();
     commands.remove_resource::<lifecycle::ResultsTransitionTimer>();
     commands.remove_resource::<lifecycle::RaceStartSound>();
+    commands.remove_resource::<lifecycle::RaceEndSound>();
     commands.remove_resource::<gate::GatePlanes>();
     commands.remove_resource::<collision::ObstacleCollisionCache>();
 }

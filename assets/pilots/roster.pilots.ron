@@ -1,0 +1,613 @@
+(
+    pilots: [
+        (
+            id: (1),
+            gamertag: "RazorFalconJr",
+            personality: [
+                Aggressive,
+                Hotdog,
+            ],
+            skill: (
+                level: 0.81715196,
+                speed: 0.2309557,
+                cornering: 0.902157,
+                consistency: 0.51730675,
+            ),
+            color_scheme: (
+                primary: (0.961, 0.192, 0.255),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 3,
+                crashes: 0,
+                wins: 2,
+                best_time: Some(15.493465),
+            ),
+        ),
+        (
+            id: (2),
+            gamertag: "RazorTorque",
+            personality: [
+                Cautious,
+            ],
+            skill: (
+                level: 0.86598206,
+                speed: 0.4090094,
+                cornering: 0.6128588,
+                consistency: 0.6293952,
+            ),
+            color_scheme: (
+                primary: (0.961, 0.506, 0.133),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 2,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.680826),
+            ),
+        ),
+        (
+            id: (3),
+            gamertag: "HyperFury",
+            personality: [
+                Technical,
+                Flashy,
+            ],
+            skill: (
+                level: 0.39033055,
+                speed: 0.75748765,
+                cornering: 0.70925426,
+                consistency: 0.92314786,
+            ),
+            color_scheme: (
+                primary: (0.98, 0.851, 0.216),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 2,
+                crashes: 1,
+                wins: 1,
+                best_time: Some(15.923817),
+            ),
+        ),
+        (
+            id: (4),
+            gamertag: "Surge267",
+            personality: [
+                Cautious,
+            ],
+            skill: (
+                level: 0.84876084,
+                speed: 0.2270092,
+                cornering: 0.42839724,
+                consistency: 0.9108891,
+            ),
+            color_scheme: (
+                primary: (0.58, 0.749, 0.188),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 1,
+                crashes: 2,
+                wins: 0,
+                best_time: Some(16.958445),
+            ),
+        ),
+        (
+            id: (5),
+            gamertag: "HawkXD",
+            personality: [
+                Smooth,
+            ],
+            skill: (
+                level: 0.34375256,
+                speed: 0.28616363,
+                cornering: 0.8177071,
+                consistency: 0.8457802,
+            ),
+            color_scheme: (
+                primary: (0.09, 0.612, 0.263),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 1,
+                finishes: 1,
+                crashes: 0,
+                wins: 0,
+                best_time: Some(16.673845),
+            ),
+        ),
+        (
+            id: (6),
+            gamertag: "HyperZenithGG",
+            personality: [
+                Flashy,
+                Reckless,
+            ],
+            skill: (
+                level: 0.79606247,
+                speed: 0.2138011,
+                cornering: 0.26074487,
+                consistency: 0.33213827,
+            ),
+            color_scheme: (
+                primary: (0.239, 0.631, 0.494),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 2,
+                finishes: 1,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.298855),
+            ),
+        ),
+        (
+            id: (7),
+            gamertag: "Apex226",
+            personality: [
+                Hotdog,
+            ],
+            skill: (
+                level: 0.6946859,
+                speed: 0.8092516,
+                cornering: 0.59107995,
+                consistency: 0.4473024,
+            ),
+            color_scheme: (
+                primary: (0.286, 0.761, 0.949),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 1,
+                finishes: 0,
+                crashes: 1,
+                wins: 0,
+                best_time: None,
+            ),
+        ),
+        (
+            id: (8),
+            gamertag: "Comet_v2",
+            personality: [
+                Flashy,
+            ],
+            skill: (
+                level: 0.3114603,
+                speed: 0.7693179,
+                cornering: 0.78148973,
+                consistency: 0.5133973,
+            ),
+            color_scheme: (
+                primary: (0.11, 0.459, 0.741),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 2,
+                finishes: 1,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.826534),
+            ),
+        ),
+        (
+            id: (9),
+            gamertag: "xXBlade007",
+            personality: [
+                Flashy,
+                Reckless,
+            ],
+            skill: (
+                level: 0.7920794,
+                speed: 0.71245515,
+                cornering: 0.62632835,
+                consistency: 0.43221962,
+            ),
+            color_scheme: (
+                primary: (0.494, 0.494, 0.949),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 0,
+                crashes: 3,
+                wins: 0,
+                best_time: None,
+            ),
+        ),
+        (
+            id: (10),
+            gamertag: "5torm",
+            personality: [
+                Technical,
+            ],
+            skill: (
+                level: 0.41018903,
+                speed: 0.2878546,
+                cornering: 0.74358165,
+                consistency: 0.99750656,
+            ),
+            color_scheme: (
+                primary: (0.639, 0.365, 0.851),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 4,
+                finishes: 0,
+                crashes: 4,
+                wins: 0,
+                best_time: None,
+            ),
+        ),
+        (
+            id: (11),
+            gamertag: "OnyxYT",
+            personality: [
+                Cautious,
+                Methodical,
+            ],
+            skill: (
+                level: 0.25442213,
+                speed: 0.5801316,
+                cornering: 0.26626816,
+                consistency: 0.25439045,
+            ),
+            color_scheme: (
+                primary: (0.851, 0.298, 0.557),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 2,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.368158),
+            ),
+        ),
+        (
+            id: (12),
+            gamertag: "xXCipherYT",
+            personality: [
+                Reckless,
+            ],
+            skill: (
+                level: 0.48085833,
+                speed: 0.27696657,
+                cornering: 0.7901492,
+                consistency: 0.40311053,
+            ),
+            color_scheme: (
+                primary: (0.949, 0.949, 0.855),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 2,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.555626),
+            ),
+        ),
+        (
+            id: (13),
+            gamertag: "Ni7ro",
+            personality: [
+                Cautious,
+            ],
+            skill: (
+                level: 0.6620431,
+                speed: 0.8131606,
+                cornering: 0.5835915,
+                consistency: 0.35267976,
+            ),
+            color_scheme: (
+                primary: (0.949, 0.384, 0.122),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 4,
+                finishes: 3,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.611427),
+            ),
+        ),
+        (
+            id: (14),
+            gamertag: "Flash420",
+            personality: [
+                Reckless,
+                Hotdog,
+            ],
+            skill: (
+                level: 0.7475141,
+                speed: 0.512925,
+                cornering: 0.80488175,
+                consistency: 0.60655713,
+            ),
+            color_scheme: (
+                primary: (0.98, 0.627, 0.196),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 2,
+                finishes: 2,
+                crashes: 0,
+                wins: 0,
+                best_time: Some(16.11831),
+            ),
+        ),
+        (
+            id: (15),
+            gamertag: "Gli7ch",
+            personality: [
+                Smooth,
+            ],
+            skill: (
+                level: 0.29802117,
+                speed: 0.6048597,
+                cornering: 0.46048886,
+                consistency: 0.77460533,
+            ),
+            color_scheme: (
+                primary: (0.8, 0.78, 0.239),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 2,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.687605),
+            ),
+        ),
+        (
+            id: (16),
+            gamertag: "Boltz",
+            personality: [
+                Cautious,
+            ],
+            skill: (
+                level: 0.92090386,
+                speed: 0.7764329,
+                cornering: 0.28730175,
+                consistency: 0.9173312,
+            ),
+            color_scheme: (
+                primary: (0.333, 0.702, 0.231),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 3,
+                crashes: 0,
+                wins: 0,
+                best_time: Some(16.451777),
+            ),
+        ),
+        (
+            id: (17),
+            gamertag: "Specter370",
+            personality: [
+                Methodical,
+            ],
+            skill: (
+                level: 0.6754398,
+                speed: 0.34452814,
+                cornering: 0.8230101,
+                consistency: 0.4524154,
+            ),
+            color_scheme: (
+                primary: (0.024, 0.502, 0.32),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 2,
+                finishes: 1,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(17.326809),
+            ),
+        ),
+        (
+            id: (18),
+            gamertag: "RazorCipherXD",
+            personality: [
+                Smooth,
+            ],
+            skill: (
+                level: 0.71608794,
+                speed: 0.80623823,
+                cornering: 0.6876693,
+                consistency: 0.57673305,
+            ),
+            color_scheme: (
+                primary: (0.126, 0.502, 0.424),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 1,
+                crashes: 2,
+                wins: 1,
+                best_time: Some(16.104431),
+            ),
+        ),
+        (
+            id: (19),
+            gamertag: "PixelJr",
+            personality: [
+                Hotdog,
+            ],
+            skill: (
+                level: 0.31489548,
+                speed: 0.43267855,
+                cornering: 0.80807877,
+                consistency: 0.81986177,
+            ),
+            color_scheme: (
+                primary: (0.145, 0.675, 0.961),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 2,
+                finishes: 1,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(17.055729),
+            ),
+        ),
+        (
+            id: (20),
+            gamertag: "VortexHawk",
+            personality: [
+                Reckless,
+            ],
+            skill: (
+                level: 0.60867065,
+                speed: 0.9665251,
+                cornering: 0.54248226,
+                consistency: 0.44000182,
+            ),
+            color_scheme: (
+                primary: (0.345, 0.416, 0.769),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 3,
+                crashes: 0,
+                wins: 0,
+                best_time: Some(16.10439),
+            ),
+        ),
+        (
+            id: (21),
+            gamertag: "HyperPulseJr",
+            personality: [
+                Hotdog,
+                Flashy,
+            ],
+            skill: (
+                level: 0.28414842,
+                speed: 0.5806958,
+                cornering: 0.96436864,
+                consistency: 0.3047805,
+            ),
+            color_scheme: (
+                primary: (0.467, 0.231, 0.749),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 0,
+                finishes: 0,
+                crashes: 0,
+                wins: 0,
+                best_time: None,
+            ),
+        ),
+        (
+            id: (22),
+            gamertag: "ApexGG",
+            personality: [
+                Smooth,
+            ],
+            skill: (
+                level: 0.9280456,
+                speed: 0.8978535,
+                cornering: 0.5201861,
+                consistency: 0.772377,
+            ),
+            color_scheme: (
+                primary: (0.792, 0.494, 0.949),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 3,
+                finishes: 2,
+                crashes: 1,
+                wins: 1,
+                best_time: Some(16.562727),
+            ),
+        ),
+        (
+            id: (23),
+            gamertag: "Spark",
+            personality: [
+                Smooth,
+            ],
+            skill: (
+                level: 0.91121894,
+                speed: 0.5087337,
+                cornering: 0.4840324,
+                consistency: 0.29412195,
+            ),
+            color_scheme: (
+                primary: (0.922, 0.459, 0.561),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 2,
+                finishes: 1,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.653051),
+            ),
+        ),
+        (
+            id: (24),
+            gamertag: "Falcon871",
+            personality: [
+                Technical,
+                Aggressive,
+            ],
+            skill: (
+                level: 0.8546285,
+                speed: 0.53911847,
+                cornering: 0.3290806,
+                consistency: 0.46847463,
+            ),
+            color_scheme: (
+                primary: (1.0, 0.725, 0.22),
+            ),
+            drone_build: (),
+            portrait: (),
+            stats: (
+                races_entered: 2,
+                finishes: 1,
+                crashes: 1,
+                wins: 0,
+                best_time: Some(16.430756),
+            ),
+        ),
+    ],
+    next_id: 25,
+)
