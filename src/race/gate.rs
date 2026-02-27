@@ -215,8 +215,12 @@ pub fn miss_detection(
         let expected = progress.drone_states[drone_idx].next_gate;
         let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
 
+        // Threshold: departure point + 0.5 spline units of margin.
+        // The gate midpoint is at expected * PPG + 0.5; departure at +1.0.
+        // Detecting at +1.5 catches the miss promptly (near the gate) rather
+        // than waiting until the drone reaches the next gate.
         let miss_threshold = if expected < progress.total_gates {
-            (expected as f32 + 1.0) * POINTS_PER_GATE
+            expected as f32 * POINTS_PER_GATE + 1.5
         } else {
             cycle_t + FINISH_EXTENSION
         };
