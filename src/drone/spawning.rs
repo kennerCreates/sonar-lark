@@ -8,7 +8,7 @@ use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::AppState;
 use super::components::*;
-use super::interpolation::{PreviousTranslation, PreviousRotation};
+use super::interpolation::{PhysicsRotation, PhysicsTranslation, PreviousRotation, PreviousTranslation};
 use super::paths::{RacePath, generate_race_path, generate_drone_race_path, compute_start_positions};
 
 const DRONE_COUNT: u8 = 12;
@@ -225,9 +225,13 @@ pub fn spawn_drones(
                 translation: position,
             },
             DronePhase::default(),
+            DespawnOnExit(AppState::Results),
+        ));
+        entity_cmd.insert((
             PreviousTranslation(position),
             PreviousRotation(rotation),
-            DespawnOnExit(AppState::Results),
+            PhysicsTranslation(position),
+            PhysicsRotation(rotation),
         ));
 
         let drone_color = DRONE_COLORS[i as usize];

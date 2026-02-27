@@ -63,6 +63,11 @@ Menu  ──►  Editor  ──►  Race  ──►  Results
 | Race | Shift+F | FPV camera (cycles target on repeat) |
 | Race | Shift+S | Spectator camera (RTS orbit) |
 | Race | F4 | Toggle dev dashboard |
+| Editor | 1 / 2 / 3 | Move / Rotate / Scale mode |
+| Editor | Shift (move) | Y-axis movement instead of XZ plane |
+| Editor | Shift (rotate) | Z-axis rotation instead of Y |
+| Editor | Ctrl (rotate) | X-axis rotation |
+| Editor | Shift (scale) | Per-axis scale instead of uniform |
 | Editor | F | Flip gate direction |
 | Editor | Q / E | Adjust height |
 
@@ -83,6 +88,7 @@ Menu  ──►  Editor  ──►  Race  ──►  Results
 - **Drone Models** — Blender-exported visual models replacing placeholders
 - **Obstacle Collision** — Swept OBB collision detection, gate opening exemption, Workshop collision volume editor, crash effects
 - **Course Cameras & Wandering** — Editor-placed cameras with frustum gizmos and PiP preview, race-time camera switching (1–0 keys), post-race ambient drone wandering
+- **Editor Gizmo Rework** — Entity-local gizmo axes (follow Y rotation), XZ-plane/Y-axis move modes, 5-degree rotation snapping, uniform/per-axis scale, modifier keys (Shift/Ctrl), 1.5x larger gizmos with thicker lines
 
 ## Architecture
 

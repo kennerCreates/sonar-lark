@@ -34,6 +34,12 @@ impl Plugin for DronePlugin {
                 explosion::load_explosion_assets,
                 fireworks::load_firework_assets,
             ))
+            // Restore authoritative physics transforms before snapshotting
+            .add_systems(
+                FixedFirst,
+                interpolation::restore_physics_transforms
+                    .run_if(in_race_or_results),
+            )
             // Snapshot transforms before physics for camera interpolation
             .add_systems(
                 FixedPreUpdate,
@@ -75,6 +81,18 @@ impl Plugin for DronePlugin {
                     physics::clamp_transform,
                 )
                     .chain()
+                    .run_if(in_race_or_results),
+            )
+            // Save authoritative physics state after the physics chain
+            .add_systems(
+                FixedPostUpdate,
+                interpolation::save_physics_transforms
+                    .run_if(in_race_or_results),
+            )
+            // Interpolate drone transforms for smooth rendering between physics ticks
+            .add_systems(
+                PostUpdate,
+                interpolation::interpolate_visual_transforms
                     .run_if(in_race_or_results),
             )
             // Flight debug visualization (F3 to toggle)

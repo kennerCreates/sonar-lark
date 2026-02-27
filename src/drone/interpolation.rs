@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::time::Fixed;
 
 use super::components::Drone;
 
@@ -12,6 +13,31 @@ pub struct PreviousTranslation(pub Vec3);
 #[derive(Component)]
 pub struct PreviousRotation(pub Quat);
 
+/// Authoritative physics translation, saved after each FixedUpdate tick.
+/// Visual interpolation blends between `PreviousTranslation` and this value.
+#[derive(Component)]
+pub struct PhysicsTranslation(pub Vec3);
+
+/// Authoritative physics rotation, saved after each FixedUpdate tick.
+#[derive(Component)]
+pub struct PhysicsRotation(pub Quat);
+
+/// Restores the authoritative physics transform before each fixed tick.
+/// Undoes the visual interpolation applied in PostUpdate so that physics
+/// and `save_previous_transforms` see the real physics state.
+/// Runs in `FixedFirst`.
+pub fn restore_physics_transforms(
+    mut query: Query<
+        (&mut Transform, &PhysicsTranslation, &PhysicsRotation),
+        With<Drone>,
+    >,
+) {
+    for (mut tf, phys_pos, phys_rot) in &mut query {
+        tf.translation = phys_pos.0;
+        tf.rotation = phys_rot.0;
+    }
+}
+
 /// Snapshots current transform into Previous* components at the start of each
 /// fixed tick. Runs in `FixedPreUpdate` so it captures state before the physics
 /// chain modifies it.
@@ -24,6 +50,43 @@ pub fn save_previous_transforms(
     for (tf, mut prev_pos, mut prev_rot) in &mut query {
         prev_pos.0 = tf.translation;
         prev_rot.0 = tf.rotation;
+    }
+}
+
+/// Saves the authoritative physics state after each FixedUpdate tick.
+/// Runs in `FixedPostUpdate`.
+pub fn save_physics_transforms(
+    mut query: Query<
+        (&Transform, &mut PhysicsTranslation, &mut PhysicsRotation),
+        With<Drone>,
+    >,
+) {
+    for (tf, mut phys_pos, mut phys_rot) in &mut query {
+        phys_pos.0 = tf.translation;
+        phys_rot.0 = tf.rotation;
+    }
+}
+
+/// Interpolates drone transforms for smooth rendering between physics ticks.
+/// Blends between the previous and current authoritative physics state using
+/// `overstep_fraction`. Runs in `PostUpdate` (after camera systems, before render).
+pub fn interpolate_visual_transforms(
+    fixed_time: Res<Time<Fixed>>,
+    mut query: Query<
+        (
+            &mut Transform,
+            &PreviousTranslation,
+            &PreviousRotation,
+            &PhysicsTranslation,
+            &PhysicsRotation,
+        ),
+        With<Drone>,
+    >,
+) {
+    let alpha = fixed_time.overstep_fraction();
+    for (mut tf, prev_pos, prev_rot, phys_pos, phys_rot) in &mut query {
+        tf.translation = prev_pos.0.lerp(phys_pos.0, alpha);
+        tf.rotation = prev_rot.0.slerp(phys_rot.0, alpha);
     }
 }
 
