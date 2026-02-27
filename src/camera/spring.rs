@@ -1,6 +1,6 @@
 use bevy::prelude::Vec3;
 
-const LN_2: f32 = 0.693_147_2;
+const LN_2: f32 = std::f32::consts::LN_2;
 
 /// Fast approximation of e^(-x) using a rational polynomial.
 /// Accurate to ~0.5% for x in [0, 5].

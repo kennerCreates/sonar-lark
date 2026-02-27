@@ -20,14 +20,14 @@ pub fn discover_existing_courses_in(courses_dir: &Path) -> Vec<CourseEntry> {
     if let Ok(entries) = fs::read_dir(courses_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("ron") {
-                if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                    let display_name = name.trim_end_matches(".course").to_string();
-                    courses.push(CourseEntry {
-                        display_name,
-                        path: path.to_string_lossy().to_string(),
-                    });
-                }
+            if path.extension().and_then(|e| e.to_str()) == Some("ron")
+                && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+            {
+                let display_name = name.trim_end_matches(".course").to_string();
+                courses.push(CourseEntry {
+                    display_name,
+                    path: path.to_string_lossy().to_string(),
+                });
             }
         }
     }

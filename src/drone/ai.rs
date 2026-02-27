@@ -111,7 +111,7 @@ pub fn update_ai_targets(
                 if ai.spline_t >= finish_t + FINISH_EPSILON {
                     // Only transition to VictoryLap if RaceProgress confirms the drone finished.
                     // If not finished, stay Racing so miss_detection (in Update) can crash it.
-                    let confirmed = race_progress.as_ref().map_or(true, |p| {
+                    let confirmed = race_progress.as_ref().is_none_or(|p| {
                         p.drone_states
                             .get(drone.index as usize)
                             .is_some_and(|s| s.finished || s.crashed)
@@ -325,7 +325,7 @@ pub fn compute_racing_line(
                 // Small organic wobble, suppressed near gates
                 let lateral = Vec3::Y.cross(corrected_tangent).normalize_or(Vec3::X);
                 let wobble_suppress = 1.0 - gate_blend / GATE_CORRECTION_STRENGTH;
-                let noise = (elapsed * config.noise_frequency + config.line_offset * 3.14).sin()
+                let noise = (elapsed * config.noise_frequency + config.line_offset * std::f32::consts::PI).sin()
                     * config.noise_amplitude * 0.3 * wobble_suppress;
                 let offset = lateral * noise;
 
@@ -363,7 +363,7 @@ pub fn compute_racing_line(
                 let tangent = cyclic_vel(&ai.spline, vel_t, cycle_t).normalize_or(Vec3::NEG_Z);
 
                 let lateral = Vec3::Y.cross(tangent).normalize_or(Vec3::X);
-                let noise = (elapsed * config.noise_frequency + config.line_offset * 3.14).sin()
+                let noise = (elapsed * config.noise_frequency + config.line_offset * std::f32::consts::PI).sin()
                     * config.noise_amplitude * 0.3;
                 let offset = lateral * noise;
 

@@ -296,10 +296,10 @@ pub fn handle_confirm_delete(
                 }
 
                 // If the deleted course was the last edited, remove that resource
-                if let Some(last) = &last_edited {
-                    if last.path == pending.path {
-                        commands.remove_resource::<LastEditedCourse>();
-                    }
+                if let Some(last) = &last_edited
+                    && last.path == pending.path
+                {
+                    commands.remove_resource::<LastEditedCourse>();
                 }
             }
             Err(e) => {

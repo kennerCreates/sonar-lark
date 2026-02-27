@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, clippy::approx_constant)]
 
 use bevy::prelude::Color;
 

@@ -322,8 +322,8 @@ fn spawn_placeholder_preview(
     let offset = state.model_offset;
 
     // Try to spawn from glTF first
-    if let Some(handle) = &gltf_handle {
-        if let Some(entity) = spawn_preview(
+    if let Some(handle) = &gltf_handle
+        && let Some(entity) = spawn_preview(
             &mut commands,
             &gltf_assets,
             &node_assets,
@@ -334,10 +334,10 @@ fn spawn_placeholder_preview(
             handle,
             &state.node_name,
             offset,
-        ) {
-            state.preview_entity = Some(entity);
-            return;
-        }
+        )
+    {
+        state.preview_entity = Some(entity);
+        return;
     }
 
     // No matching glTF node — spawn a placeholder cube

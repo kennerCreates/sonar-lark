@@ -323,11 +323,9 @@ pub fn update_display_values(
     mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>)>,
     mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>, Without<HasCollisionText>)>,
     mut collision_text: Query<&mut Text, (With<HasCollisionText>, Without<NameDisplayText>, Without<HasTriggerText>)>,
-    mut toggle_bgs: ParamSet<(
+    mut bgs: ParamSet<(
         Query<&mut BackgroundColor, With<HasTriggerToggle>>,
         Query<&mut BackgroundColor, With<HasCollisionToggle>>,
-    )>,
-    mut radio_bgs: ParamSet<(
         Query<&mut BackgroundColor, With<EditTargetRadioModel>>,
         Query<&mut BackgroundColor, With<EditTargetRadioTrigger>>,
         Query<&mut BackgroundColor, With<EditTargetRadioCollision>>,
@@ -359,20 +357,20 @@ pub fn update_display_values(
         **text = if state.has_collision { "ON" } else { "OFF" }.to_string();
     }
 
-    if let Ok(mut bg) = toggle_bgs.p0().single_mut() {
+    if let Ok(mut bg) = bgs.p0().single_mut() {
         *bg = BackgroundColor(if state.has_trigger { TOGGLE_ON } else { TOGGLE_OFF });
     }
-    if let Ok(mut bg) = toggle_bgs.p1().single_mut() {
+    if let Ok(mut bg) = bgs.p1().single_mut() {
         *bg = BackgroundColor(if state.has_collision { TOGGLE_ON } else { TOGGLE_OFF });
     }
 
-    if let Ok(mut bg) = radio_bgs.p0().single_mut() {
+    if let Ok(mut bg) = bgs.p2().single_mut() {
         *bg = BackgroundColor(if state.edit_target == EditTarget::Model { RADIO_ACTIVE } else { RADIO_INACTIVE });
     }
-    if let Ok(mut bg) = radio_bgs.p1().single_mut() {
+    if let Ok(mut bg) = bgs.p3().single_mut() {
         *bg = BackgroundColor(if state.edit_target == EditTarget::Trigger { RADIO_ACTIVE } else { RADIO_INACTIVE });
     }
-    if let Ok(mut bg) = radio_bgs.p2().single_mut() {
+    if let Ok(mut bg) = bgs.p4().single_mut() {
         *bg = BackgroundColor(if state.edit_target == EditTarget::Collision { RADIO_ACTIVE } else { RADIO_INACTIVE });
     }
 }

@@ -54,23 +54,23 @@ fn discover_courses_in(courses_dir: &Path) -> Vec<CourseEntry> {
     if let Ok(entries) = fs::read_dir(courses_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("ron") {
-                if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
-                    let display_name = name.trim_end_matches(".course").to_string();
-                    let gate_count = load_course_from_file(&path)
-                        .map(|c| {
-                            c.instances
-                                .iter()
-                                .filter(|i| i.gate_order.is_some())
-                                .count()
-                        })
-                        .unwrap_or(0);
-                    courses.push(CourseEntry {
-                        name: display_name,
-                        path: path.to_string_lossy().to_string(),
-                        gate_count,
-                    });
-                }
+            if path.extension().and_then(|e| e.to_str()) == Some("ron")
+                && let Some(name) = path.file_stem().and_then(|s| s.to_str())
+            {
+                let display_name = name.trim_end_matches(".course").to_string();
+                let gate_count = load_course_from_file(&path)
+                    .map(|c| {
+                        c.instances
+                            .iter()
+                            .filter(|i| i.gate_order.is_some())
+                            .count()
+                    })
+                    .unwrap_or(0);
+                courses.push(CourseEntry {
+                    name: display_name,
+                    path: path.to_string_lossy().to_string(),
+                    gate_count,
+                });
             }
         }
     }
@@ -375,17 +375,15 @@ pub fn handle_race_button(
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            if let Some(idx) = available.selected_index {
-                if let Some(course) = available.courses.get(idx) {
-                    if course.gate_count >= MIN_RACEABLE_GATES {
-                        commands.insert_resource(SelectedCourse {
-                            path: course.path.clone(),
-                        });
-                        next_state.set(AppState::Race);
-                    }
-                }
-            }
+        if *interaction == Interaction::Pressed
+            && let Some(idx) = available.selected_index
+            && let Some(course) = available.courses.get(idx)
+            && course.gate_count >= MIN_RACEABLE_GATES
+        {
+            commands.insert_resource(SelectedCourse {
+                path: course.path.clone(),
+            });
+            next_state.set(AppState::Race);
         }
     }
 }

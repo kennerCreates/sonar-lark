@@ -209,15 +209,15 @@ pub fn spawn_explosion(
     }
 
     // --- Audio ---
-    if let Some(sounds) = explosion_sounds {
-        if !sounds.0.is_empty() {
-            let idx = rng.gen_range(0..sounds.0.len());
-            commands.spawn((
-                AudioPlayer::new(sounds.0[idx].clone()),
-                PlaybackSettings::DESPAWN,
-                DespawnOnExit(AppState::Results),
-            ));
-        }
+    if let Some(sounds) = explosion_sounds
+        && !sounds.0.is_empty()
+    {
+        let idx = rng.gen_range(0..sounds.0.len());
+        commands.spawn((
+            AudioPlayer::new(sounds.0[idx].clone()),
+            PlaybackSettings::DESPAWN,
+            DespawnOnExit(AppState::Results),
+        ));
     }
 }
 

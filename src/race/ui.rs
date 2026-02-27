@@ -540,7 +540,7 @@ pub fn update_leaderboard(
 
     // Build position→data lookup (avoids O(n²) nested query iteration)
     let mut row_data = [(0usize, false, false, false, 0.0f32); 12];
-    for (pos, &(drone_idx, ref state)) in standings.iter().enumerate() {
+    for (pos, &(drone_idx, state)) in standings.iter().enumerate() {
         if pos >= 12 { break; }
         row_data[pos] = (drone_idx, true, state.finished, state.crashed, state.finish_time.unwrap_or(0.0));
     }

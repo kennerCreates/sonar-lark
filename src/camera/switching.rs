@@ -76,10 +76,10 @@ pub fn reset_camera_for_race(
 ) {
     state.mode = CameraMode::Chase;
     state.target_standings_index = 0;
-    if let Ok(mut projection) = camera.single_mut() {
-        if let Projection::Perspective(ref mut persp) = *projection {
-            persp.fov = settings.fov_degrees.to_radians();
-        }
+    if let Ok(mut projection) = camera.single_mut()
+        && let Projection::Perspective(ref mut persp) = *projection
+    {
+        persp.fov = settings.fov_degrees.to_radians();
     }
 }
 
@@ -90,9 +90,9 @@ pub fn reset_camera_on_exit(
 ) {
     state.mode = CameraMode::Spectator;
     state.target_standings_index = 0;
-    if let Ok(mut projection) = camera.single_mut() {
-        if let Projection::Perspective(ref mut persp) = *projection {
-            persp.fov = settings.fov_degrees.to_radians();
-        }
+    if let Ok(mut projection) = camera.single_mut()
+        && let Projection::Perspective(ref mut persp) = *projection
+    {
+        persp.fov = settings.fov_degrees.to_radians();
     }
 }

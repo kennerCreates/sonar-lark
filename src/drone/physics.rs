@@ -227,7 +227,7 @@ pub fn dirty_air_perturbation(
             }
             let to_me = my_pos - other_pos;
             let dist = to_me.length();
-            if dist > DIRTY_AIR_RADIUS || dist < 0.1 {
+            if !(0.1..=DIRTY_AIR_RADIUS).contains(&dist) {
                 continue;
             }
 
@@ -255,7 +255,7 @@ pub fn dirty_air_perturbation(
         let descent_rate = (-dynamics.velocity.y).max(0.0);
         if descent_rate > PROP_WASH_ONSET {
             let wash_strength = ((descent_rate - PROP_WASH_ONSET) / 10.0).min(1.0);
-            let phase = my_idx as f32 * 3.14 + 100.0 + seed_phase;
+            let phase = my_idx as f32 * std::f32::consts::PI + 100.0 + seed_phase;
             let wash_noise = Vec3::new(
                 (t * 19.7 + phase).sin() + (t * 37.3 + phase * 1.3).sin() * 0.6,
                 (t * 11.3 + phase * 2.1).sin() * 0.2,

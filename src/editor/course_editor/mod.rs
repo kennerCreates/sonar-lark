@@ -308,13 +308,13 @@ fn handle_placement_and_selection(
     );
 
     if state.gate_order_mode {
-        if let Some(entity) = nearest {
-            if let Ok((_, mut placed)) = obstacle_query.get_mut(entity) {
-                let order = state.next_gate_order;
-                placed.gate_order = Some(order);
-                state.next_gate_order += 1;
-                info!("Assigned gate order {order} to {:?}", entity);
-            }
+        if let Some(entity) = nearest
+            && let Ok((_, mut placed)) = obstacle_query.get_mut(entity)
+        {
+            let order = state.next_gate_order;
+            placed.gate_order = Some(order);
+            state.next_gate_order += 1;
+            info!("Assigned gate order {order} to {:?}", entity);
         }
         return;
     }
@@ -335,10 +335,10 @@ fn handle_delete_key(
         return;
     }
 
-    if keyboard.just_pressed(KeyCode::Delete) {
-        if let Some(entity) = state.selected_entity.take() {
-            commands.entity(entity).despawn();
-        }
+    if keyboard.just_pressed(KeyCode::Delete)
+        && let Some(entity) = state.selected_entity.take()
+    {
+        commands.entity(entity).despawn();
     }
 }
 

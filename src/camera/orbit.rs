@@ -146,7 +146,7 @@ pub fn rts_camera_system(
 
     let editing_name = placement_state
         .as_ref()
-        .map_or(false, |s| s.editing_name);
+        .is_some_and(|s| s.editing_name);
 
     let dt = time.delta_secs();
     let mut orbit_changed = false;
@@ -271,7 +271,7 @@ pub fn workshop_orbit_camera_system(
     // Scroll wheel: zoom (skip if editing text field)
     let editing_name = workshop_state
         .as_ref()
-        .map_or(false, |s| s.editing_name);
+        .is_some_and(|s| s.editing_name);
 
     if !editing_name {
         let scroll_y = mouse_scroll.delta.y;

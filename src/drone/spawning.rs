@@ -80,25 +80,23 @@ pub fn setup_drone_assets(
     let gltf = gltf_assets.get(&gltf_handle.0).expect("run condition guarantees loaded");
 
     let node_name: Box<str> = "Drone".into();
-    if let Some(node_handle) = gltf.named_nodes.get(&node_name) {
-        if let Some(node) = node_assets.get(node_handle) {
-            if let Some(gltf_mesh_handle) = node.mesh.as_ref() {
-                if let Some(gltf_mesh) = mesh_assets.get(gltf_mesh_handle) {
-                    let primitives: Vec<Handle<Mesh>> = gltf_mesh
-                        .primitives
-                        .iter()
-                        .map(|p| p.mesh.clone())
-                        .collect();
+    if let Some(node_handle) = gltf.named_nodes.get(&node_name)
+        && let Some(node) = node_assets.get(node_handle)
+        && let Some(gltf_mesh_handle) = node.mesh.as_ref()
+        && let Some(gltf_mesh) = mesh_assets.get(gltf_mesh_handle)
+    {
+        let primitives: Vec<Handle<Mesh>> = gltf_mesh
+            .primitives
+            .iter()
+            .map(|p| p.mesh.clone())
+            .collect();
 
-                    if !primitives.is_empty() {
-                        commands.insert_resource(DroneAssets {
-                            mesh_primitives: primitives,
-                            mesh_transform: node.transform,
-                        });
-                        return;
-                    }
-                }
-            }
+        if !primitives.is_empty() {
+            commands.insert_resource(DroneAssets {
+                mesh_primitives: primitives,
+                mesh_transform: node.transform,
+            });
+            return;
         }
     }
 

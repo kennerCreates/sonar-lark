@@ -258,10 +258,10 @@ pub fn obstacle_collision_check(
             };
 
             // If this is a gate OBB and the hit is inside the opening, it's a safe pass
-            if let Some(ref opening) = obb.gate_opening {
-                if point_in_gate_opening(hit_point, opening) {
-                    continue;
-                }
+            if let Some(ref opening) = obb.gate_opening
+                && point_in_gate_opening(hit_point, opening)
+            {
+                continue;
             }
 
             let drone_idx = drone.index as usize;

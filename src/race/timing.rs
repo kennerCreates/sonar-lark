@@ -16,9 +16,9 @@ impl Default for RaceClock {
 }
 
 pub fn tick_race_clock(time: Res<Time>, mut clock: Option<ResMut<RaceClock>>) {
-    if let Some(ref mut clock) = clock {
-        if clock.running {
-            clock.elapsed += time.delta_secs();
-        }
+    if let Some(ref mut clock) = clock
+        && clock.running
+    {
+        clock.elapsed += time.delta_secs();
     }
 }

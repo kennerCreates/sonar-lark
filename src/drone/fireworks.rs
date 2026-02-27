@@ -436,14 +436,14 @@ pub fn tick_firework_shells(
             );
 
             // Play sound
-            if let Some(ref sounds) = firework_sounds {
-                if !sounds.0.is_empty() {
-                    commands.spawn((
-                        AudioPlayer::new(sounds.0[0].clone()),
-                        PlaybackSettings::DESPAWN,
-                        DespawnOnExit(AppState::Results),
-                    ));
-                }
+            if let Some(ref sounds) = firework_sounds
+                && !sounds.0.is_empty()
+            {
+                commands.spawn((
+                    AudioPlayer::new(sounds.0[0].clone()),
+                    PlaybackSettings::DESPAWN,
+                    DespawnOnExit(AppState::Results),
+                ));
             }
 
             commands.entity(entity).despawn();
