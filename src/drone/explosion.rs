@@ -33,7 +33,7 @@ const DARK_SMOKE_DRAG: f32 = 1.5;
 const DARK_SMOKE_GROW_PEAK: f32 = 0.2;
 
 const GRAVITY: f32 = 9.81;
-const EXPLOSION_SOUND_COUNT: usize = 4;
+const CRASH_SOUND_COUNT: usize = 6;
 
 #[derive(Clone, Copy)]
 pub enum ParticleKind {
@@ -51,7 +51,7 @@ pub struct ExplosionParticle {
 }
 
 #[derive(Resource)]
-pub struct ExplosionSounds(pub Vec<Handle<bevy::audio::AudioSource>>);
+pub struct CrashSounds(pub Vec<Handle<bevy::audio::AudioSource>>);
 
 /// Pre-allocated meshes for explosion particles, shared across all explosions.
 #[derive(Resource)]
@@ -68,10 +68,10 @@ pub fn load_explosion_assets(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let handles: Vec<Handle<bevy::audio::AudioSource>> = (1..=EXPLOSION_SOUND_COUNT)
-        .map(|i| asset_server.load(format!("sounds/explosion_{i}.wav")))
+    let handles: Vec<Handle<bevy::audio::AudioSource>> = (1..=CRASH_SOUND_COUNT)
+        .map(|i| asset_server.load(format!("sounds/drone_crash_pole_hit_{i}.wav")))
         .collect();
-    commands.insert_resource(ExplosionSounds(handles));
+    commands.insert_resource(CrashSounds(handles));
     commands.insert_resource(ExplosionMeshes {
         debris_small: meshes.add(Cuboid::new(DEBRIS_SIZE_SMALL, DEBRIS_SIZE_SMALL, DEBRIS_SIZE_SMALL)),
         debris_med: meshes.add(Cuboid::new(DEBRIS_SIZE_MED, DEBRIS_SIZE_MED, DEBRIS_SIZE_MED)),
@@ -88,7 +88,6 @@ pub fn spawn_explosion(
     position: Vec3,
     drone_velocity: Vec3,
     color: Color,
-    explosion_sounds: Option<&ExplosionSounds>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -208,17 +207,6 @@ pub fn spawn_explosion(
         ));
     }
 
-    // --- Audio ---
-    if let Some(sounds) = explosion_sounds
-        && !sounds.0.is_empty()
-    {
-        let idx = rng.gen_range(0..sounds.0.len());
-        commands.spawn((
-            AudioPlayer::new(sounds.0[idx].clone()),
-            PlaybackSettings::DESPAWN,
-            DespawnOnExit(AppState::Results),
-        ));
-    }
 }
 
 pub fn update_explosion_particles(
@@ -286,6 +274,6 @@ pub fn update_explosion_particles(
 }
 
 pub fn cleanup_explosion_assets(mut commands: Commands) {
-    commands.remove_resource::<ExplosionSounds>();
+    commands.remove_resource::<CrashSounds>();
     commands.remove_resource::<ExplosionMeshes>();
 }

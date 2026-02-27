@@ -27,7 +27,7 @@
         ),
         (
             obstacle_id: ("gate_ground"),
-            translation: (27.173832, 0.0, 25.02662),
+            translation: (26.245731, -0.08741379, 23.447927),
             rotation: (0.0, -0.2374509, 0.0, 0.97139955),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(0),

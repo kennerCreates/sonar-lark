@@ -1,10 +1,13 @@
 use bevy::prelude::*;
 
+use rand::Rng;
+
 use crate::drone::components::{Drone, DroneDynamics, DronePhase};
-use crate::drone::explosion::{self, ExplosionMeshes, ExplosionSounds};
+use crate::drone::explosion::{self, CrashSounds, ExplosionMeshes};
 use crate::drone::interpolation::PreviousTranslation;
 use crate::drone::spawning::DRONE_COLORS;
 use crate::obstacle::spawning::{ObstacleCollisionVolume, TriggerVolume};
+use crate::states::AppState;
 use super::progress::{DnfReason, RaceProgress};
 
 // ---------------------------------------------------------------------------
@@ -189,7 +192,7 @@ pub fn crash_drone(
     progress: Option<&mut RaceProgress>,
     explosion_meshes: &ExplosionMeshes,
     materials: &mut ResMut<Assets<StandardMaterial>>,
-    explosion_sounds: Option<&ExplosionSounds>,
+    crash_sounds: Option<&CrashSounds>,
     reason: DnfReason,
 ) {
     *phase = DronePhase::Crashed;
@@ -208,8 +211,18 @@ pub fn crash_drone(
         position,
         crash_velocity,
         DRONE_COLORS[drone_index],
-        explosion_sounds,
     );
+
+    if let Some(sounds) = crash_sounds
+        && !sounds.0.is_empty()
+    {
+        let idx = rand::thread_rng().gen_range(0..sounds.0.len());
+        commands.spawn((
+            AudioPlayer::new(sounds.0[idx].clone()),
+            PlaybackSettings::DESPAWN,
+            DespawnOnExit(AppState::Results),
+        ));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +239,7 @@ pub fn obstacle_collision_check(
     cache: Option<Res<ObstacleCollisionCache>>,
     explosion_meshes: Option<Res<ExplosionMeshes>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    explosion_sounds: Option<Res<ExplosionSounds>>,
+    crash_sounds: Option<Res<CrashSounds>>,
     mut drone_query: Query<(
         &Drone,
         &Transform,
@@ -278,7 +291,7 @@ pub fn obstacle_collision_check(
                 progress.as_deref_mut(),
                 meshes,
                 &mut materials,
-                explosion_sounds.as_deref(),
+                crash_sounds.as_deref(),
                 DnfReason::ObstacleCollision,
             );
 

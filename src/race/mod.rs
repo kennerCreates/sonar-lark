@@ -15,7 +15,7 @@ impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             OnEnter(AppState::Race),
-            (setup_race, ui::setup_race_ui, ui::setup_leaderboard, ui::setup_camera_hud),
+            (setup_race, ui::setup_race_ui, ui::setup_leaderboard, ui::setup_camera_hud, lifecycle::load_race_sounds),
         )
             // Build GatePlanes resource once gate entities are spawned
             .add_systems(
@@ -83,6 +83,7 @@ fn cleanup_race(mut commands: Commands) {
     commands.remove_resource::<timing::RaceClock>();
     commands.remove_resource::<lifecycle::CountdownTimer>();
     commands.remove_resource::<lifecycle::ResultsTransitionTimer>();
+    commands.remove_resource::<lifecycle::RaceStartSound>();
     commands.remove_resource::<gate::GatePlanes>();
     commands.remove_resource::<collision::ObstacleCollisionCache>();
 }

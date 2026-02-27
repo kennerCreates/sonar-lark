@@ -8,6 +8,9 @@ use crate::states::AppState;
 use super::progress::{DroneRaceState, RaceProgress};
 use super::timing::RaceClock;
 
+#[derive(Resource)]
+pub struct RaceStartSound(pub Handle<bevy::audio::AudioSource>);
+
 #[derive(Resource, Default, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum RacePhase {
     #[default]
@@ -32,6 +35,10 @@ impl Default for CountdownTimer {
 #[derive(Resource)]
 pub struct ResultsTransitionTimer {
     pub remaining: f32,
+}
+
+pub fn load_race_sounds(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(RaceStartSound(asset_server.load("sounds/race_start.wav")));
 }
 
 /// Run condition: returns true when any drone is actively racing, victory-lapping, or returning.
