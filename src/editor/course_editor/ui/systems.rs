@@ -8,6 +8,7 @@ use crate::editor::course_editor::{
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
+use crate::states::AppState;
 use crate::rendering::{cel_material_from_color, CelLightDir, CelMaterial};
 
 use super::types::*;
@@ -61,9 +62,17 @@ pub fn handle_palette_selection(
         );
 
         if let Some(entity) = spawned {
+            let gate_order = if def.is_gate {
+                let order = state.next_gate_order;
+                state.next_gate_order += 1;
+                Some(order)
+            } else {
+                None
+            };
+            commands.entity(entity).remove::<DespawnOnExit<AppState>>();
             commands.entity(entity).insert(PlacedObstacle {
                 obstacle_id: btn.0.clone(),
-                gate_order: None,
+                gate_order,
                 gate_forward_flipped: false,
             });
             state.selected_entity = Some(entity);
@@ -136,6 +145,10 @@ pub fn update_display_values(
         &mut Text,
         (With<CourseNameDisplayText>, Without<GateOrderModeText>),
     >,
+    mut name_border: Query<
+        &mut BorderColor,
+        (With<CourseNameField>, Without<GateOrderModeButton>),
+    >,
     mut gate_mode_text: Query<
         &mut Text,
         (With<GateOrderModeText>, Without<CourseNameDisplayText>),
@@ -151,6 +164,14 @@ pub fn update_display_values(
 ) {
     if !state.is_changed() {
         return;
+    }
+
+    if let Ok(mut border) = name_border.single_mut() {
+        *border = if state.editing_name {
+            BorderColor::all(palette::SKY)
+        } else {
+            BorderColor::all(palette::STEEL)
+        };
     }
 
     if let Ok(mut text) = name_text.single_mut() {
@@ -202,6 +223,7 @@ pub fn handle_button_hover(
             Or<(
                 With<BackToWorkshopButton>,
                 With<BackToMenuButton>,
+                With<NewCourseButton>,
                 With<ExistingCourseButton>,
                 With<ClearGateOrdersButton>,
                 With<DeleteCourseButton>,

@@ -143,6 +143,7 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_back_to_menu,
                     ui::handle_save_button,
                     ui::handle_load_button,
+                    ui::handle_new_course_button,
                     ui::handle_gate_order_toggle,
                     ui::handle_clear_gate_orders_button,
                     ui::handle_name_field_focus,
@@ -297,10 +298,6 @@ fn handle_placement_and_selection(
     interaction_query: Query<&Interaction>,
     mut ray_cast: MeshRayCast,
 ) {
-    if state.editing_name {
-        return;
-    }
-
     // Don't process clicks when a gizmo drag is active
     if move_widget.active_drag.is_some()
         || rotate_widget.active
@@ -310,6 +307,15 @@ fn handle_placement_and_selection(
     }
 
     let over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
+
+    // Clicking in the 3D viewport while editing the course name unfocuses the text field.
+    if state.editing_name {
+        if mouse_buttons.just_pressed(MouseButton::Left) && !over_ui {
+            state.editing_name = false;
+        }
+        return;
+    }
+
     if over_ui || !mouse_buttons.just_pressed(MouseButton::Left) {
         return;
     }

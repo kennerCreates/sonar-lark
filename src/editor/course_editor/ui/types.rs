@@ -29,6 +29,9 @@ pub struct BackToWorkshopButton;
 pub struct BackToMenuButton;
 
 #[derive(Component)]
+pub struct NewCourseButton;
+
+#[derive(Component)]
 pub struct SaveCourseButton;
 
 #[derive(Component)]

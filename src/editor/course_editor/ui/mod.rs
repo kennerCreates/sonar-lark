@@ -7,7 +7,8 @@ pub use build::{build_course_editor_ui, discover_existing_courses};
 pub use file_ops::{
     auto_load_pending_course, handle_back_to_menu, handle_back_to_workshop,
     handle_cancel_delete, handle_clear_gate_orders_button, handle_confirm_delete,
-    handle_delete_button, handle_gate_order_toggle, handle_load_button, handle_save_button,
+    handle_delete_button, handle_gate_order_toggle, handle_load_button, handle_new_course_button,
+    handle_save_button,
 };
 pub use systems::{
     handle_button_hover, handle_camera_placement, handle_camera_primary_toggle,

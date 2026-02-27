@@ -483,6 +483,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[Cour
                     ));
                 });
 
+            spawn_small_button(panel, "New Course", NewCourseButton);
             spawn_action_button(
                 panel,
                 "Save Course",

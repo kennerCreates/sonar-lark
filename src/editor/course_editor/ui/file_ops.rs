@@ -97,6 +97,36 @@ pub fn handle_back_to_menu(
     }
 }
 
+pub fn handle_new_course_button(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<NewCourseButton>)>,
+    mut state: ResMut<PlacementState>,
+    placed_query: Query<
+        Entity,
+        Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
+    >,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        for entity in &placed_query {
+            commands.entity(entity).despawn();
+        }
+
+        state.selected_entity = None;
+        state.selected_palette_id = None;
+        state.course_name = "new_course".to_string();
+        state.next_gate_order = 0;
+        state.gate_order_mode = false;
+        state.editing_name = false;
+
+        commands.remove_resource::<LastEditedCourse>();
+        info!("Cleared editor for new course");
+    }
+}
+
 fn rebuild_courses_list(commands: &mut Commands, container: Entity) {
     let courses = discover_existing_courses();
     commands.entity(container).despawn_related::<Children>();
@@ -433,6 +463,7 @@ fn load_course_into_editor(
         );
 
         if let Some(entity) = spawned {
+            commands.entity(entity).remove::<DespawnOnExit<AppState>>();
             commands.entity(entity).insert(PlacedObstacle {
                 obstacle_id: instance.obstacle_id.clone(),
                 gate_order: instance.gate_order,
