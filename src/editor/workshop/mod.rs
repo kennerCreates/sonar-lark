@@ -5,6 +5,8 @@ use bevy::{
     prelude::*,
 };
 
+use crate::camera::orbit::MainCamera;
+
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
 use crate::palette;
@@ -482,7 +484,7 @@ fn draw_move_arrows(
 fn handle_move_widget(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     mut preview_query: Query<&mut Transform, With<PreviewObstacle>>,
     mut state: ResMut<WorkshopState>,
     mut widget: ResMut<MoveWidgetState>,
@@ -659,7 +661,7 @@ fn draw_resize_handles(
 fn handle_resize_widget(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     mut state: ResMut<WorkshopState>,
     mut resize: ResMut<ResizeWidgetState>,
     move_widget: Res<MoveWidgetState>,

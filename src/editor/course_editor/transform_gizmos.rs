@@ -2,6 +2,7 @@ use std::f32::consts::TAU;
 
 use bevy::prelude::*;
 
+use crate::camera::orbit::MainCamera;
 use crate::editor::gizmos::{
     closest_point_on_axis, perpendicular_basis, point_to_segment_distance, ray_intersect_plane,
     Axis,
@@ -79,7 +80,7 @@ pub(super) fn draw_move_gizmo(
 pub(super) fn handle_move_gizmo(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     state: Res<PlacementState>,
     mut widget: ResMut<MoveWidgetState>,
     mut placed_query: Query<&mut Transform, PlacedFilter>,
@@ -183,7 +184,7 @@ pub(super) fn draw_rotate_gizmo(
 pub(super) fn handle_rotate_gizmo(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     state: Res<PlacementState>,
     mut widget: ResMut<RotateWidgetState>,
     mut placed_query: Query<&mut Transform, PlacedFilter>,
@@ -295,7 +296,7 @@ pub(super) fn draw_scale_gizmo(
 pub(super) fn handle_scale_gizmo(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     state: Res<PlacementState>,
     mut widget: ResMut<ScaleWidgetState>,
     mut placed_query: Query<&mut Transform, PlacedFilter>,

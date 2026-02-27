@@ -45,6 +45,7 @@ src/
 │   └── course_editor/   Place obstacles and props, set gate order
 │       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, PlacedProp, PlacedCamera, EditorTab, placement/selection
 │       ├── overlays.rs  Visualization gizmos (trigger volumes, gate sequence, spline preview, prop gizmos, camera frustums)
+│       ├── preview.rs   Camera PiP preview (render-to-texture, PreviewCamera, sync system)
 │       ├── transform_gizmos.rs Move/rotate/scale widget systems
 │       └── ui/          Course editor UI
 │           ├── mod.rs   Re-exports
@@ -159,6 +160,8 @@ CourseData ──► spawn obstacles + firework emitters + drones + build Course
 | `EditorTab` | Enum | editor/course_editor | Obstacles (default), Props, or Cameras — switches the left-panel palette |
 | `PropEditorMeshes` | Resource | editor/course_editor/ui | Shared mesh+material handles for prop placeholder cubes in the editor |
 | `CameraEditorMeshes` | Resource | editor/course_editor/ui | Shared mesh+material handles for camera placeholder cubes in the editor (sky/sunshine colors) |
+| `CameraPreview` | Resource | editor/course_editor/preview | Holds camera entity for render-to-texture PiP preview |
+| `PreviewCamera` | Component | editor/course_editor/preview | Marker on the secondary Camera3d used for PiP render-to-texture |
 | `PropKind` | Enum | course/data | ConfettiEmitter or ShellBurstEmitter — firework emitter type |
 | `PropInstance` | Data | course/data | Per-prop placement: kind, translation, rotation, optional color_override |
 | `FireworkEmitter` | Component | drone/fireworks | Race-time marker entity spawned from course props; carries `PropKind` and optional `Color` override |

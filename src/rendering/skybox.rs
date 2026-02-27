@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{AsBindGroup, Face};
 use bevy::shader::ShaderRef;
 
+use crate::camera::orbit::MainCamera;
 use crate::palette;
 
 const SHADER_PATH: &str = "shaders/tron_skybox.wgsl";
@@ -86,7 +87,7 @@ pub fn spawn_skybox(
 /// Keep skybox centered on the camera and update time for star twinkle.
 pub fn update_skybox(
     time: Res<Time>,
-    camera_query: Query<&GlobalTransform, With<Camera3d>>,
+    camera_query: Query<&GlobalTransform, With<MainCamera>>,
     mut skybox_query: Query<&mut Transform, With<SkyboxEntity>>,
     skybox_mat_query: Query<&MeshMaterial3d<SkyboxMaterial>, With<SkyboxEntity>>,
     mut skybox_materials: ResMut<Assets<SkyboxMaterial>>,

@@ -98,9 +98,15 @@
     ],
     cameras: [
         (
-            translation: (24.28654, 7.2852206, 48.47949),
-            rotation: (0.0, -0.053253483, 0.0, 0.99858105),
+            translation: (26.21682, 7.2852206, 45.34074),
+            rotation: (0.0, -0.12723294, 0.0, 0.9918729),
             is_primary: true,
+            label: None,
+        ),
+        (
+            translation: (43.192703, 14.654391, -14.934012),
+            rotation: (0.0, 0.36543897, 0.0, 0.9308353),
+            is_primary: false,
             label: None,
         ),
     ],

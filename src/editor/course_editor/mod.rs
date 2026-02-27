@@ -1,6 +1,7 @@
 pub mod ui;
 
 mod overlays;
+mod preview;
 mod transform_gizmos;
 
 use bevy::{
@@ -8,6 +9,8 @@ use bevy::{
     picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings},
     prelude::*,
 };
+
+use crate::camera::orbit::MainCamera;
 
 use crate::course::data::PropKind;
 use crate::obstacle::definition::ObstacleId;
@@ -127,6 +130,7 @@ impl Plugin for CourseEditorPlugin {
                     setup_course_editor,
                     ui::setup_prop_editor_meshes,
                     ui::setup_camera_editor_meshes,
+                    preview::setup_camera_preview,
                 ),
             )
             .add_systems(
@@ -213,7 +217,14 @@ impl Plugin for CourseEditorPlugin {
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
-            .add_systems(OnExit(EditorMode::CourseEditor), cleanup_course_editor);
+            .add_systems(
+                Update,
+                preview::sync_preview_camera.run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                OnExit(EditorMode::CourseEditor),
+                (cleanup_course_editor, preview::cleanup_camera_preview),
+            );
     }
 }
 
@@ -276,7 +287,7 @@ fn handle_placement_and_selection(
     scale_widget: Res<ScaleWidgetState>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window>,
-    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     mut obstacle_query: Query<(Entity, &mut PlacedObstacle)>,
     prop_query: Query<Entity, With<PlacedProp>>,
     camera_entity_query: Query<Entity, With<PlacedCamera>>,

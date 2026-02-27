@@ -33,14 +33,15 @@ impl Plugin for CameraPlugin {
             .init_resource::<FpvFollowState>()
             .init_resource::<SpectatorOrbitState>()
             .add_systems(Startup, spawn_camera)
-            // Race camera lifecycle
+            // Race camera lifecycle (must run after course loading inserts CourseData)
             .add_systems(
                 OnEnter(AppState::Race),
                 (
                     switching::build_course_cameras,
                     switching::reset_camera_for_race,
                 )
-                    .chain(),
+                    .chain()
+                    .after(crate::course::loader::load_course),
             )
             .add_systems(OnExit(AppState::Results), switching::reset_camera_on_exit)
             // Race camera mode switching (active during Race and Results)
