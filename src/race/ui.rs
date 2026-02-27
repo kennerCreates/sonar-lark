@@ -692,10 +692,14 @@ pub fn update_camera_hud(
     }
 
     let hint = if cam_count > 0 {
-        let cam_keys = if cam_count == 1 {
-            "[1] Cam".to_string()
-        } else {
-            format!("[1-{}] Cams", cam_count.min(9))
+        // Key mapping: 1=Cam0, 2=Chase, 3=Cam1, 4=Cam2, ..., 9=Cam7, 0=Cam8
+        let cam_keys = match cam_count.min(9) {
+            1 => "[1] Cam".to_string(),
+            2 => "[1,3] Cams".to_string(),
+            n => {
+                let last = if n <= 8 { format!("{}", n + 1) } else { "0".to_string() };
+                format!("[1,3-{}] Cams", last)
+            }
         };
         match camera_state.mode {
             CameraMode::Fpv => format!("{cam_keys}  [2] Chase  [Shift+F] Next  [Shift+S] Spec"),
