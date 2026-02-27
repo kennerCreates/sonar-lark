@@ -255,6 +255,7 @@ fn setup_course_editor(
 
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = -1.0;
+    config.line.width = 3.0;
 }
 
 fn cleanup_course_editor(
@@ -276,6 +277,7 @@ fn cleanup_course_editor(
 
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = 0.0;
+    config.line.width = 2.0;
 }
 
 // --- Placement and Selection ---
@@ -300,9 +302,9 @@ fn handle_placement_and_selection(
     }
 
     // Don't process clicks when a gizmo drag is active
-    if move_widget.active_axis.is_some()
-        || rotate_widget.active_axis.is_some()
-        || scale_widget.active_axis.is_some()
+    if move_widget.active_drag.is_some()
+        || rotate_widget.active
+        || scale_widget.active_drag.is_some()
     {
         return;
     }
@@ -380,11 +382,11 @@ fn handle_transform_mode_keys(
         return;
     }
 
-    let new_mode = if keyboard.just_pressed(KeyCode::KeyG) {
+    let new_mode = if keyboard.just_pressed(KeyCode::Digit1) {
         Some(TransformMode::Move)
-    } else if keyboard.just_pressed(KeyCode::KeyR) {
+    } else if keyboard.just_pressed(KeyCode::Digit2) {
         Some(TransformMode::Rotate)
-    } else if keyboard.just_pressed(KeyCode::KeyS) {
+    } else if keyboard.just_pressed(KeyCode::Digit3) {
         Some(TransformMode::Scale)
     } else {
         None
@@ -392,12 +394,13 @@ fn handle_transform_mode_keys(
 
     if let Some(mode) = new_mode {
         state.transform_mode = mode;
-        move_widget.active_axis = None;
-        move_widget.hovered_axis = None;
-        rotate_widget.active_axis = None;
-        rotate_widget.hovered_axis = None;
-        scale_widget.active_axis = None;
+        move_widget.active_drag = None;
+        move_widget.hovered = false;
+        rotate_widget.active = false;
+        rotate_widget.hovered = false;
+        scale_widget.active_drag = None;
         scale_widget.hovered_axis = None;
+        scale_widget.hovered_center = false;
     }
 }
 

@@ -2,8 +2,9 @@ use bevy::prelude::*;
 
 // --- Axis ---
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum Axis {
+    #[default]
     X,
     Y,
     Z,
@@ -16,6 +17,10 @@ impl Axis {
             Axis::Y => Vec3::Y,
             Axis::Z => Vec3::Z,
         }
+    }
+
+    pub(crate) fn rotated_direction(self, yaw_quat: Quat) -> Vec3 {
+        yaw_quat * self.direction()
     }
 
     pub(crate) fn color(self, hovered: bool, active: bool) -> Color {
@@ -104,6 +109,18 @@ pub(crate) fn perpendicular_basis(axis: Axis) -> (Vec3, Vec3) {
         Axis::Y => (Vec3::X, Vec3::Z),
         Axis::Z => (Vec3::X, Vec3::Y),
     }
+}
+
+/// Extract only the Y-rotation (yaw) from a transform's rotation.
+pub(crate) fn yaw_quat_from_transform(transform: &Transform) -> Quat {
+    let (yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
+    Quat::from_rotation_y(yaw)
+}
+
+/// Perpendicular basis vectors rotated by yaw.
+pub(crate) fn rotated_perpendicular_basis(axis: Axis, yaw_quat: Quat) -> (Vec3, Vec3) {
+    let (a, b) = perpendicular_basis(axis);
+    (yaw_quat * a, yaw_quat * b)
 }
 
 #[cfg(test)]
@@ -280,5 +297,39 @@ mod tests {
         let r = ray(Vec3::new(3.0, 0.0, 8.0), Vec3::NEG_X);
         let t = closest_point_on_axis(r, Vec3::ZERO, Vec3::Z);
         assert!((t - 8.0).abs() < 1e-4);
+    }
+
+    // --- rotated_direction ---
+
+    #[test]
+    fn rotated_direction_90_y() {
+        let yaw = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
+        let rx = Axis::X.rotated_direction(yaw);
+        assert!((rx - Vec3::NEG_Z).length() < 1e-5);
+        let rz = Axis::Z.rotated_direction(yaw);
+        assert!((rz - Vec3::X).length() < 1e-5);
+        let ry = Axis::Y.rotated_direction(yaw);
+        assert!((ry - Vec3::Y).length() < 1e-5);
+    }
+
+    // --- rotated_perpendicular_basis ---
+
+    #[test]
+    fn rotated_perpendicular_basis_identity() {
+        let (a, b) = rotated_perpendicular_basis(Axis::Y, Quat::IDENTITY);
+        assert!((a - Vec3::X).length() < 1e-5);
+        assert!((b - Vec3::Z).length() < 1e-5);
+    }
+
+    // --- yaw_quat_from_transform ---
+
+    #[test]
+    fn yaw_quat_extracts_y_only() {
+        let rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_4)
+            * Quat::from_rotation_x(0.5);
+        let tf = Transform::from_rotation(rotation);
+        let yaw_q = yaw_quat_from_transform(&tf);
+        let up = yaw_q * Vec3::Y;
+        assert!((up - Vec3::Y).length() < 1e-5, "Yaw quat should not tilt Y axis");
     }
 }

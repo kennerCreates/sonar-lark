@@ -602,9 +602,9 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[Cour
                     ..default()
                 },))
                 .with_children(|row| {
-                    spawn_transform_mode_button(row, "Move (G)", TransformMode::Move);
-                    spawn_transform_mode_button(row, "Rotate (R)", TransformMode::Rotate);
-                    spawn_transform_mode_button(row, "Scale (S)", TransformMode::Scale);
+                    spawn_transform_mode_button(row, "Move (1)", TransformMode::Move);
+                    spawn_transform_mode_button(row, "Rotate (2)", TransformMode::Rotate);
+                    spawn_transform_mode_button(row, "Scale (3)", TransformMode::Scale);
                 });
 
             spawn_divider(panel);
@@ -647,6 +647,24 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[Cour
 
             panel.spawn((
                 Text::new("F  →  flip gate direction"),
+                TextFont {
+                    font_size: 12.0,
+                    ..default()
+                },
+                TextColor(palette::CHAINMAIL),
+            ));
+
+            panel.spawn((
+                Text::new("Shift  →  Y-move / axis-scale / Z-rotate"),
+                TextFont {
+                    font_size: 12.0,
+                    ..default()
+                },
+                TextColor(palette::CHAINMAIL),
+            ));
+
+            panel.spawn((
+                Text::new("Ctrl  →  X-rotate"),
                 TextFont {
                     font_size: 12.0,
                     ..default()

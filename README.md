@@ -10,7 +10,9 @@ Define obstacle types by importing 3D models from Blender, build race courses by
 - **12 AI Drones** — Thrust-through-body quadrotor physics with cascaded PID control, per-drone variation (cornering aggression, braking, attitude damping), dirty air/prop wash perturbations, and battery sag
 - **Race System** — Gate validation with plane-crossing detection (tunneling-proof), per-drone timing, DNF on missed gates, countdown sequence, and a results screen with standings
 - **Cel-Shaded Rendering** — Custom WGSL shaders with halftone dot transitions, hue-shifted highlights/shadows, and a procedural TRON-style night skybox
-- **Camera Modes** — Chase camera (pack-follow), FPV (drone-mounted with target cycling), and Spectator (RTS orbit)
+- **Obstacle Collision** — Swept segment vs OBB collision detection with gate opening exemption, editable collision volumes per obstacle type in the Workshop
+- **Camera Modes** — Editor-placed course cameras (up to 9), chase camera (pack-follow), FPV (drone-mounted with target cycling), and Spectator (RTS orbit), with PiP preview in the editor
+- **Post-Race Wandering** — Drones transition to ambient wandering with deterministic Fibonacci-hashed waypoints after results, replacing static victory laps
 - **Victory Effects** — Confetti fans and staggered shell bursts from course-placed firework emitter props
 - **Dev Dashboard** — F4 toggleable tuning panel with 14 parameters for AI behavior, aerodynamics, and proximity avoidance
 
@@ -55,9 +57,11 @@ Menu  ──►  Editor  ──►  Race  ──►  Results
 
 | Context | Key | Action |
 |---------|-----|--------|
-| Race | 1 | Chase camera |
-| Race | 2 | Spectator camera |
-| Race | 3 | FPV camera (cycles target) |
+| Race | 1 | Primary course camera (Chase fallback if none) |
+| Race | 2 | Chase camera |
+| Race | 3–9, 0 | Course cameras 2–9 (if placed) |
+| Race | Shift+F | FPV camera (cycles target on repeat) |
+| Race | Shift+S | Spectator camera (RTS orbit) |
 | Race | F4 | Toggle dev dashboard |
 | Editor | F | Flip gate direction |
 | Editor | Q / E | Adjust height |
@@ -77,6 +81,8 @@ Menu  ──►  Editor  ──►  Race  ──►  Results
 - **Course Props** — Firework emitter props, tabbed editor UI, confetti/shell burst effects at race finish
 - **Code Health** — File splitting, async poll replacement, UI unit tests, spline rebuild optimization
 - **Drone Models** — Blender-exported visual models replacing placeholders
+- **Obstacle Collision** — Swept OBB collision detection, gate opening exemption, Workshop collision volume editor, crash effects
+- **Course Cameras & Wandering** — Editor-placed cameras with frustum gizmos and PiP preview, race-time camera switching (1–0 keys), post-race ambient drone wandering
 
 ## Architecture
 
