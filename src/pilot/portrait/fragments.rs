@@ -1,6 +1,6 @@
 use bevy::log::warn;
 
-use super::PortraitDescriptor;
+use super::{EyeStyle, PortraitDescriptor};
 use super::loader::PortraitParts;
 
 // ---------------------------------------------------------------------------
@@ -62,6 +62,7 @@ enum LayerType {
     Face,
     Hair,
     Eyes,
+    EyesVisor,
     Mouth,
     Shirt,
     Accessory,
@@ -74,6 +75,7 @@ struct PortraitColors {
     skin_highlight_hex: String,
     hair_hex: String,
     eye_hex: String,
+    eye_shadow_hex: String,
     shirt_hex: String,
     acc_hex: String,
     acc_shadow_hex: String,
@@ -87,6 +89,7 @@ impl PortraitColors {
             skin_highlight_hex: color_to_hex(compute_highlight(desc.skin_tone)),
             hair_hex: color_to_hex(desc.hair_color),
             eye_hex: color_to_hex(desc.eye_color),
+            eye_shadow_hex: color_to_hex(compute_shadow(desc.eye_color)),
             shirt_hex: color_to_hex(desc.shirt_color),
             acc_hex: color_to_hex(desc.accessory_color),
             acc_shadow_hex: color_to_hex(compute_shadow(desc.accessory_color)),
@@ -96,56 +99,84 @@ impl PortraitColors {
 
 /// Apply color replacements to a fragment based on its layer type.
 ///
-/// Global replacements (all non-background layers):
-/// - `#808080` → VANILLA
-/// - `#333333` → BLACK
-///
-/// Per-layer primary (`#000000`) and secondary (`#ffffff`) vary by type.
+/// All replacements are applied in a single pass to avoid chained substitutions
+/// (e.g., #000000 → #808080 then #808080 → VANILLA).
 fn replace_layer_colors(content: &str, layer_type: LayerType, colors: &PortraitColors) -> String {
-    let mut result = content.to_string();
+    // Build the replacement table: (source_hex, target_hex).
+    // Order doesn't matter — they're applied simultaneously.
+    let mut replacements: Vec<(&str, &str)> = Vec::with_capacity(5);
 
     match layer_type {
         LayerType::Background => {
-            // Background: #808080 is the bg rect fill → pilot bg_color
-            result = result.replace(SRC_GRAY_50, &colors.bg_hex);
-            result = result.replace(SRC_GRAY_80, BLACK_HEX);
+            replacements.push((SRC_GRAY_50, &colors.bg_hex));
+            replacements.push((SRC_GRAY_80, BLACK_HEX));
         }
-        _ => {
-            // Global fixed-color replacements for all other layers
-            result = result.replace(SRC_GRAY_50, VANILLA_HEX);
-            result = result.replace(SRC_GRAY_80, BLACK_HEX);
+        LayerType::Face => {
+            replacements.push((SRC_WHITE, &colors.skin_highlight_hex));
+            replacements.push((SRC_BLACK, &colors.skin_hex));
+            replacements.push((SRC_GRAY_50, VANILLA_HEX));
+            replacements.push((SRC_GRAY_80, BLACK_HEX));
+        }
+        LayerType::Hair => {
+            replacements.push((SRC_BLACK, &colors.hair_hex));
+            replacements.push((SRC_GRAY_50, VANILLA_HEX));
+            replacements.push((SRC_GRAY_80, BLACK_HEX));
+        }
+        LayerType::Eyes => {
+            replacements.push((SRC_WHITE, &colors.eye_hex));
+            replacements.push((SRC_BLACK, &colors.hair_hex));
+            replacements.push((SRC_GRAY_50, VANILLA_HEX));
+            replacements.push((SRC_GRAY_80, BLACK_HEX));
+        }
+        LayerType::EyesVisor => {
+            // Visor: WHITE = eye_color, BLACK = eye shadow (darker tint)
+            replacements.push((SRC_WHITE, &colors.eye_hex));
+            replacements.push((SRC_BLACK, &colors.eye_shadow_hex));
+            replacements.push((SRC_GRAY_50, VANILLA_HEX));
+            replacements.push((SRC_GRAY_80, BLACK_HEX));
+        }
+        LayerType::Mouth => {
+            replacements.push((SRC_TEETH, VANILLA_HEX));
+            replacements.push((SRC_BLACK, &colors.skin_highlight_hex));
+            replacements.push((SRC_GRAY_50, VANILLA_HEX));
+            replacements.push((SRC_GRAY_80, BLACK_HEX));
+        }
+        LayerType::Shirt => {
+            replacements.push((SRC_BLACK, &colors.shirt_hex));
+            replacements.push((SRC_GRAY_50, VANILLA_HEX));
+            replacements.push((SRC_GRAY_80, BLACK_HEX));
+        }
+        LayerType::Accessory => {
+            replacements.push((SRC_WHITE, &colors.acc_shadow_hex));
+            replacements.push((SRC_BLACK, &colors.acc_hex));
+            replacements.push((SRC_GRAY_50, VANILLA_HEX));
+            replacements.push((SRC_GRAY_80, BLACK_HEX));
         }
     }
 
-    // Per-layer primary/secondary replacements
-    match layer_type {
-        LayerType::Background => {
-            // Already handled above; no primary/secondary
+    replace_all_simultaneous(content, &replacements)
+}
+
+/// Replace multiple patterns simultaneously so no replacement's output can
+/// be consumed by another replacement's source pattern.
+fn replace_all_simultaneous(input: &str, replacements: &[(&str, &str)]) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut i = 0;
+    let bytes = input.as_bytes();
+
+    while i < bytes.len() {
+        let mut matched = false;
+        for &(src, dst) in replacements {
+            if input[i..].starts_with(src) {
+                result.push_str(dst);
+                i += src.len();
+                matched = true;
+                break;
+            }
         }
-        LayerType::Face => {
-            result = result.replace(SRC_WHITE, &colors.skin_highlight_hex);
-            result = result.replace(SRC_BLACK, &colors.skin_hex);
-        }
-        LayerType::Hair => {
-            result = result.replace(SRC_BLACK, &colors.hair_hex);
-        }
-        LayerType::Eyes => {
-            // #ffffff = iris color, #000000 = eyebrow/outline color
-            result = result.replace(SRC_WHITE, &colors.eye_hex);
-            result = result.replace(SRC_BLACK, &colors.hair_hex);
-        }
-        LayerType::Mouth => {
-            // #e5e5e5 (teeth fill in smile) → VANILLA
-            result = result.replace(SRC_TEETH, VANILLA_HEX);
-            // #000000 (strokes) → skin highlight
-            result = result.replace(SRC_BLACK, &colors.skin_highlight_hex);
-        }
-        LayerType::Shirt => {
-            result = result.replace(SRC_BLACK, &colors.shirt_hex);
-        }
-        LayerType::Accessory => {
-            result = result.replace(SRC_WHITE, &colors.acc_shadow_hex);
-            result = result.replace(SRC_BLACK, &colors.acc_hex);
+        if !matched {
+            result.push(bytes[i] as char);
+            i += 1;
         }
     }
 
@@ -204,7 +235,12 @@ pub fn assemble_svg(
     // Eyes
     let eyes = get_or_warn(parts, "eyes", descriptor.eyes.group_id());
     if !eyes.is_empty() {
-        svg.push_str(&replace_layer_colors(eyes, LayerType::Eyes, &colors));
+        let eye_layer = if descriptor.eyes == EyeStyle::Visor {
+            LayerType::EyesVisor
+        } else {
+            LayerType::Eyes
+        };
+        svg.push_str(&replace_layer_colors(eyes, eye_layer, &colors));
     }
 
     // Mouth

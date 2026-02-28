@@ -3,6 +3,7 @@
 mod camera;
 mod common;
 mod course;
+mod dev_menu;
 mod drone;
 mod editor;
 mod menu;
@@ -34,6 +35,7 @@ fn main() {
             race::RacePlugin,
             camera::CameraPlugin,
             results::ResultsPlugin,
+            dev_menu::DevMenuPlugin,
         ))
         .run();
 }

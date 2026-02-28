@@ -18,7 +18,7 @@ pub enum FaceShape {
     Diamond,
 }
 
-const ALL_FACE_SHAPES: [FaceShape; 6] = [
+pub const ALL_FACE_SHAPES: [FaceShape; 6] = [
     FaceShape::Oval,
     FaceShape::Round,
     FaceShape::Square,
@@ -52,7 +52,7 @@ pub enum EyeStyle {
     Winking,
 }
 
-const ALL_EYE_STYLES: [EyeStyle; 6] = [
+pub const ALL_EYE_STYLES: [EyeStyle; 6] = [
     EyeStyle::Normal,
     EyeStyle::Narrow,
     EyeStyle::Wide,
@@ -85,7 +85,7 @@ pub enum MouthStyle {
     Frown,
 }
 
-const ALL_MOUTH_STYLES: [MouthStyle; 5] = [
+pub const ALL_MOUTH_STYLES: [MouthStyle; 5] = [
     MouthStyle::Neutral,
     MouthStyle::Smile,
     MouthStyle::Smirk,
@@ -119,7 +119,7 @@ pub enum HairStyle {
     Ponytail,
 }
 
-const ALL_HAIR_STYLES: [HairStyle; 7] = [
+pub const ALL_HAIR_STYLES: [HairStyle; 7] = [
     HairStyle::ShortCrop,
     HairStyle::Mohawk,
     HairStyle::LongSwept,
@@ -156,7 +156,7 @@ pub enum Accessory {
     NecklacePendant,
 }
 
-const ALL_ACCESSORIES: [Accessory; 4] = [
+pub const ALL_ACCESSORIES: [Accessory; 4] = [
     Accessory::EarringRound,
     Accessory::EarringRing,
     Accessory::NecklaceChain,
@@ -186,7 +186,7 @@ pub enum ShirtStyle {
     Vneck,
 }
 
-const ALL_SHIRT_STYLES: [ShirtStyle; 4] = [
+pub const ALL_SHIRT_STYLES: [ShirtStyle; 4] = [
     ShirtStyle::Crew,
     ShirtStyle::Round,
     ShirtStyle::Turtleneck,
@@ -349,6 +349,82 @@ impl PortraitDescriptor {
             eye_color,
             accessory_color,
             shirt_color,
+            generated: true,
+        }
+    }
+
+    /// Generate a randomized portrait using a palette configuration.
+    ///
+    /// Colors are picked from non-vetoed palette entries. Secondary colors
+    /// use explicit complementary mappings when available, falling back to
+    /// algorithmic derivation.
+    pub fn generate_with_config(
+        rng: &mut impl Rng,
+        primary_color: [f32; 3],
+        palette_colors: &[(&str, [f32; 3])],
+        config: &crate::dev_menu::portrait_config::PortraitPaletteConfig,
+    ) -> Self {
+        use crate::dev_menu::portrait_config::PortraitColorSlot;
+
+        let face_shape = FaceShape::random(rng);
+        let eyes = EyeStyle::random(rng);
+        let mouth = MouthStyle::random(rng);
+        let hair = HairStyle::random(rng);
+        let shirt = ShirtStyle::random(rng);
+
+        let accessory = if rng.gen_bool(0.5) {
+            Some(Accessory::random(rng))
+        } else {
+            None
+        };
+
+        let mut pick = |slot: PortraitColorSlot, fallback: [f32; 3]| -> (usize, [f32; 3]) {
+            let allowed = config.allowed_indices(slot);
+            if allowed.is_empty() {
+                return (0, fallback);
+            }
+            let idx = allowed[rng.gen_range(0..allowed.len())];
+            (idx, palette_colors[idx].1)
+        };
+
+        let (skin_idx, skin_tone) = pick(PortraitColorSlot::Skin, SKIN_TONES[0]);
+        let (_hair_idx, hair_color) = pick(PortraitColorSlot::Hair, [0.3, 0.2, 0.1]);
+        let (_eye_idx, eye_color_fallback) = pick(PortraitColorSlot::Eye, [0.3, 0.5, 0.7]);
+        let (_shirt_idx, shirt_color_from_palette) =
+            pick(PortraitColorSlot::Shirt, derive_shirt_color(primary_color));
+        let (acc_idx, acc_color_from_palette) = pick(
+            PortraitColorSlot::Accessory,
+            derive_accessory_color(primary_color),
+        );
+
+        // Secondary colors: check complementary map, else use palette pick or auto-derive
+        let _skin_highlight = config
+            .get_complementary(PortraitColorSlot::Skin, skin_idx)
+            .map(|i| palette_colors[i].1);
+        // Note: skin highlight is auto-computed by the fragment system, not stored on descriptor
+
+        let eye_color = config
+            .get_complementary(PortraitColorSlot::Eye, _hair_idx)
+            .map(|i| palette_colors[i].1)
+            .unwrap_or(eye_color_fallback);
+
+        let _acc_shadow = config
+            .get_complementary(PortraitColorSlot::Accessory, acc_idx)
+            .map(|i| palette_colors[i].1);
+        // Note: acc shadow is auto-computed by the fragment system, not stored on descriptor
+
+        Self {
+            face_shape,
+            eyes,
+            mouth,
+            hair,
+            shirt,
+            accessory,
+            skin_tone,
+            hair_color,
+            eye_color,
+            accessory_color: acc_color_from_palette,
+            shirt_color: shirt_color_from_palette,
             generated: true,
         }
     }

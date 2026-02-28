@@ -138,9 +138,13 @@ pub fn save_roster_to_default(roster: &PilotRoster) {
 }
 
 fn generate_initial_roster() -> PilotRoster {
+    use crate::dev_menu::portrait_config::{load_config, PALETTE_COLORS};
+
     let mut rng = rand::thread_rng();
     let mut roster = PilotRoster::default();
     let mut used_tags = HashSet::new();
+    let palette_config = load_config();
+    let has_config = !palette_config.vetoed.is_empty() || !palette_config.complementary.is_empty();
 
     for i in 0..INITIAL_ROSTER_SIZE {
         let id = PilotId(roster.next_id);
@@ -162,7 +166,16 @@ fn generate_initial_roster() -> PilotRoster {
             primary: ROSTER_COLORS[i % ROSTER_COLORS.len()],
         };
 
-        let portrait = PortraitDescriptor::generate(&mut rng, color.primary);
+        let portrait = if has_config {
+            PortraitDescriptor::generate_with_config(
+                &mut rng,
+                color.primary,
+                &PALETTE_COLORS,
+                &palette_config,
+            )
+        } else {
+            PortraitDescriptor::generate(&mut rng, color.primary)
+        };
 
         roster.pilots.push(Pilot {
             id,

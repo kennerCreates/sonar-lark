@@ -449,7 +449,7 @@ pub(crate) struct LbTimeText(usize);
 #[derive(Component)]
 pub(crate) struct LbPortrait(usize);
 
-const LB_PORTRAIT_SIZE: f32 = 48.0;
+const LB_PORTRAIT_SIZE: f32 = 64.0;
 
 pub fn setup_leaderboard(
     mut commands: Commands,

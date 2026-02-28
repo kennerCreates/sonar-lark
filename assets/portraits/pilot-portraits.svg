@@ -26,14 +26,14 @@
      inkscape:deskcolor="#505050"
      inkscape:document-units="mm"
      inkscape:zoom="16"
-     inkscape:cx="32.3125"
+     inkscape:cx="32.34375"
      inkscape:cy="28.0625"
      inkscape:window-width="3840"
      inkscape:window-height="2054"
      inkscape:window-x="-11"
      inkscape:window-y="-11"
      inkscape:window-maximized="1"
-     inkscape:current-layer="layer27"
+     inkscape:current-layer="layer12"
      showguides="true"><sodipodi:guide
        position="59.597394,285.62292"
        orientation="0,-1"
@@ -392,7 +392,7 @@
      inkscape:groupmode="layer"
      id="layer27"
      inkscape:label="eyes_normal"
-     style="display:inline"><path
+     style="display:none"><path
        style="display:inline;fill:#808080;fill-opacity:1;stroke:none;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
        d="m 18.501841,19.693152 c -0.255982,-0.503819 -1.517751,-1.01813 -1.721592,-0.0124 0.553871,0.720476 1.447705,0.611309 1.721592,0.0124 z"
        id="path7-2-4"
@@ -444,8 +444,8 @@
      inkscape:groupmode="layer"
      id="layer12"
      inkscape:label="eyes_visor"
-     style="display:none"><path
-       style="display:inline;fill:#000000;fill-opacity:1;stroke:#ffffff;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
+     style="display:inline"><path
+       style="display:inline;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
        d="m 23.883601,18.944106 c -0.333937,0.555245 -1.674542,1.420589 -2.366632,1.460123 -0.748274,0.04274 -1.595644,-0.333381 -2.064214,-0.327302 -0.609839,0.0079 -1.291627,0.468298 -1.992747,0.342694 -0.701121,-0.125606 -2.159062,-0.803655 -2.662729,-1.718475 l 0.03326,-1.085491 c 1.089847,0.380199 2.283731,0.04843 3.002147,0.196575 0.718416,0.148146 1.230422,0.718707 1.722055,0.737462 0.492465,0.01879 0.875667,-0.668296 1.712315,-0.743537 0.772417,-0.06946 1.985712,0.09981 2.563669,-0.06031 z"
        id="path38-8"
        sodipodi:nodetypes="csssccssscc"

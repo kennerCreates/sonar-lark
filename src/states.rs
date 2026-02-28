@@ -7,6 +7,7 @@ pub enum AppState {
     Editor,
     Race,
     Results,
+    DevMenu,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, SubStates)]

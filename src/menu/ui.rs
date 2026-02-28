@@ -44,6 +44,9 @@ pub(crate) struct RaceButtonText;
 #[derive(Component)]
 pub(crate) struct HintText;
 
+#[derive(Component)]
+pub(crate) struct DevButton;
+
 fn discover_courses() -> Vec<CourseEntry> {
     discover_courses_in(Path::new("assets/courses"))
 }
@@ -214,6 +217,8 @@ pub fn setup_menu(mut commands: Commands) {
                             RaceButtonText,
                         ));
                     });
+
+                    spawn_menu_button(row, "Dev", DevButton);
                 });
 
             parent.spawn((
@@ -388,10 +393,24 @@ pub fn handle_race_button(
     }
 }
 
+pub fn handle_dev_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<DevButton>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(AppState::DevMenu);
+        }
+    }
+}
+
 pub fn handle_button_visuals(
     mut query: Query<
         (&Interaction, &mut BackgroundColor, &mut BorderColor),
-        (Changed<Interaction>, Or<(With<EditorButton>, With<RaceButton>)>),
+        (
+            Changed<Interaction>,
+            Or<(With<EditorButton>, With<RaceButton>, With<DevButton>)>,
+        ),
     >,
 ) {
     for (interaction, mut bg, mut border) in &mut query {

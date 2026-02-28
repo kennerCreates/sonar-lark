@@ -17,6 +17,7 @@ impl Plugin for MenuPlugin {
                     ui::update_course_highlights,
                     ui::handle_editor_button,
                     ui::handle_race_button,
+                    ui::handle_dev_button,
                     ui::handle_button_visuals,
                 )
                     .run_if(in_state(AppState::Menu)),

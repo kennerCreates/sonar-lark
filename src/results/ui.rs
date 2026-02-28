@@ -135,16 +135,16 @@ pub fn setup_results_ui(
                                     row.spawn((
                                         ImageNode::new(handle),
                                         Node {
-                                            width: Val::Px(20.0),
-                                            height: Val::Px(20.0),
+                                            width: Val::Px(64.0),
+                                            height: Val::Px(64.0),
                                             ..default()
                                         },
                                     ));
                                 } else {
                                     row.spawn((
                                         Node {
-                                            width: Val::Px(20.0),
-                                            height: Val::Px(20.0),
+                                            width: Val::Px(64.0),
+                                            height: Val::Px(64.0),
                                             ..default()
                                         },
                                         BackgroundColor(color),

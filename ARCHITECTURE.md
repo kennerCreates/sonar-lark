@@ -53,6 +53,10 @@ src/
 │           ├── build.rs UI hierarchy construction (palette, panels)
 │           ├── file_ops.rs Save/load/delete, navigation, gate ordering
 │           └── systems.rs Interaction handlers, display updates, prop color
+├── dev_menu/            Development tools (accessible via Dev button on main menu)
+│   ├── mod.rs           DevMenuPlugin, system registration
+│   ├── portrait_config.rs PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS, RON persistence
+│   └── portrait_editor.rs Portrait palette editor UI, live preview, veto/complementary systems
 ├── pilot/               Procedural pilot system
 │   ├── mod.rs           PilotPlugin, Pilot, PilotId, SelectedPilots, PilotConfigs, ColorScheme
 │   ├── personality.rs   PersonalityTrait enum, trait modifiers, catchphrase pools
@@ -213,6 +217,9 @@ CourseData ──► spawn obstacles + firework emitters + drones + build Course
 | `SkillProfile` | Data | pilot/skill | Per-pilot skill: level + speed/cornering/consistency axes |
 | `PortraitDescriptor` | Data | pilot/portrait | Face/eyes/mouth/hair/shirt/accessory slots + colors (6 slot enums), `generate()` for random creation |
 | `PortraitCache` | Resource | pilot/portrait/cache | Cached `Handle<Image>` per pilot, persists across races, built `OnEnter(Race)` |
+| `PortraitPaletteConfig` | Resource | dev_menu/portrait_config | Per-slot vetoed color indices and complementary color mappings, persisted to RON |
+| `PortraitColorSlot` | Enum | dev_menu/portrait_config | Color pool categories: Skin, Hair, Eye, Shirt, Accessory |
+| `PortraitEditorState` | Resource | dev_menu/portrait_editor | Active tab, variant selections, color selections, preview dirty flag |
 
 ## Assets
 
