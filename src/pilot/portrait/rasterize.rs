@@ -4,17 +4,23 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 use super::PortraitDescriptor;
 use super::fragments::assemble_svg;
+use super::loader::PortraitParts;
 
 /// Rasterize a pilot portrait SVG into a Bevy `Image`.
 ///
-/// Assembles the SVG from the descriptor, parses it with `usvg`, renders it with
-/// `resvg` into a `tiny_skia::Pixmap`, and converts the resulting RGBA bytes into
-/// a Bevy `Image` suitable for UI display.
+/// Assembles the SVG from the descriptor and loaded parts, parses it with `usvg`,
+/// renders it with `resvg` into a `tiny_skia::Pixmap`, and converts the resulting
+/// RGBA bytes into a Bevy `Image` suitable for UI display.
 ///
 /// On any failure (SVG parse error, render error), returns a solid-color fallback
 /// image filled with `bg_color`.
-pub fn rasterize_portrait(descriptor: &PortraitDescriptor, bg_color: [f32; 3], size: u32) -> Image {
-    let svg_string = assemble_svg(descriptor, bg_color);
+pub fn rasterize_portrait(
+    descriptor: &PortraitDescriptor,
+    bg_color: [f32; 3],
+    size: u32,
+    parts: &PortraitParts,
+) -> Image {
+    let svg_string = assemble_svg(descriptor, bg_color, parts);
 
     match rasterize_svg(&svg_string, size) {
         Ok(image) => image,
@@ -170,11 +176,48 @@ mod tests {
         assert_eq!(data[3], 255);
     }
 
+    /// Build minimal `PortraitParts` with hex-colored SVG content for rasterization tests.
+    fn test_parts() -> PortraitParts {
+        let mut parts = PortraitParts::default();
+        let bg = r##"<rect width="20" height="20" rx="1.5" ry="1.5" fill="#808080"/>"##;
+        parts.insert("background", bg);
+        for v in &["oval", "round", "square", "angular"] {
+            let s = r##"<ellipse cx="10" cy="8" rx="4" ry="5" fill="#000000"/>"##;
+            parts.insert(format!("face_{v}"), s);
+        }
+        for v in &["normal", "narrow", "wide", "visor"] {
+            let s = r##"<circle cx="8" cy="7" r="1" fill="#808080"/><circle cx="8" cy="7" r="0.5" fill="#ffffff"/>"##;
+            parts.insert(format!("eyes_{v}"), s);
+        }
+        for v in &["neutral", "smile", "smirk", "frown"] {
+            let s = r##"<path d="M8 11 Q10 12 12 11" stroke="#000000" fill="none"/>"##;
+            parts.insert(format!("mouth_{v}"), s);
+        }
+        for v in &["short_crop", "long_sweep", "beanie"] {
+            let s = r##"<ellipse cx="10" cy="5" rx="5" ry="3" fill="#000000"/>"##;
+            parts.insert(format!("hair_back_{v}"), s);
+        }
+        for v in &["short_crop", "mohawk", "long_sweep", "beanie"] {
+            let s = r##"<path d="M5 5 Q10 2 15 5" fill="#000000"/>"##;
+            parts.insert(format!("hair_front_{v}"), s);
+        }
+        for v in &["crew", "round", "turtleneck", "vneck"] {
+            let s = r##"<rect x="4" y="14" width="12" height="6" fill="#000000"/>"##;
+            parts.insert(format!("shirt_{v}"), s);
+        }
+        for v in &["earring_round", "earring_ring", "necklace_chain", "necklace_pendant"] {
+            let s = r##"<circle cx="10" cy="14" r="0.5" fill="#000000"/>"##;
+            parts.insert(format!("acc_{v}"), s);
+        }
+        parts
+    }
+
     #[test]
     fn rasterize_portrait_produces_correct_size() {
         let mut rng = rand::thread_rng();
         let desc = super::super::PortraitDescriptor::generate(&mut rng, [0.8, 0.2, 0.4]);
-        let img = rasterize_portrait(&desc, [0.8, 0.2, 0.4], 48);
+        let parts = test_parts();
+        let img = rasterize_portrait(&desc, [0.8, 0.2, 0.4], 48, &parts);
         assert_eq!(img.width(), 48);
         assert_eq!(img.height(), 48);
         let data = img.data.as_ref().unwrap();

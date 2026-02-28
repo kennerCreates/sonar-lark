@@ -1,5 +1,6 @@
 pub mod cache;
 pub mod fragments;
+pub mod loader;
 pub mod rasterize;
 
 use rand::Rng;
@@ -30,6 +31,15 @@ impl FaceShape {
     fn random(rng: &mut impl Rng) -> Self {
         ALL_FACE_SHAPES[rng.gen_range(0..ALL_FACE_SHAPES.len())]
     }
+
+    pub fn group_id(&self) -> &'static str {
+        match self {
+            FaceShape::Oval | FaceShape::Long => "oval",
+            FaceShape::Round => "round",
+            FaceShape::Square => "square",
+            FaceShape::Angular | FaceShape::Diamond => "angular",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -55,6 +65,15 @@ impl EyeStyle {
     fn random(rng: &mut impl Rng) -> Self {
         ALL_EYE_STYLES[rng.gen_range(0..ALL_EYE_STYLES.len())]
     }
+
+    pub fn group_id(&self) -> &'static str {
+        match self {
+            EyeStyle::Normal | EyeStyle::Winking => "normal",
+            EyeStyle::Narrow => "narrow",
+            EyeStyle::Wide | EyeStyle::Goggles => "wide",
+            EyeStyle::Visor => "visor",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -77,6 +96,15 @@ const ALL_MOUTH_STYLES: [MouthStyle; 5] = [
 impl MouthStyle {
     fn random(rng: &mut impl Rng) -> Self {
         ALL_MOUTH_STYLES[rng.gen_range(0..ALL_MOUTH_STYLES.len())]
+    }
+
+    pub fn group_id(&self) -> &'static str {
+        match self {
+            MouthStyle::Neutral => "neutral",
+            MouthStyle::Smile => "smile",
+            MouthStyle::Smirk => "smirk",
+            MouthStyle::Gritted | MouthStyle::Frown => "frown",
+        }
     }
 }
 
@@ -105,30 +133,48 @@ impl HairStyle {
     fn random(rng: &mut impl Rng) -> Self {
         ALL_HAIR_STYLES[rng.gen_range(0..ALL_HAIR_STYLES.len())]
     }
+
+    pub fn group_id(&self) -> &'static str {
+        match self {
+            HairStyle::ShortCrop | HairStyle::Bald => "short_crop",
+            HairStyle::Mohawk => "mohawk",
+            HairStyle::LongSwept | HairStyle::Ponytail => "long_sweep",
+            HairStyle::Helmet | HairStyle::Beanie => "beanie",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Accessory {
-    #[serde(alias = "Scar")]
-    Necklace,
-    #[serde(alias = "FacePaint")]
-    SpikedCollar,
-    #[serde(alias = "Earpiece")]
-    Piercings,
-    #[serde(alias = "GogglesUp", alias = "Antenna")]
-    Earring,
+    #[serde(alias = "Earring", alias = "GogglesUp", alias = "Antenna")]
+    EarringRound,
+    #[serde(alias = "SpikedCollar", alias = "FacePaint")]
+    EarringRing,
+    #[serde(alias = "Piercings", alias = "Earpiece")]
+    NecklaceChain,
+    #[serde(alias = "Necklace", alias = "Scar")]
+    NecklacePendant,
 }
 
 const ALL_ACCESSORIES: [Accessory; 4] = [
-    Accessory::Necklace,
-    Accessory::SpikedCollar,
-    Accessory::Piercings,
-    Accessory::Earring,
+    Accessory::EarringRound,
+    Accessory::EarringRing,
+    Accessory::NecklaceChain,
+    Accessory::NecklacePendant,
 ];
 
 impl Accessory {
     fn random(rng: &mut impl Rng) -> Self {
         ALL_ACCESSORIES[rng.gen_range(0..ALL_ACCESSORIES.len())]
+    }
+
+    pub fn group_id(&self) -> &'static str {
+        match self {
+            Accessory::EarringRound => "earring_round",
+            Accessory::EarringRing => "earring_ring",
+            Accessory::NecklaceChain => "necklace_chain",
+            Accessory::NecklacePendant => "necklace_pendant",
+        }
     }
 }
 
@@ -150,6 +196,15 @@ const ALL_SHIRT_STYLES: [ShirtStyle; 4] = [
 impl ShirtStyle {
     fn random(rng: &mut impl Rng) -> Self {
         ALL_SHIRT_STYLES[rng.gen_range(0..ALL_SHIRT_STYLES.len())]
+    }
+
+    pub fn group_id(&self) -> &'static str {
+        match self {
+            ShirtStyle::Crew => "crew",
+            ShirtStyle::Round => "round",
+            ShirtStyle::Turtleneck => "turtleneck",
+            ShirtStyle::Vneck => "vneck",
+        }
     }
 }
 
@@ -620,7 +675,10 @@ mod tests {
     #[test]
     fn accessory_alias_backward_compat() {
         // Old variant names should deserialize to new ones
-        let old_names = ["Scar", "FacePaint", "Earpiece", "GogglesUp", "Antenna"];
+        let old_names = [
+            "Necklace", "Scar", "SpikedCollar", "FacePaint",
+            "Piercings", "Earpiece", "Earring", "GogglesUp", "Antenna",
+        ];
         for name in old_names {
             let ron_str = format!("{name}");
             let result: Result<Accessory, _> = ron::from_str(&ron_str);

@@ -5,9 +5,10 @@ use bevy::prelude::*;
 use crate::pilot::roster::PilotRoster;
 use crate::pilot::{PilotId, SelectedPilots};
 
+use super::loader::PortraitParts;
 use super::rasterize::rasterize_portrait;
 
-const PORTRAIT_SIZE: u32 = 48;
+const PORTRAIT_SIZE: u32 = 512;
 
 /// Cached portrait textures keyed by `PilotId`. Persists across races so
 /// portraits only need to be rasterized once per pilot per session.
@@ -20,16 +21,22 @@ impl PortraitCache {
     pub fn get(&self, pilot_id: PilotId) -> Option<Handle<Image>> {
         self.portraits.get(&pilot_id).cloned()
     }
+
+    /// Clear all cached portraits, forcing re-rasterization on next race entry.
+    pub fn invalidate(&mut self) {
+        self.portraits.clear();
+    }
 }
 
 /// Rasterize portraits for all selected pilots and insert/update the cache.
 /// Runs `OnEnter(Race)` after pilot selection, guarded by
-/// `run_if(resource_exists::<SelectedPilots>)`.
+/// `run_if(resource_exists::<PortraitParts>)`.
 pub fn setup_portrait_cache(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     selected: Res<SelectedPilots>,
     roster: Res<PilotRoster>,
+    parts: Res<PortraitParts>,
     existing_cache: Option<Res<PortraitCache>>,
 ) {
     let mut cache = existing_cache
@@ -51,7 +58,12 @@ pub fn setup_portrait_cache(
             continue;
         };
 
-        let image = rasterize_portrait(&pilot.portrait, pilot.color_scheme.primary, PORTRAIT_SIZE);
+        let image = rasterize_portrait(
+            &pilot.portrait,
+            pilot.color_scheme.primary,
+            PORTRAIT_SIZE,
+            &parts,
+        );
         let handle = images.add(image);
         cache.portraits.insert(sel.pilot_id, handle);
     }

@@ -59,9 +59,10 @@ src/
 │   ├── skill.rs         SkillProfile, skill+personality → DroneConfig mapping
 │   ├── gamertag.rs      Combinatorial gamertag generation
 │   ├── roster.rs        PilotRoster resource, RON persistence, initial generation, portrait migration
-│   └── portrait/        Portrait generation from hand-drawn Inkscape SVGs
+│   └── portrait/        Portrait generation from master Inkscape SVG
 │       ├── mod.rs       PortraitDescriptor, slot enums (FaceShape, EyeStyle, MouthStyle, HairStyle, ShirtStyle, Accessory)
-│       ├── fragments.rs Hand-drawn Inkscape SVG fragments (viewBox "9.5 11.5 20.1 20.1"), assemble_svg(), shirt_fragment(), color helpers
+│       ├── loader.rs    PortraitParts resource, master SVG layer parser, hot-reload (F6)
+│       ├── fragments.rs Per-layer hex color replacement, assemble_svg(), PortraitColors, LayerType
 │       ├── rasterize.rs resvg pipeline: SVG → tiny_skia::Pixmap → Bevy Image (48×48)
 │       └── cache.rs     PortraitCache resource (HashMap<PilotId, Handle<Image>>), setup system
 ├── drone/               Drone simulation
@@ -300,7 +301,8 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `pilot::roster` | 10 | Save/load roundtrip, roster size, unique IDs, load error, backward compat (stats+portrait), migration backfill, deterministic migration, skip-already-generated, incompatible filter |
 | `pilot::mod` | 1 | ColorScheme roundtrip |
 | `pilot::portrait` | 16 | Generation bounds, HSL roundtrip, serde compat, enum reachability, accessory rate |
-| `pilot::portrait::fragments` | 15 | Color helpers, SVG assembly, placeholder replacement, layer ordering, fragment validity |
+| `pilot::portrait::loader` | 9 | Master SVG layer parsing, nested children, empty layers, PortraitParts get/get_by_label |
+| `pilot::portrait::fragments` | 18 | Color helpers, SVG assembly, per-layer color replacement, layer ordering |
 | `pilot::portrait::rasterize` | 7 | Solid color images, unpremultiply alpha, rasterization output dimensions |
 | `rendering::cel_material` | 3 | Hue-shift algorithm: highlight warmth, shadow coolness, color clamping |
 

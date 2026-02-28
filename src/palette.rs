@@ -14,7 +14,7 @@ pub const STONE: Color = Color::srgb(0.412, 0.396, 0.439);           // #696570
 pub const CHAINMAIL: Color = Color::srgb(0.502, 0.475, 0.502);       // #807980
 pub const SIDEWALK: Color = Color::srgb(0.651, 0.604, 0.612);        // #a69a9c
 pub const SAND: Color = Color::srgb(0.769, 0.733, 0.702);            // #c4bbb3
-pub const TAN: Color = Color::srgb(0.851, 0.655, 0.596);             // #d9a798
+pub const TAN: Color = Color::srgb(0.851, 0.655, 0.596);             // rgb(217, 167, 152)
 pub const VANILLA: Color = Color::srgb(0.949, 0.949, 0.855);         // #f2f2da
 
 // --- Blues ---
@@ -29,7 +29,7 @@ pub const SKY: Color = Color::srgb(0.286, 0.761, 0.949);             // #49c2f2
 pub const VIOLET: Color = Color::srgb(0.306, 0.153, 0.549);          // #4e278c
 pub const ROYAL: Color = Color::srgb(0.467, 0.231, 0.749);           // #773bbf
 pub const ULTRAMARINE: Color = Color::srgb(0.208, 0.325, 0.651);     // #3553a6
-pub const SLATE: Color = Color::srgb(0.345, 0.416, 0.769);           // #586ac4
+pub const SLATE: Color = Color::srgb(0.345, 0.416, 0.769);           // rgb(88, 106, 196)
 pub const PERIWINKLE: Color = Color::srgb(0.494, 0.494, 0.949);      // #7e7ef2
 pub const AMETHYST: Color = Color::srgb(0.639, 0.365, 0.851);        // #a35dd9
 pub const ORCHID: Color = Color::srgb(0.792, 0.494, 0.949);          // #ca7ef2

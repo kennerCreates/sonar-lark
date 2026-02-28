@@ -18,17 +18,31 @@ pub struct PilotPlugin;
 
 impl Plugin for PilotPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, roster::load_or_generate_roster)
-            .add_systems(
-                OnEnter(AppState::Race),
-                (
-                    select_pilots_for_race,
-                    portrait::cache::setup_portrait_cache,
-                )
-                    .chain(),
+        app.add_systems(
+            Startup,
+            (
+                roster::load_or_generate_roster,
+                portrait::loader::load_portrait_parts,
+            ),
+        )
+        .add_systems(
+            OnEnter(AppState::Race),
+            (
+                select_pilots_for_race,
+                portrait::cache::setup_portrait_cache,
             )
-            .add_systems(OnEnter(AppState::Results), update_pilot_stats_after_race)
-            .add_systems(OnExit(AppState::Results), cleanup_race_pilot_resources);
+                .chain()
+                .run_if(resource_exists::<portrait::loader::PortraitParts>),
+        )
+        .add_systems(OnEnter(AppState::Results), update_pilot_stats_after_race)
+        .add_systems(OnExit(AppState::Results), cleanup_race_pilot_resources);
+
+        #[cfg(debug_assertions)]
+        app.add_systems(
+            Update,
+            portrait::loader::hot_reload_portraits
+                .run_if(in_state(AppState::Race)),
+        );
     }
 }
 
