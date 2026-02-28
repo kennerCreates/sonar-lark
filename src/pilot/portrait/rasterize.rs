@@ -33,7 +33,15 @@ fn rasterize_svg(svg: &str, size: u32) -> Result<Image, String> {
     let mut pixmap = resvg::tiny_skia::Pixmap::new(size, size)
         .ok_or_else(|| "Failed to create pixmap".to_string())?;
 
-    resvg::render(&tree, resvg::tiny_skia::Transform::default(), &mut pixmap.as_mut());
+    // Scale the SVG to fill the entire pixmap. Without this, the SVG renders
+    // at its intrinsic size (viewBox units ≈ 20×20) into a 48×48 pixmap,
+    // leaving most of the image transparent.
+    let tree_size = tree.size();
+    let sx = size as f32 / tree_size.width();
+    let sy = size as f32 / tree_size.height();
+    let transform = resvg::tiny_skia::Transform::from_scale(sx, sy);
+
+    resvg::render(&tree, transform, &mut pixmap.as_mut());
 
     // resvg outputs premultiplied RGBA. Convert to straight alpha for Bevy's
     // Rgba8UnormSrgb format, which expects non-premultiplied data.

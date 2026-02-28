@@ -7,6 +7,7 @@ pub mod ui;
 
 use bevy::prelude::*;
 
+use crate::pilot::portrait::cache::setup_portrait_cache;
 use crate::states::AppState;
 
 pub struct RacePlugin;
@@ -15,7 +16,7 @@ impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             OnEnter(AppState::Race),
-            (setup_race, ui::setup_race_ui, ui::setup_leaderboard, ui::setup_camera_hud, lifecycle::load_race_sounds),
+            (setup_race, ui::setup_race_ui, ui::setup_leaderboard.after(setup_portrait_cache), ui::setup_camera_hud, lifecycle::load_race_sounds),
         )
             // Build GatePlanes resource once gate entities are spawned
             .add_systems(

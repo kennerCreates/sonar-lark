@@ -431,7 +431,7 @@ pub fn update_open_editor_button_visuals(
 const LB_BG: Color = Color::srgba(0.02, 0.055, 0.102, 0.80);
 const LB_FONT: f32 = 13.0;
 const LB_WIDTH: f32 = 216.0;
-const LB_ROW_HEIGHT: f32 = 20.0;
+const LB_ROW_HEIGHT: f32 = 48.0;
 const LB_COLOR_BAR_W: f32 = 4.0;
 
 #[derive(Component)]
@@ -449,7 +449,7 @@ pub(crate) struct LbTimeText(usize);
 #[derive(Component)]
 pub(crate) struct LbPortrait(usize);
 
-const LB_PORTRAIT_SIZE: f32 = 16.0;
+const LB_PORTRAIT_SIZE: f32 = 48.0;
 
 pub fn setup_leaderboard(
     mut commands: Commands,
@@ -472,7 +472,6 @@ pub fn setup_leaderboard(
             },
             BackgroundColor(LB_BG),
             GlobalZIndex(90),
-            Visibility::Hidden,
         ))
         .with_children(|panel| {
             for i in 0..12usize {
@@ -515,10 +514,15 @@ pub fn setup_leaderboard(
                         if let Some(handle) = portrait_handle {
                             row.spawn((
                                 LbPortrait(i),
-                                ImageNode::new(handle),
+                                ImageNode {
+                                    image: handle,
+                                    image_mode: NodeImageMode::Stretch,
+                                    ..default()
+                                },
                                 Node {
                                     width: Val::Px(LB_PORTRAIT_SIZE),
                                     height: Val::Px(LB_PORTRAIT_SIZE),
+                                    flex_shrink: 0.0,
                                     ..default()
                                 },
                             ));
@@ -529,6 +533,7 @@ pub fn setup_leaderboard(
                                 Node {
                                     width: Val::Px(LB_PORTRAIT_SIZE),
                                     height: Val::Px(LB_PORTRAIT_SIZE),
+                                    flex_shrink: 0.0,
                                     ..default()
                                 },
                                 BackgroundColor(init_color),
@@ -581,15 +586,12 @@ pub fn update_leaderboard(
     >,
     mut portraits: Query<(&LbPortrait, Option<&mut ImageNode>, &mut BackgroundColor), (Without<LbColorBar>, Without<LbNameText>, Without<LbTimeText>)>,
 ) {
-    let show = matches!(*phase, RacePhase::Racing | RacePhase::Finished);
     for mut vis in &mut root_vis {
-        *vis = if show {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+        *vis = Visibility::Inherited;
     }
-    if !show {
+
+    let has_standings = matches!(*phase, RacePhase::Racing | RacePhase::Finished);
+    if !has_standings {
         return;
     }
 
