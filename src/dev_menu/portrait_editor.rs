@@ -223,7 +223,7 @@ pub fn setup_portrait_editor(
     if let Some(ref parts) = portrait_parts {
         let descriptor = state.build_descriptor();
         let bg = PALETTE_COLORS[state.primary_colors[&PortraitColorSlot::Skin]].1;
-        let image = rasterize_portrait(&descriptor, bg, 128, parts);
+        let image = rasterize_portrait(&descriptor, bg, 512, parts);
         let handle = images.add(image);
         state.preview_handle = Some(handle.clone());
 
@@ -330,8 +330,8 @@ fn build_ui(
                     let mut preview_cmd = left.spawn((
                         PreviewImage,
                         Node {
-                            width: Val::Px(128.0),
-                            height: Val::Px(128.0),
+                            width: Val::Px(512.0),
+                            height: Val::Px(512.0),
                             border: UiRect::all(Val::Px(2.0)),
                             ..default()
                         },
@@ -873,7 +873,7 @@ pub fn update_preview(
 
     let descriptor = state.build_descriptor();
     let bg = PALETTE_COLORS[state.primary_colors[&PortraitColorSlot::Skin]].1;
-    let image = rasterize_portrait(&descriptor, bg, 128, &parts);
+    let image = rasterize_portrait(&descriptor, bg, 512, &parts);
     let handle = images.add(image);
     state.preview_handle = Some(handle.clone());
 

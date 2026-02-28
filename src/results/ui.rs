@@ -106,7 +106,7 @@ pub fn setup_results_ui(
 
                         container
                             .spawn(Node {
-                                height: Val::Px(24.0),
+                                height: Val::Px(128.0),
                                 flex_direction: FlexDirection::Row,
                                 align_items: AlignItems::Center,
                                 column_gap: Val::Px(6.0),
@@ -135,16 +135,16 @@ pub fn setup_results_ui(
                                     row.spawn((
                                         ImageNode::new(handle),
                                         Node {
-                                            width: Val::Px(64.0),
-                                            height: Val::Px(64.0),
+                                            width: Val::Px(128.0),
+                                            height: Val::Px(128.0),
                                             ..default()
                                         },
                                     ));
                                 } else {
                                     row.spawn((
                                         Node {
-                                            width: Val::Px(64.0),
-                                            height: Val::Px(64.0),
+                                            width: Val::Px(128.0),
+                                            height: Val::Px(128.0),
                                             ..default()
                                         },
                                         BackgroundColor(color),

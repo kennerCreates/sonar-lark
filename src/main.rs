@@ -17,10 +17,21 @@ mod states;
 
 use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
+use bevy::window::WindowResolution;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, MeshPickingPlugin))
+        .add_plugins((
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    resolution: WindowResolution::new(1920, 1080),
+                    title: "Sonar Lark".into(),
+                    ..default()
+                }),
+                ..default()
+            }),
+            MeshPickingPlugin,
+        ))
         .init_state::<states::AppState>()
         .add_sub_state::<states::EditorMode>()
         .add_plugins((

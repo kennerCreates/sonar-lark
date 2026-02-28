@@ -430,15 +430,11 @@ pub fn update_open_editor_button_visuals(
 
 const LB_BG: Color = Color::srgba(0.02, 0.055, 0.102, 0.80);
 const LB_FONT: f32 = 13.0;
-const LB_WIDTH: f32 = 216.0;
-const LB_ROW_HEIGHT: f32 = 48.0;
-const LB_COLOR_BAR_W: f32 = 4.0;
+const LB_WIDTH: f32 = 280.0;
+const LB_ROW_HEIGHT: f32 = 64.0;
 
 #[derive(Component)]
 pub(crate) struct LeaderboardRoot;
-
-#[derive(Component)]
-pub(crate) struct LbColorBar(usize);
 
 #[derive(Component)]
 pub(crate) struct LbNameText(usize);
@@ -494,16 +490,6 @@ pub fn setup_leaderboard(
                             } else {
                                 (DRONE_NAMES[i], DRONE_COLORS[i])
                             };
-                        // Colored accent bar
-                        row.spawn((
-                            LbColorBar(i),
-                            Node {
-                                width: Val::Px(LB_COLOR_BAR_W),
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(init_color),
-                        ));
                         // Portrait thumbnail
                         let portrait_handle = selected.as_ref()
                             .and_then(|s| s.pilots.get(i))
@@ -575,7 +561,6 @@ pub fn update_leaderboard(
     selected: Option<Res<SelectedPilots>>,
     portrait_cache: Option<Res<PortraitCache>>,
     mut root_vis: Query<&mut Visibility, With<LeaderboardRoot>>,
-    mut color_bars: Query<(&LbColorBar, &mut BackgroundColor), Without<LbPortrait>>,
     mut name_texts: Query<
         (&LbNameText, &mut Text, &mut TextColor),
         (Without<LbTimeText>, Without<LbPortrait>),
@@ -584,7 +569,7 @@ pub fn update_leaderboard(
         (&LbTimeText, &mut Text, &mut TextColor),
         (Without<LbNameText>, Without<LbPortrait>),
     >,
-    mut portraits: Query<(&LbPortrait, Option<&mut ImageNode>, &mut BackgroundColor), (Without<LbColorBar>, Without<LbNameText>, Without<LbTimeText>)>,
+    mut portraits: Query<(&LbPortrait, Option<&mut ImageNode>, &mut BackgroundColor), (Without<LbNameText>, Without<LbTimeText>)>,
 ) {
     for mut vis in &mut root_vis {
         *vis = Visibility::Inherited;
@@ -606,18 +591,6 @@ pub fn update_leaderboard(
         row_data[pos] = (drone_idx, true, state.finished, state.crashed, state.finish_time.unwrap_or(0.0));
     }
 
-    for (bar, mut bg) in &mut color_bars {
-        let pos = bar.0;
-        if pos < 12 && row_data[pos].1 {
-            let drone_idx = row_data[pos].0;
-            let color = selected
-                .as_ref()
-                .and_then(|s| s.pilots.get(drone_idx))
-                .map(|p| p.color)
-                .unwrap_or(DRONE_COLORS[drone_idx]);
-            *bg = BackgroundColor(color);
-        }
-    }
     for (portrait, image_node, mut bg) in &mut portraits {
         let pos = portrait.0;
         if pos < 12 && row_data[pos].1 {
