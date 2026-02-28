@@ -16,34 +16,6 @@ use super::{ColorScheme, DroneBuildDescriptor, Pilot, PilotId, PilotStats, Portr
 const ROSTER_PATH: &str = "assets/pilots/roster.pilots.ron";
 const INITIAL_ROSTER_SIZE: usize = 24;
 
-/// 24 distinct sRGB colors with good hue spread for the initial pilot roster.
-const ROSTER_COLORS: [[f32; 3]; 24] = [
-    [0.961, 0.192, 0.255], // NEON_RED
-    [0.961, 0.506, 0.133], // SUNFLOWER
-    [0.980, 0.851, 0.216], // LIMON
-    [0.580, 0.749, 0.188], // GRASS
-    [0.090, 0.612, 0.263], // FROG
-    [0.239, 0.631, 0.494], // JADE
-    [0.286, 0.761, 0.949], // SKY
-    [0.110, 0.459, 0.741], // HOMEWORLD
-    [0.494, 0.494, 0.949], // PERIWINKLE
-    [0.639, 0.365, 0.851], // AMETHYST
-    [0.851, 0.298, 0.557], // PINK
-    [0.949, 0.949, 0.855], // VANILLA
-    [0.949, 0.384, 0.122], // TANGERINE
-    [0.980, 0.627, 0.196], // DANDELION
-    [0.800, 0.780, 0.239], // LIME
-    [0.333, 0.702, 0.231], // GREEN
-    [0.024, 0.502, 0.320], // JUNGLE (0.318 triggers approx_constant lint)
-    [0.126, 0.502, 0.424], // SEAGREEN
-    [0.145, 0.675, 0.961], // CERULEAN
-    [0.345, 0.416, 0.769], // SLATE
-    [0.467, 0.231, 0.749], // ROYAL
-    [0.792, 0.494, 0.949], // ORCHID
-    [0.922, 0.459, 0.561], // BUBBLEGUM
-    [1.000, 0.725, 0.220], // SUNSHINE
-];
-
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
 pub struct PilotRoster {
     pub pilots: Vec<Pilot>,
@@ -138,13 +110,15 @@ pub fn save_roster_to_default(roster: &PilotRoster) {
 }
 
 fn generate_initial_roster() -> PilotRoster {
-    use crate::dev_menu::portrait_config::{load_config, PALETTE_COLORS};
+    use crate::dev_menu::portrait_config::{PortraitColorSlot, load_config, PALETTE_COLORS};
 
     let mut rng = rand::thread_rng();
     let mut roster = PilotRoster::default();
     let mut used_tags = HashSet::new();
     let palette_config = load_config();
     let has_config = !palette_config.vetoed.is_empty() || !palette_config.complementary.is_empty();
+
+    let allowed_drone_colors = palette_config.allowed_indices(PortraitColorSlot::Drone);
 
     for i in 0..INITIAL_ROSTER_SIZE {
         let id = PilotId(roster.next_id);
@@ -162,8 +136,11 @@ fn generate_initial_roster() -> PilotRoster {
             consistency: rng.gen_range(0.2..=1.0),
         };
 
+        let idx = allowed_drone_colors[i % allowed_drone_colors.len()];
+        let drone_primary = PALETTE_COLORS[idx].1;
+
         let color = ColorScheme {
-            primary: ROSTER_COLORS[i % ROSTER_COLORS.len()],
+            primary: drone_primary,
         };
 
         let portrait = if has_config {

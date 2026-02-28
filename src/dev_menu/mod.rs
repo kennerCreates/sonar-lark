@@ -41,6 +41,7 @@ impl Plugin for DevMenuPlugin {
                 portrait_editor::rebuild_variant_panel,
                 portrait_editor::rebuild_primary_grid,
                 portrait_editor::rebuild_secondary_grid,
+                portrait_editor::update_drone_warning,
                 portrait_editor::update_color_name_on_hover,
                 portrait_editor::handle_button_hover_visuals,
             )

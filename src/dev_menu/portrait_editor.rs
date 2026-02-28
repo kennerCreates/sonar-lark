@@ -14,7 +14,7 @@ use crate::pilot::portrait::{
 use crate::states::AppState;
 
 use super::portrait_config::{
-    PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS, save_config,
+    MIN_DRONE_COLORS, PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS, save_config,
 };
 
 // ── Colors ──────────────────────────────────────────────────────────────────
@@ -26,7 +26,6 @@ const RADIO_NORMAL: Color = palette::SMOKY_BLACK;
 const RADIO_ACTIVE: Color = palette::SAPPHIRE;
 const COLOR_CELL_SIZE: f32 = 24.0;
 const COLOR_GRID_COLS: usize = 8;
-const VETO_OVERLAY: Color = Color::srgba(0.8, 0.1, 0.1, 0.6);
 const SELECTED_BORDER: Color = palette::VANILLA;
 const COMPLEMENTARY_BORDER: Color = palette::SUNSHINE;
 
@@ -40,16 +39,18 @@ pub enum EditorTab {
     Hair,
     Shirt,
     Accessory,
+    Drone,
 }
 
 impl EditorTab {
-    const ALL: [EditorTab; 6] = [
+    const ALL: [EditorTab; 7] = [
         EditorTab::Face,
         EditorTab::Eyes,
         EditorTab::Mouth,
         EditorTab::Hair,
         EditorTab::Shirt,
         EditorTab::Accessory,
+        EditorTab::Drone,
     ];
 
     fn label(self) -> &'static str {
@@ -60,6 +61,7 @@ impl EditorTab {
             EditorTab::Hair => "Hair",
             EditorTab::Shirt => "Shirt",
             EditorTab::Accessory => "Acc",
+            EditorTab::Drone => "Drone",
         }
     }
 
@@ -71,6 +73,7 @@ impl EditorTab {
             EditorTab::Hair => Some(PortraitColorSlot::Hair),
             EditorTab::Shirt => Some(PortraitColorSlot::Shirt),
             EditorTab::Accessory => Some(PortraitColorSlot::Accessory),
+            EditorTab::Drone => Some(PortraitColorSlot::Drone),
         }
     }
 }
@@ -100,6 +103,7 @@ impl Default for PortraitEditorState {
         primary_colors.insert(PortraitColorSlot::Eye, 15); // Sky
         primary_colors.insert(PortraitColorSlot::Shirt, 7); // Sand
         primary_colors.insert(PortraitColorSlot::Accessory, 4); // Stone
+        primary_colors.insert(PortraitColorSlot::Drone, 33); // Neon Red
 
         let mut secondary_colors = HashMap::new();
         secondary_colors.insert(PortraitColorSlot::Skin, 9); // Vanilla (highlight)
@@ -177,7 +181,10 @@ pub struct PrimaryColorCell(pub usize);
 pub struct SecondaryColorCell(pub usize);
 
 #[derive(Component)]
-pub struct VetoOverlay;
+pub struct AllowedGridPanel;
+
+#[derive(Component)]
+pub struct VetoedGridPanel;
 
 #[derive(Component)]
 pub struct PreviewImage;
@@ -209,6 +216,9 @@ pub struct AutoSecondaryButton;
 #[derive(Component)]
 pub struct ColorNameLabel;
 
+#[derive(Component)]
+pub struct DroneWarningLabel;
+
 // ── Setup ───────────────────────────────────────────────────────────────────
 
 pub fn setup_portrait_editor(
@@ -222,7 +232,7 @@ pub fn setup_portrait_editor(
     // If we have portrait parts, render initial preview
     if let Some(ref parts) = portrait_parts {
         let descriptor = state.build_descriptor();
-        let bg = PALETTE_COLORS[state.primary_colors[&PortraitColorSlot::Skin]].1;
+        let bg = PALETTE_COLORS[state.primary_colors[&PortraitColorSlot::Drone]].1;
         let image = rasterize_portrait(&descriptor, bg, 512, parts);
         let handle = images.add(image);
         state.preview_handle = Some(handle.clone());
@@ -313,7 +323,8 @@ fn build_ui(
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
                     row_gap: Val::Px(8.0),
-                    width: Val::Px(160.0),
+                    width: Val::Px(520.0),
+                    flex_shrink: 0.0,
                     ..default()
                 })
                 .with_children(|left| {
@@ -424,27 +435,99 @@ fn build_ui(
                             spawn_variant_buttons(variant_area, state);
                         });
 
-                    // Primary color grid
+                    // Primary color grid (two-column: allowed / vetoed)
                     right.spawn((
-                        Text::new("Primary Color (left-click = select, right-click = veto)"),
+                        Text::new("Primary Color (left-click = select, right-click = move)"),
                         TextFont {
                             font_size: 12.0,
                             ..default()
                         },
                         TextColor(palette::SIDEWALK),
                     ));
+                    right
+                        .spawn((
+                            PrimaryGridPanel,
+                            Node {
+                                flex_direction: FlexDirection::Row,
+                                column_gap: Val::Px(16.0),
+                                ..default()
+                            },
+                        ))
+                        .with_children(|grid_parent| {
+                            // Left: Allowed colors
+                            grid_parent
+                                .spawn(Node {
+                                    flex_direction: FlexDirection::Column,
+                                    row_gap: Val::Px(4.0),
+                                    ..default()
+                                })
+                                .with_children(|col| {
+                                    col.spawn((
+                                        Text::new("Allowed"),
+                                        TextFont {
+                                            font_size: 11.0,
+                                            ..default()
+                                        },
+                                        TextColor(palette::SIDEWALK),
+                                    ));
+                                    col.spawn((
+                                        AllowedGridPanel,
+                                        Node {
+                                            flex_direction: FlexDirection::Row,
+                                            flex_wrap: FlexWrap::Wrap,
+                                            column_gap: Val::Px(2.0),
+                                            row_gap: Val::Px(2.0),
+                                            max_width: Val::Px(
+                                                (COLOR_CELL_SIZE + 2.0)
+                                                    * COLOR_GRID_COLS as f32,
+                                            ),
+                                            ..default()
+                                        },
+                                    ));
+                                });
+                            // Right: Vetoed colors
+                            grid_parent
+                                .spawn(Node {
+                                    flex_direction: FlexDirection::Column,
+                                    row_gap: Val::Px(4.0),
+                                    ..default()
+                                })
+                                .with_children(|col| {
+                                    col.spawn((
+                                        Text::new("Vetoed"),
+                                        TextFont {
+                                            font_size: 11.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::srgba(0.8, 0.3, 0.3, 1.0)),
+                                    ));
+                                    col.spawn((
+                                        VetoedGridPanel,
+                                        Node {
+                                            flex_direction: FlexDirection::Row,
+                                            flex_wrap: FlexWrap::Wrap,
+                                            column_gap: Val::Px(2.0),
+                                            row_gap: Val::Px(2.0),
+                                            max_width: Val::Px(
+                                                (COLOR_CELL_SIZE + 2.0)
+                                                    * COLOR_GRID_COLS as f32,
+                                            ),
+                                            ..default()
+                                        },
+                                    ));
+                                });
+                        });
+
+                    // Drone color minimum warning (hidden by default)
                     right.spawn((
-                        PrimaryGridPanel,
-                        Node {
-                            flex_direction: FlexDirection::Row,
-                            flex_wrap: FlexWrap::Wrap,
-                            column_gap: Val::Px(2.0),
-                            row_gap: Val::Px(2.0),
-                            max_width: Val::Px(
-                                (COLOR_CELL_SIZE + 2.0) * COLOR_GRID_COLS as f32,
-                            ),
+                        DroneWarningLabel,
+                        Text::new(""),
+                        TextFont {
+                            font_size: 12.0,
                             ..default()
                         },
+                        TextColor(Color::srgba(1.0, 0.3, 0.3, 1.0)),
+                        Visibility::Hidden,
                     ));
 
                     // Secondary color grid (conditionally shown)
@@ -632,6 +715,16 @@ fn spawn_variant_buttons(parent: &mut ChildSpawnerCommands, state: &PortraitEdit
                 );
             }
         }
+        EditorTab::Drone => {
+            parent.spawn((
+                Text::new("Portrait background color"),
+                TextFont {
+                    font_size: 12.0,
+                    ..default()
+                },
+                TextColor(palette::SIDEWALK),
+            ));
+        }
     }
 }
 
@@ -740,6 +833,7 @@ pub fn handle_variant_selection(
                     state.accessory = Some(ALL_ACCESSORIES[vb.index]);
                 }
             }
+            EditorTab::Drone => {}
         }
         state.preview_dirty = true;
     }
@@ -773,6 +867,13 @@ pub fn handle_primary_color_veto(
     };
     for (interaction, cell) in &query {
         if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
+            // Block vetoing if it would drop drone colors below minimum
+            if slot == PortraitColorSlot::Drone
+                && !config.is_vetoed(slot, cell.0)
+                && config.drone_colors_allowed() <= MIN_DRONE_COLORS
+            {
+                return;
+            }
             config.toggle_veto(slot, cell.0);
         }
     }
@@ -820,6 +921,14 @@ pub fn handle_save_button(
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            if config.drone_colors_allowed() < MIN_DRONE_COLORS {
+                warn!(
+                    "Cannot save: need at least {} drone colors, have {}",
+                    MIN_DRONE_COLORS,
+                    config.drone_colors_allowed()
+                );
+                return;
+            }
             save_config(&config);
         }
     }
@@ -872,7 +981,7 @@ pub fn update_preview(
     };
 
     let descriptor = state.build_descriptor();
-    let bg = PALETTE_COLORS[state.primary_colors[&PortraitColorSlot::Skin]].1;
+    let bg = PALETTE_COLORS[state.primary_colors[&PortraitColorSlot::Drone]].1;
     let image = rasterize_portrait(&descriptor, bg, 512, &parts);
     let handle = images.add(image);
     state.preview_handle = Some(handle.clone());
@@ -926,65 +1035,62 @@ pub fn rebuild_primary_grid(
     state: Res<PortraitEditorState>,
     config: Res<PortraitPaletteConfig>,
     mut commands: Commands,
-    grid_panel: Query<Entity, With<PrimaryGridPanel>>,
+    allowed_panel: Query<Entity, With<AllowedGridPanel>>,
+    vetoed_panel: Query<Entity, With<VetoedGridPanel>>,
 ) {
     if !state.is_changed() && !config.is_changed() {
         return;
     }
-    for entity in &grid_panel {
+    let slot = state.active_tab.color_slot();
+    let selected = slot.and_then(|s| state.primary_colors.get(&s).copied());
+
+    for entity in &allowed_panel {
         commands.entity(entity).despawn_children();
         commands.entity(entity).with_children(|parent| {
-            let slot = state.active_tab.color_slot();
-            let selected = slot.and_then(|s| state.primary_colors.get(&s).copied());
-            spawn_primary_color_grid(parent, &config, slot, selected);
+            for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
+                if slot.is_some_and(|s| config.is_vetoed(s, i)) {
+                    continue;
+                }
+                spawn_color_cell(parent, i, rgb, selected == Some(i));
+            }
+        });
+    }
+
+    for entity in &vetoed_panel {
+        commands.entity(entity).despawn_children();
+        commands.entity(entity).with_children(|parent| {
+            for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
+                if !slot.is_some_and(|s| config.is_vetoed(s, i)) {
+                    continue;
+                }
+                spawn_color_cell(parent, i, rgb, selected == Some(i));
+            }
         });
     }
 }
 
-fn spawn_primary_color_grid(
+fn spawn_color_cell(
     parent: &mut ChildSpawnerCommands,
-    config: &PortraitPaletteConfig,
-    slot: Option<PortraitColorSlot>,
-    selected: Option<usize>,
+    index: usize,
+    rgb: &[f32; 3],
+    is_selected: bool,
 ) {
-    for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
-        let is_selected = selected == Some(i);
-        let is_vetoed = slot.is_some_and(|s| config.is_vetoed(s, i));
-
-        parent
-            .spawn((
-                Button,
-                PrimaryColorCell(i),
-                Node {
-                    width: Val::Px(COLOR_CELL_SIZE),
-                    height: Val::Px(COLOR_CELL_SIZE),
-                    border: UiRect::all(Val::Px(if is_selected { 2.0 } else { 1.0 })),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(rgb[0], rgb[1], rgb[2])),
-                BorderColor::all(if is_selected {
-                    SELECTED_BORDER
-                } else {
-                    Color::srgba(0.0, 0.0, 0.0, 0.3)
-                }),
-            ))
-            .with_children(|cell| {
-                if is_vetoed {
-                    cell.spawn((
-                        VetoOverlay,
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            position_type: PositionType::Absolute,
-                            ..default()
-                        },
-                        BackgroundColor(VETO_OVERLAY),
-                    ));
-                }
-            });
-    }
+    parent.spawn((
+        Button,
+        PrimaryColorCell(index),
+        Node {
+            width: Val::Px(COLOR_CELL_SIZE),
+            height: Val::Px(COLOR_CELL_SIZE),
+            border: UiRect::all(Val::Px(if is_selected { 2.0 } else { 1.0 })),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(rgb[0], rgb[1], rgb[2])),
+        BorderColor::all(if is_selected {
+            SELECTED_BORDER
+        } else {
+            Color::srgba(0.0, 0.0, 0.0, 0.3)
+        }),
+    ));
 }
 
 pub fn rebuild_secondary_grid(
@@ -1043,6 +1149,32 @@ fn spawn_secondary_color_grid(
                 Color::srgba(0.0, 0.0, 0.0, 0.3)
             }),
         ));
+    }
+}
+
+pub fn update_drone_warning(
+    config: Res<PortraitPaletteConfig>,
+    state: Res<PortraitEditorState>,
+    mut query: Query<(&mut Text, &mut Visibility), With<DroneWarningLabel>>,
+) {
+    if !config.is_changed() && !state.is_changed() {
+        return;
+    }
+    let allowed = config.drone_colors_allowed();
+    let show = state.active_tab == EditorTab::Drone && allowed <= MIN_DRONE_COLORS;
+    for (mut text, mut vis) in &mut query {
+        if show {
+            *vis = Visibility::Visible;
+            let msg = format!(
+                "Need at least {} drone colors ({} allowed) \u{2014} cannot save",
+                MIN_DRONE_COLORS, allowed,
+            );
+            if text.0 != msg {
+                text.0 = msg;
+            }
+        } else {
+            *vis = Visibility::Hidden;
+        }
     }
 }
 

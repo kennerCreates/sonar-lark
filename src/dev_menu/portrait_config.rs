@@ -8,6 +8,9 @@ use crate::palette;
 
 const CONFIG_PATH: &str = "assets/dev/portrait_palette.ron";
 
+/// Minimum number of allowed drone colors (one per race slot).
+pub const MIN_DRONE_COLORS: usize = 12;
+
 /// Which color pool a portrait layer draws from.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PortraitColorSlot {
@@ -16,6 +19,7 @@ pub enum PortraitColorSlot {
     Eye,
     Shirt,
     Accessory,
+    Drone,
 }
 
 impl PortraitColorSlot {
@@ -84,6 +88,10 @@ impl PortraitPaletteConfig {
     pub fn reset_slot(&mut self, slot: PortraitColorSlot) {
         self.vetoed.remove(&slot);
         self.complementary.remove(&slot);
+    }
+
+    pub fn drone_colors_allowed(&self) -> usize {
+        self.allowed_indices(PortraitColorSlot::Drone).len()
     }
 
     pub fn reset_all(&mut self) {

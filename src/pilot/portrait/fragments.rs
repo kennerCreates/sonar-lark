@@ -25,6 +25,8 @@ const SRC_GRAY_50: &str = "#808080";
 const SRC_GRAY_80: &str = "#333333";
 /// Mouth smile fill (teeth) in the master SVG.
 const SRC_TEETH: &str = "#e5e5e5";
+/// Hair stroke detail color in the master SVG.
+const SRC_HAIR_STROKE: &str = "#b2b2b2";
 
 // ---------------------------------------------------------------------------
 // Color helpers
@@ -118,6 +120,7 @@ fn replace_layer_colors(content: &str, layer_type: LayerType, colors: &PortraitC
             replacements.push((SRC_GRAY_80, BLACK_HEX));
         }
         LayerType::Hair => {
+            replacements.push((SRC_HAIR_STROKE, &colors.hair_hex));
             replacements.push((SRC_BLACK, &colors.hair_hex));
             replacements.push((SRC_GRAY_50, VANILLA_HEX));
             replacements.push((SRC_GRAY_80, BLACK_HEX));
@@ -354,14 +357,14 @@ mod tests {
         for v in &["short_crop", "long_sweep", "beanie"] {
             parts.insert(
                 format!("hair_back_{v}"),
-                format!(r##"<path id="hair-back-{v}" fill="#000000"/>"##),
+                format!(r##"<path id="hair-back-{v}" fill="#000000" stroke="#b2b2b2"/>"##),
             );
         }
 
         for v in &["short_crop", "mohawk", "long_sweep", "beanie"] {
             parts.insert(
                 format!("hair_front_{v}"),
-                format!(r##"<path id="hair-front-{v}" fill="#000000"/>"##),
+                format!(r##"<path id="hair-front-{v}" fill="#000000" stroke="#b2b2b2"/>"##),
             );
         }
 
@@ -450,10 +453,11 @@ mod tests {
     #[test]
     fn replace_hair_colors() {
         let colors = PortraitColors::from_descriptor(&test_desc(), [0.1, 0.1, 0.2]);
-        let content = r##"<path fill="#000000"/>"##;
+        let content = r##"<path fill="#000000" stroke="#b2b2b2"/>"##;
         let result = replace_layer_colors(content, LayerType::Hair, &colors);
         assert!(result.contains(&colors.hair_hex), "Hair fill should be hair_color");
-        assert!(!result.contains(SRC_BLACK));
+        assert!(!result.contains(SRC_BLACK), "No source BLACK should remain");
+        assert!(!result.contains(SRC_HAIR_STROKE), "Hair strokes should become hair_color");
     }
 
     #[test]
