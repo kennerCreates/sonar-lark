@@ -1,5 +1,6 @@
 pub mod gamertag;
 pub mod personality;
+pub mod portrait;
 pub mod roster;
 pub mod skill;
 
@@ -11,12 +12,21 @@ use crate::drone::components::DroneConfig;
 use crate::race::progress::RaceResults;
 use crate::states::AppState;
 
+pub use portrait::PortraitDescriptor;
+
 pub struct PilotPlugin;
 
 impl Plugin for PilotPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, roster::load_or_generate_roster)
-            .add_systems(OnEnter(AppState::Race), select_pilots_for_race)
+            .add_systems(
+                OnEnter(AppState::Race),
+                (
+                    select_pilots_for_race,
+                    portrait::cache::setup_portrait_cache,
+                )
+                    .chain(),
+            )
             .add_systems(OnEnter(AppState::Results), update_pilot_stats_after_race)
             .add_systems(OnExit(AppState::Results), cleanup_race_pilot_resources);
     }
@@ -51,10 +61,6 @@ impl ColorScheme {
 /// Placeholder for Phase 3: drone build configuration.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct DroneBuildDescriptor {}
-
-/// Placeholder for Phase 2: portrait part selections.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct PortraitDescriptor {}
 
 /// Accumulated stats across races.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

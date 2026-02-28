@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="1.668541mm"
+   height="0.41688955mm"
+   viewBox="0 0 1.668541 0.41688955"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   sodipodi:docname="pilot-portraits.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm"
+     inkscape:zoom="32"
+     inkscape:cx="365.95312"
+     inkscape:cy="85.34375"
+     inkscape:window-width="3840"
+     inkscape:window-height="2054"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g18-5-4-7">
+    <inkscape:page
+       x="1.3660889e-21"
+       y="0"
+       width="1.6685411"
+       height="0.41688955"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1">
+    <linearGradient
+       id="swatch4"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#262626;stop-opacity:1;"
+         offset="0"
+         id="stop4" />
+    </linearGradient>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-18.604404,-23.581688)">
+    <g
+       id="g18"
+       inkscape:label="portrait - 01">
+      <path
+         style="fill:none;fill-opacity:1;stroke:#0d0d0d;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
+         d="m 18.729405,23.741416 c 0.601921,0.251291 1.164067,0.08658 1.418543,-0.03473"
+         id="path11"
+         sodipodi:nodetypes="cc"
+         inkscape:label="mouth - neutral" />
+    </g>
+  </g>
+</svg>

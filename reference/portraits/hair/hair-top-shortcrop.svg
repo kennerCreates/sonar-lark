@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="9.2555265mm"
+   height="4.9142776mm"
+   viewBox="0 0 9.2555265 4.9142776"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   sodipodi:docname="pilot-portraits.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm"
+     inkscape:zoom="32"
+     inkscape:cx="365.95312"
+     inkscape:cy="85.34375"
+     inkscape:window-width="3840"
+     inkscape:window-height="2054"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g18-5-4-7">
+    <inkscape:page
+       x="0"
+       y="4.0425973e-21"
+       width="9.2555265"
+       height="4.9142776"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1">
+    <linearGradient
+       id="swatch4"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#262626;stop-opacity:1;"
+         offset="0"
+         id="stop4" />
+    </linearGradient>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-14.690159,-13.14481)">
+    <g
+       id="g18"
+       inkscape:label="portrait - 01">
+      <path
+         style="fill:#b2b2b2;fill-opacity:1;stroke:none;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
+         d="m 21.944237,16.71038 c -0.662002,0.624491 -0.476681,0.22622 -0.87017,0.641194 -0.473999,-0.413274 -0.381961,-0.234857 -0.854121,-0.782929 -0.264354,0.214658 -0.598052,0.635291 -0.944341,0.797359 -0.07972,-0.175376 -0.08535,-0.538329 -0.18359,-0.618287 -0.09824,-0.07996 -0.309566,0.40371 -0.420642,0.354708 -0.111076,-0.049 -0.116061,-0.437738 -0.234274,-0.520241 -0.118213,-0.0825 -0.323345,0.304925 -0.422536,0.443092 -0.198371,-0.244236 -0.403437,-0.502314 -0.515534,-0.546421 -0.0687,-0.02703 -0.173435,0.682105 -0.288616,0.650725 -0.11518,-0.03139 -0.156341,-0.480774 -0.256676,-0.597361 -0.03129,0.04183 -0.212932,0.503236 -0.275966,0.548399 -0.06303,0.04516 -0.463481,-0.358074 -0.5465,-0.332502 -0.08302,0.02557 -0.322178,0.652426 -0.413423,0.635484 -0.09125,-0.01694 -0.364904,-0.353198 -0.452614,-0.435579 -0.257934,0.091 -0.181465,0.965051 -0.528618,0.936974 -0.266973,-2.044598 0.62258,-3.821379 2.517529,-4.485631 0.912011,-0.319067 2.813667,-0.326444 3.73271,-0.0877 1.275127,0.331249 1.799167,0.80007 2.360974,1.402345 0.685485,0.734862 0.59377,3.345079 0.59377,3.345079 0,0 -0.166734,-0.41086 -0.32111,-0.480893 -0.154372,-0.07003 -0.378597,-0.794005 -0.608395,-0.912786 -0.153792,0.325575 -0.211603,0.493039 -0.497138,0.676128 -0.226274,-0.146257 -0.301216,-0.531318 -0.570719,-0.631154 z"
+         id="path5-1-0"
+         sodipodi:nodetypes="ccccssscsscsssccssscscccc"
+         inkscape:label="hair - top - shortcrop" />
+    </g>
+  </g>
+</svg>

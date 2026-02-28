@@ -4,7 +4,8 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 
 use super::gamertag::generate_gamertag;
@@ -59,7 +60,6 @@ impl Default for PilotRoster {
 }
 
 impl PilotRoster {
-    #[allow(dead_code)]
     pub fn get(&self, id: PilotId) -> Option<&Pilot> {
         self.pilots.iter().find(|p| p.id == id)
     }
@@ -72,7 +72,7 @@ impl PilotRoster {
 /// System: load roster from disk or generate a fresh one. Runs at Startup.
 pub fn load_or_generate_roster(mut commands: Commands) {
     let path = Path::new(ROSTER_PATH);
-    let roster = if path.exists() {
+    let mut roster = if path.exists() {
         match load_roster_from_file(path) {
             Ok(r) => {
                 info!("Loaded pilot roster with {} pilots", r.pilots.len());
@@ -87,7 +87,30 @@ pub fn load_or_generate_roster(mut commands: Commands) {
         info!("No pilot roster found, generating initial roster");
         generate_initial_roster()
     };
+
+    // Migrate Phase 1 rosters: backfill empty portraits
+    if backfill_empty_portraits(&mut roster) {
+        save_roster_to_default(&roster);
+        info!("Backfilled portraits for pilots missing them");
+    }
+
     commands.insert_resource(roster);
+}
+
+/// Backfill portraits for pilots that have empty/default descriptors.
+/// Uses deterministic RNG seeded by `PilotId` so the same pilot always gets
+/// the same portrait, even if migration runs multiple times.
+/// Returns `true` if any portraits were backfilled.
+fn backfill_empty_portraits(roster: &mut PilotRoster) -> bool {
+    let mut changed = false;
+    for pilot in &mut roster.pilots {
+        if pilot.portrait.is_empty() {
+            let mut rng = StdRng::seed_from_u64(pilot.id.0);
+            pilot.portrait = PortraitDescriptor::generate(&mut rng, pilot.color_scheme.primary);
+            changed = true;
+        }
+    }
+    changed
 }
 
 pub fn load_roster_from_file(path: &Path) -> Result<PilotRoster, String> {
@@ -139,6 +162,8 @@ fn generate_initial_roster() -> PilotRoster {
             primary: ROSTER_COLORS[i % ROSTER_COLORS.len()],
         };
 
+        let portrait = PortraitDescriptor::generate(&mut rng, color.primary);
+
         roster.pilots.push(Pilot {
             id,
             gamertag,
@@ -146,7 +171,7 @@ fn generate_initial_roster() -> PilotRoster {
             skill,
             color_scheme: color,
             drone_build: DroneBuildDescriptor::default(),
-            portrait: PortraitDescriptor::default(),
+            portrait,
             stats: PilotStats::default(),
         });
     }
@@ -285,6 +310,124 @@ mod tests {
         assert_eq!(roster.pilots.len(), 1);
         assert_eq!(roster.pilots[0].stats.races_entered, 0);
         assert_eq!(roster.pilots[0].stats.best_time, None);
+    }
+
+    #[test]
+    fn backward_compat_phase1_portrait_is_empty() {
+        // Phase 1 roster: portrait is empty struct `()`
+        let ron_str = r#"(
+            pilots: [(
+                id: (42),
+                gamertag: "OldPilot",
+                personality: [Smooth],
+                skill: (level: 0.7, speed: 0.6, cornering: 0.5, consistency: 0.8),
+                color_scheme: (primary: (0.5, 0.5, 1.0)),
+            )],
+            next_id: 43,
+        )"#;
+        let roster: PilotRoster = ron::from_str(ron_str).unwrap();
+        assert!(roster.pilots[0].portrait.is_empty());
+    }
+
+    #[test]
+    fn backfill_generates_portraits_for_empty() {
+        let mut roster = PilotRoster {
+            pilots: vec![
+                Pilot {
+                    id: PilotId(1),
+                    gamertag: "Pilot1".to_string(),
+                    personality: vec![PersonalityTrait::Aggressive],
+                    skill: SkillProfile {
+                        level: 0.5,
+                        speed: 0.5,
+                        cornering: 0.5,
+                        consistency: 0.5,
+                    },
+                    color_scheme: ColorScheme {
+                        primary: [1.0, 0.0, 0.0],
+                    },
+                    drone_build: DroneBuildDescriptor::default(),
+                    portrait: PortraitDescriptor::default(),
+                    stats: PilotStats::default(),
+                },
+            ],
+            next_id: 2,
+        };
+
+        assert!(roster.pilots[0].portrait.is_empty());
+        let changed = backfill_empty_portraits(&mut roster);
+        assert!(changed);
+        assert!(!roster.pilots[0].portrait.is_empty());
+        assert!(roster.pilots[0].portrait.generated);
+    }
+
+    #[test]
+    fn backfill_deterministic_same_pilot_same_portrait() {
+        let mut roster1 = PilotRoster {
+            pilots: vec![Pilot {
+                id: PilotId(99),
+                gamertag: "Test".to_string(),
+                personality: vec![],
+                skill: SkillProfile {
+                    level: 0.5,
+                    speed: 0.5,
+                    cornering: 0.5,
+                    consistency: 0.5,
+                },
+                color_scheme: ColorScheme {
+                    primary: [0.5, 0.3, 0.8],
+                },
+                drone_build: DroneBuildDescriptor::default(),
+                portrait: PortraitDescriptor::default(),
+                stats: PilotStats::default(),
+            }],
+            next_id: 100,
+        };
+        let mut roster2 = roster1.clone();
+
+        backfill_empty_portraits(&mut roster1);
+        backfill_empty_portraits(&mut roster2);
+
+        // Same PilotId should produce identical portrait
+        assert_eq!(
+            format!("{:?}", roster1.pilots[0].portrait.face_shape),
+            format!("{:?}", roster2.pilots[0].portrait.face_shape)
+        );
+        assert_eq!(
+            roster1.pilots[0].portrait.skin_tone,
+            roster2.pilots[0].portrait.skin_tone
+        );
+    }
+
+    #[test]
+    fn backfill_skips_already_generated() {
+        let mut rng = rand::thread_rng();
+        let portrait = PortraitDescriptor::generate(&mut rng, [0.5, 0.5, 0.5]);
+        let original_face = portrait.face_shape;
+        let mut roster = PilotRoster {
+            pilots: vec![Pilot {
+                id: PilotId(1),
+                gamertag: "Already".to_string(),
+                personality: vec![],
+                skill: SkillProfile {
+                    level: 0.5,
+                    speed: 0.5,
+                    cornering: 0.5,
+                    consistency: 0.5,
+                },
+                color_scheme: ColorScheme {
+                    primary: [0.5, 0.5, 0.5],
+                },
+                drone_build: DroneBuildDescriptor::default(),
+                portrait,
+                stats: PilotStats::default(),
+            }],
+            next_id: 2,
+        };
+
+        let changed = backfill_empty_portraits(&mut roster);
+        assert!(!changed);
+        assert_eq!(roster.pilots[0].portrait.face_shape, original_face);
     }
 
     #[test]

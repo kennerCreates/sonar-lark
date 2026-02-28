@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="2.4552643mm"
+   height="4.6934314mm"
+   viewBox="0 0 2.4552643 4.6934314"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   sodipodi:docname="pilot-portraits.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm"
+     inkscape:zoom="32"
+     inkscape:cx="365.95312"
+     inkscape:cy="85.34375"
+     inkscape:window-width="3840"
+     inkscape:window-height="2054"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g18-5-4-7">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="2.4552643"
+       height="4.6934314"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1">
+    <linearGradient
+       id="swatch4"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#262626;stop-opacity:1;"
+         offset="0"
+         id="stop4" />
+    </linearGradient>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     style="display:inline"
+     transform="translate(-46.10996,-12.533249)">
+    <g
+       id="g18-5-4"
+       transform="translate(27.867259,0.04827012)"
+       inkscape:label="portrait - 02"
+       style="display:inline">
+      <path
+         style="fill:#b2b2b2;fill-opacity:1;stroke:#b2b2b2;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
+         d="m 18.430687,12.879106 c 0.05908,0.05064 0.370761,0.426558 0.475425,0.558105 0.01747,-0.202627 0.118163,-0.436267 0.194334,-0.640789 0.075,-0.229699 0.108725,-0.323542 0.268719,-0.02067 0.135925,0.257305 0.178346,0.273066 0.289387,0.578776 0.04325,-0.124958 0.08715,-0.489743 0.425813,-0.760674 0.05841,-0.04673 0.282429,0.44628 0.332256,0.588252 0.30521,1.089635 0.132803,3.311851 0.132803,3.311851 0,0 -0.615085,0.316925 -0.991441,0.584454 -0.338317,-0.241061 -0.768516,-0.457969 -1.07443,-0.568886 0.222775,-1.575695 -0.349128,-3.884361 -0.05287,-3.630419 z"
+         id="path30"
+         sodipodi:nodetypes="scsscsccccs"
+         inkscape:label="hair - top - mohawk"
+         inkscape:export-filename="hair - top - mohawk.png"
+         inkscape:export-xdpi="300"
+         inkscape:export-ydpi="300" />
+    </g>
+  </g>
+</svg>

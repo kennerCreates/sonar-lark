@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="13.459645mm"
+   height="4.9506025mm"
+   viewBox="0 0 13.459645 4.9506025"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   sodipodi:docname="pilot-portraits.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm"
+     inkscape:zoom="32"
+     inkscape:cx="365.95312"
+     inkscape:cy="85.34375"
+     inkscape:window-width="3840"
+     inkscape:window-height="2054"
+     inkscape:window-x="-11"
+     inkscape:window-y="-11"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g18-5-4-7">
+    <inkscape:page
+       x="-1.2447928e-23"
+       y="0"
+       width="13.459644"
+       height="4.9506025"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1">
+    <linearGradient
+       id="swatch4"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#262626;stop-opacity:1;"
+         offset="0"
+         id="stop4" />
+    </linearGradient>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     style="display:inline"
+     transform="translate(-12.708854,-26.62062)">
+    <g
+       id="g18"
+       inkscape:label="portrait - 01"
+       style="display:inline">
+      <path
+         id="path4"
+         style="fill:#d9d9d9;fill-opacity:1;stroke:none;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:1.15654;paint-order:markers fill stroke"
+         d="m 21.127463,26.624733 c -0.833097,0.696632 -2.774842,0.851607 -3.906739,-0.0036 -4.057841,0.336216 -4.366944,1.766888 -4.511869,4.921147 l 13.459644,0.02894 c -0.309965,-2.899166 -0.674136,-4.609096 -5.036902,-4.950602 z"
+         sodipodi:nodetypes="cccccc"
+         inkscape:label="shirt - crew"
+         inkscape:export-filename="shirt-crew.png"
+         inkscape:export-xdpi="96"
+         inkscape:export-ydpi="96" />
+    </g>
+  </g>
+</svg>

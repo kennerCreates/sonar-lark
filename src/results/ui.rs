@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::drone::spawning::{DRONE_COLORS, DRONE_NAMES};
 use crate::palette;
 use crate::pilot::SelectedPilots;
+use crate::pilot::portrait::cache::PortraitCache;
 use crate::race::progress::RaceResults;
 use crate::states::AppState;
 
@@ -20,6 +21,7 @@ pub fn setup_results_ui(
     mut commands: Commands,
     results: Option<Res<RaceResults>>,
     selected: Option<Res<SelectedPilots>>,
+    portrait_cache: Option<Res<PortraitCache>>,
 ) {
     let Some(results) = results else {
         warn!("No RaceResults resource found, skipping results UI.");
@@ -121,6 +123,33 @@ pub fn setup_results_ui(
                                     },
                                     BackgroundColor(color),
                                 ));
+
+                                // Portrait thumbnail
+                                let portrait_handle = selected.as_ref()
+                                    .and_then(|s| s.pilots.get(drone_idx))
+                                    .and_then(|sel| {
+                                        portrait_cache.as_ref()
+                                            .and_then(|cache| cache.get(sel.pilot_id))
+                                    });
+                                if let Some(handle) = portrait_handle {
+                                    row.spawn((
+                                        ImageNode::new(handle),
+                                        Node {
+                                            width: Val::Px(20.0),
+                                            height: Val::Px(20.0),
+                                            ..default()
+                                        },
+                                    ));
+                                } else {
+                                    row.spawn((
+                                        Node {
+                                            width: Val::Px(20.0),
+                                            height: Val::Px(20.0),
+                                            ..default()
+                                        },
+                                        BackgroundColor(color),
+                                    ));
+                                }
 
                                 // Position + name
                                 let name_color = if is_winner {

@@ -5,6 +5,7 @@ use crate::course::loader::SelectedCourse;
 use crate::drone::components::*;
 use crate::drone::spawning::{DRONE_COLORS, DRONE_NAMES, NoGatesCourse};
 use crate::pilot::SelectedPilots;
+use crate::pilot::portrait::cache::PortraitCache;
 use crate::editor::course_editor::PendingEditorCourse;
 use crate::palette;
 use crate::states::AppState;
@@ -429,7 +430,7 @@ pub fn update_open_editor_button_visuals(
 
 const LB_BG: Color = Color::srgba(0.02, 0.055, 0.102, 0.80);
 const LB_FONT: f32 = 13.0;
-const LB_WIDTH: f32 = 190.0;
+const LB_WIDTH: f32 = 216.0;
 const LB_ROW_HEIGHT: f32 = 20.0;
 const LB_COLOR_BAR_W: f32 = 4.0;
 
@@ -445,7 +446,16 @@ pub(crate) struct LbNameText(usize);
 #[derive(Component)]
 pub(crate) struct LbTimeText(usize);
 
-pub fn setup_leaderboard(mut commands: Commands, selected: Option<Res<SelectedPilots>>) {
+#[derive(Component)]
+pub(crate) struct LbPortrait(usize);
+
+const LB_PORTRAIT_SIZE: f32 = 16.0;
+
+pub fn setup_leaderboard(
+    mut commands: Commands,
+    selected: Option<Res<SelectedPilots>>,
+    portrait_cache: Option<Res<PortraitCache>>,
+) {
     commands
         .spawn((
             LeaderboardRoot,
@@ -495,6 +505,35 @@ pub fn setup_leaderboard(mut commands: Commands, selected: Option<Res<SelectedPi
                             },
                             BackgroundColor(init_color),
                         ));
+                        // Portrait thumbnail
+                        let portrait_handle = selected.as_ref()
+                            .and_then(|s| s.pilots.get(i))
+                            .and_then(|sel| {
+                                portrait_cache.as_ref()
+                                    .and_then(|cache| cache.get(sel.pilot_id))
+                            });
+                        if let Some(handle) = portrait_handle {
+                            row.spawn((
+                                LbPortrait(i),
+                                ImageNode::new(handle),
+                                Node {
+                                    width: Val::Px(LB_PORTRAIT_SIZE),
+                                    height: Val::Px(LB_PORTRAIT_SIZE),
+                                    ..default()
+                                },
+                            ));
+                        } else {
+                            // Fallback: solid color square
+                            row.spawn((
+                                LbPortrait(i),
+                                Node {
+                                    width: Val::Px(LB_PORTRAIT_SIZE),
+                                    height: Val::Px(LB_PORTRAIT_SIZE),
+                                    ..default()
+                                },
+                                BackgroundColor(init_color),
+                            ));
+                        }
                         // Position + name
                         row.spawn((
                             LbNameText(i),
@@ -529,16 +568,18 @@ pub fn update_leaderboard(
     progress: Option<Res<RaceProgress>>,
     clock: Option<Res<RaceClock>>,
     selected: Option<Res<SelectedPilots>>,
+    portrait_cache: Option<Res<PortraitCache>>,
     mut root_vis: Query<&mut Visibility, With<LeaderboardRoot>>,
-    mut color_bars: Query<(&LbColorBar, &mut BackgroundColor)>,
+    mut color_bars: Query<(&LbColorBar, &mut BackgroundColor), Without<LbPortrait>>,
     mut name_texts: Query<
         (&LbNameText, &mut Text, &mut TextColor),
-        Without<LbTimeText>,
+        (Without<LbTimeText>, Without<LbPortrait>),
     >,
     mut time_texts: Query<
         (&LbTimeText, &mut Text, &mut TextColor),
-        Without<LbNameText>,
+        (Without<LbNameText>, Without<LbPortrait>),
     >,
+    mut portraits: Query<(&LbPortrait, Option<&mut ImageNode>, &mut BackgroundColor), (Without<LbColorBar>, Without<LbNameText>, Without<LbTimeText>)>,
 ) {
     let show = matches!(*phase, RacePhase::Racing | RacePhase::Finished);
     for mut vis in &mut root_vis {
@@ -573,6 +614,34 @@ pub fn update_leaderboard(
                 .map(|p| p.color)
                 .unwrap_or(DRONE_COLORS[drone_idx]);
             *bg = BackgroundColor(color);
+        }
+    }
+    for (portrait, image_node, mut bg) in &mut portraits {
+        let pos = portrait.0;
+        if pos < 12 && row_data[pos].1 {
+            let drone_idx = row_data[pos].0;
+            if let Some(mut img) = image_node {
+                // Update portrait image if cache has one for this pilot
+                if let Some(handle) = selected
+                    .as_ref()
+                    .and_then(|s| s.pilots.get(drone_idx))
+                    .and_then(|sel| {
+                        portrait_cache
+                            .as_ref()
+                            .and_then(|cache| cache.get(sel.pilot_id))
+                    })
+                {
+                    img.image = handle;
+                }
+            } else {
+                // Fallback: update background color
+                let color = selected
+                    .as_ref()
+                    .and_then(|s| s.pilots.get(drone_idx))
+                    .map(|p| p.color)
+                    .unwrap_or(DRONE_COLORS[drone_idx]);
+                *bg = BackgroundColor(color);
+            }
         }
     }
     for (nt, mut text, mut tc) in &mut name_texts {

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="10.412042mm"
+   height="0.83330065mm"
+   viewBox="0 0 10.412042 0.83330065"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1">
+    <linearGradient
+       id="swatch4">
+      <stop
+         style="stop-color:#262626;stop-opacity:1;"
+         offset="0"
+         id="stop4" />
+    </linearGradient>
+  </defs>
+  <g
+     id="layer1"
+     style="display:inline"
+     transform="translate(-68.312111,-20.40599)">
+    <g
+       id="g19"
+       transform="translate(26.061458,-0.52916666)"
+       style="display:inline">
+      <g
+         id="g37">
+        <circle
+           style="fill:#808080;fill-opacity:1;stroke:none;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
+           id="path37"
+           cx="52.362694"
+           cy="21.468456"
+           r="0.30000001" />
+        <circle
+           style="fill:#808080;fill-opacity:1;stroke:none;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
+           id="path37-2"
+           cx="42.550648"
+           cy="21.235157"
+           r="0.30000001" />
+      </g>
+    </g>
+  </g>
+</svg>
