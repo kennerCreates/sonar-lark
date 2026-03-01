@@ -5,7 +5,6 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::palette;
-use crate::pilot::portrait::fragments::{compute_highlight, compute_shadow};
 
 const CONFIG_PATH: &str = "assets/dev/portrait_palette.ron";
 
@@ -80,6 +79,7 @@ impl PortraitPaletteConfig {
             .insert(primary_index, secondary_index);
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn clear_complementary(&mut self, slot: PortraitColorSlot, primary_index: usize) {
         if let Some(map) = self.complementary.get_mut(&slot) {
             map.remove(&primary_index);
@@ -209,6 +209,7 @@ impl PortraitPaletteConfig {
         self.set_complementary(slot, primary_index, secondary_index);
     }
 
+    #[allow(dead_code)]
     pub fn clear_complementary_for(
         &mut self,
         slot: PortraitColorSlot,
@@ -233,35 +234,10 @@ impl PortraitPaletteConfig {
             {
                 continue;
             }
-            let nearest = auto_secondary_index(slot, primary_idx);
-            self.set_complementary_for(slot, variant_idx, primary_idx, nearest);
+            // Default: use pilot's drone color
+            self.set_complementary_for(slot, variant_idx, primary_idx, DRONE_COLOR_INDEX);
         }
     }
-}
-
-/// Returns the palette index of the algorithmically-computed secondary color
-/// for a given slot and primary index (highlight for Skin, shadow for Accessory).
-pub fn auto_secondary_index(slot: PortraitColorSlot, primary_idx: usize) -> usize {
-    let primary_rgb = PALETTE_COLORS[primary_idx].1;
-    let target = match slot {
-        PortraitColorSlot::Skin => compute_highlight(primary_rgb),
-        PortraitColorSlot::Accessory | PortraitColorSlot::Eye => compute_shadow(primary_rgb),
-        _ => return primary_idx,
-    };
-    nearest_palette_index(&target)
-}
-
-fn nearest_palette_index(target: &[f32; 3]) -> usize {
-    PALETTE_COLORS
-        .iter()
-        .enumerate()
-        .min_by(|(_, (_, a)), (_, (_, b))| {
-            let da: f32 = (0..3).map(|i| (a[i] - target[i]).powi(2)).sum();
-            let db: f32 = (0..3).map(|i| (b[i] - target[i]).powi(2)).sum();
-            da.partial_cmp(&db).unwrap()
-        })
-        .map(|(i, _)| i)
-        .unwrap_or(0)
 }
 
 pub fn load_config() -> PortraitPaletteConfig {

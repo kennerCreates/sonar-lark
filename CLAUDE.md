@@ -51,21 +51,21 @@ The performance target is a stable **60fps**. Performance is paramount.
 
 ## Detailed Docs
 
-Consult these when working on specific subsystems:
+**Only read a doc when the current task directly involves that subsystem.** Do not read docs speculatively or "just in case". Use grep on `docs/types-reference.md` for type lookups rather than reading it in full.
 
-| Document | When to read |
-|----------|-------------|
-| [`docs/bevy-018.md`](docs/bevy-018.md) | Before writing any Bevy code (API changes from prior versions) |
-| [`docs/drone-system.md`](docs/drone-system.md) | Drone spawning, physics, AI, paths, explosions, fireworks, dev dashboard |
-| [`docs/drone-physics.md`](docs/drone-physics.md) | Real-world flight dynamics reference, simulation parameters, tuning |
-| [`docs/race-system.md`](docs/race-system.md) | Race flow, gate detection, obstacle collision, leaderboard, results |
-| [`docs/editor-system.md`](docs/editor-system.md) | Workshop, course editor, asset loading pipeline, props, cameras, PiP preview |
-| [`docs/pilot-system.md`](docs/pilot-system.md) | Pilot roster, portraits, dev menu palette editor |
-| [`docs/camera-system.md`](docs/camera-system.md) | Camera modes (chase, FPV, spectator, course cameras), switching |
-| [`docs/rendering.md`](docs/rendering.md) | CelMaterial, skybox, shaders, light direction |
-| [`docs/types-reference.md`](docs/types-reference.md) | Full type/resource/component reference table |
-| [`docs/post-phase-checklist.md`](docs/post-phase-checklist.md) | End-of-phase build, clippy, test, and manual testing steps |
-| [`docs/testing-conventions.md`](docs/testing-conventions.md) | Test file layout, tempfile usage, parameterized paths |
+| Document | ONLY read when... |
+|----------|-------------------|
+| [`docs/bevy-018.md`](docs/bevy-018.md) | Writing or modifying Bevy systems, queries, or ECS code |
+| [`docs/drone-system.md`](docs/drone-system.md) | Changing drone spawning, physics systems, AI, paths, explosions, or fireworks |
+| [`docs/drone-physics.md`](docs/drone-physics.md) | Tuning flight parameters or modifying physics code (quick ref; see `drone-physics-deep-dive.md` for real-world reference) |
+| [`docs/race-system.md`](docs/race-system.md) | Changing race flow, gate detection, collision, leaderboard, or results |
+| [`docs/editor-system.md`](docs/editor-system.md) | Changing workshop, course editor, asset loading, props, or cameras |
+| [`docs/pilot-system.md`](docs/pilot-system.md) | Changing pilot roster, portraits, or dev menu palette editor |
+| [`docs/camera-system.md`](docs/camera-system.md) | Changing camera modes or switching logic |
+| [`docs/rendering.md`](docs/rendering.md) | Changing CelMaterial, skybox, shaders, or light direction |
+| [`docs/types-reference.md`](docs/types-reference.md) | Looking up a specific type — **grep, don't read in full** |
+| [`docs/post-phase-checklist.md`](docs/post-phase-checklist.md) | Completing an implementation phase |
+| [`docs/testing-conventions.md`](docs/testing-conventions.md) | Writing or modifying tests |
 
 ## Post-Phase Checklist
 

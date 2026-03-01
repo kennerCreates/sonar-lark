@@ -1,6 +1,6 @@
 use bevy::log::warn;
 
-use super::{EyeStyle, PortraitDescriptor};
+use super::{EyeStyle, PortraitDescriptor, SecondaryColor};
 use super::loader::PortraitParts;
 
 // ---------------------------------------------------------------------------
@@ -31,20 +31,6 @@ const SRC_HAIR_STROKE: &str = "#b2b2b2";
 // ---------------------------------------------------------------------------
 // Color helpers
 // ---------------------------------------------------------------------------
-
-/// Brighten a color to ~130% lightness for highlight tones, clamped to 1.0.
-pub fn compute_highlight(base: [f32; 3]) -> [f32; 3] {
-    [
-        (base[0] * 1.3).min(1.0),
-        (base[1] * 1.3).min(1.0),
-        (base[2] * 1.3).min(1.0),
-    ]
-}
-
-/// Darken a color to ~70% lightness for shadow tones.
-pub fn compute_shadow(base: [f32; 3]) -> [f32; 3] {
-    [base[0] * 0.7, base[1] * 0.7, base[2] * 0.7]
-}
 
 pub fn color_to_hex(rgb: [f32; 3]) -> String {
     let r = (rgb[0].clamp(0.0, 1.0) * 255.0).round() as u8;
@@ -83,26 +69,18 @@ struct PortraitColors {
     acc_shadow_hex: String,
 }
 
+fn resolve_secondary(secondary: &SecondaryColor, drone_color: [f32; 3]) -> [f32; 3] {
+    match secondary {
+        SecondaryColor::DroneColor => drone_color,
+        SecondaryColor::Chosen(c) => *c,
+    }
+}
+
 impl PortraitColors {
     fn from_descriptor(desc: &PortraitDescriptor, bg_color: [f32; 3]) -> Self {
-        let skin_highlight = if desc.skin_highlight_drone {
-            bg_color
-        } else {
-            desc.skin_highlight
-                .unwrap_or_else(|| compute_highlight(desc.skin_tone))
-        };
-        let acc_shadow = if desc.acc_shadow_drone {
-            bg_color
-        } else {
-            desc.acc_shadow
-                .unwrap_or_else(|| compute_shadow(desc.accessory_color))
-        };
-        let eye_secondary = if desc.eye_secondary_drone {
-            bg_color
-        } else {
-            desc.eye_secondary
-                .unwrap_or_else(|| compute_shadow(desc.eye_color))
-        };
+        let skin_highlight = resolve_secondary(&desc.skin_secondary, bg_color);
+        let acc_shadow = resolve_secondary(&desc.acc_secondary, bg_color);
+        let eye_secondary = resolve_secondary(&desc.eye_secondary, bg_color);
         Self {
             bg_hex: color_to_hex(bg_color),
             skin_hex: color_to_hex(desc.skin_tone),
@@ -317,24 +295,6 @@ mod tests {
         assert_eq!(color_to_hex([1.5, -0.5, 0.5]), "#ff0080");
     }
 
-    #[test]
-    fn compute_shadow_darkens() {
-        let base = [1.0, 0.8, 0.6];
-        let shadow = compute_shadow(base);
-        assert!((shadow[0] - 0.7).abs() < 1e-6);
-        assert!((shadow[1] - 0.56).abs() < 1e-6);
-        assert!((shadow[2] - 0.42).abs() < 1e-6);
-    }
-
-    #[test]
-    fn compute_highlight_brightens_and_clamps() {
-        let base = [0.5, 0.9, 1.0];
-        let highlight = compute_highlight(base);
-        assert!((highlight[0] - 0.65).abs() < 1e-6);
-        assert!((highlight[1] - 1.0).abs() < 1e-6);
-        assert!((highlight[2] - 1.0).abs() < 1e-6);
-    }
-
     /// Build a `PortraitParts` with hex-colored placeholder content for all slots.
     fn test_parts() -> PortraitParts {
         let mut parts = PortraitParts::default();
@@ -416,12 +376,9 @@ mod tests {
             eye_color: [0.2, 0.5, 0.8],
             accessory_color: [0.5, 0.5, 0.5],
             shirt_color: [0.8, 0.8, 0.85],
-            skin_highlight: None,
-            acc_shadow: None,
-            eye_secondary: None,
-            skin_highlight_drone: false,
-            acc_shadow_drone: false,
-            eye_secondary_drone: false,
+            skin_secondary: SecondaryColor::DroneColor,
+            acc_secondary: SecondaryColor::DroneColor,
+            eye_secondary: SecondaryColor::DroneColor,
             generated: true,
         }
     }

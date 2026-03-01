@@ -4,12 +4,13 @@ pub mod loader;
 pub mod rasterize;
 
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 // ── Slot enums ──────────────────────────────────────────────────────────────
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum FaceShape {
+    #[default]
     Oval,
     Round,
     Square,
@@ -32,6 +33,10 @@ impl FaceShape {
         ALL_FACE_SHAPES[rng.gen_range(0..ALL_FACE_SHAPES.len())]
     }
 
+    pub fn index(&self) -> usize {
+        ALL_FACE_SHAPES.iter().position(|s| s == self).unwrap()
+    }
+
     pub fn group_id(&self) -> &'static str {
         match self {
             FaceShape::Oval | FaceShape::Long => "oval",
@@ -42,8 +47,9 @@ impl FaceShape {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum EyeStyle {
+    #[default]
     Normal,
     Narrow,
     Wide,
@@ -66,6 +72,10 @@ impl EyeStyle {
         ALL_EYE_STYLES[rng.gen_range(0..ALL_EYE_STYLES.len())]
     }
 
+    pub fn index(&self) -> usize {
+        ALL_EYE_STYLES.iter().position(|s| s == self).unwrap()
+    }
+
     pub fn group_id(&self) -> &'static str {
         match self {
             EyeStyle::Normal | EyeStyle::Winking => "normal",
@@ -76,8 +86,9 @@ impl EyeStyle {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum MouthStyle {
+    #[default]
     Neutral,
     Smile,
     Smirk,
@@ -98,6 +109,11 @@ impl MouthStyle {
         ALL_MOUTH_STYLES[rng.gen_range(0..ALL_MOUTH_STYLES.len())]
     }
 
+    #[allow(dead_code)]
+    pub fn index(&self) -> usize {
+        ALL_MOUTH_STYLES.iter().position(|s| s == self).unwrap()
+    }
+
     pub fn group_id(&self) -> &'static str {
         match self {
             MouthStyle::Neutral => "neutral",
@@ -108,8 +124,9 @@ impl MouthStyle {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum HairStyle {
+    #[default]
     ShortCrop,
     Mohawk,
     LongSwept,
@@ -132,6 +149,10 @@ pub const ALL_HAIR_STYLES: [HairStyle; 7] = [
 impl HairStyle {
     fn random(rng: &mut impl Rng) -> Self {
         ALL_HAIR_STYLES[rng.gen_range(0..ALL_HAIR_STYLES.len())]
+    }
+
+    pub fn index(&self) -> usize {
+        ALL_HAIR_STYLES.iter().position(|s| s == self).unwrap()
     }
 
     pub fn group_id(&self) -> &'static str {
@@ -168,6 +189,10 @@ impl Accessory {
         ALL_ACCESSORIES[rng.gen_range(0..ALL_ACCESSORIES.len())]
     }
 
+    pub fn index(&self) -> usize {
+        ALL_ACCESSORIES.iter().position(|s| s == self).unwrap()
+    }
+
     pub fn group_id(&self) -> &'static str {
         match self {
             Accessory::EarringRound => "earring_round",
@@ -183,8 +208,9 @@ impl Accessory {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum ShirtStyle {
+    #[default]
     Crew,
     Round,
     Turtleneck,
@@ -201,6 +227,10 @@ pub const ALL_SHIRT_STYLES: [ShirtStyle; 4] = [
 impl ShirtStyle {
     fn random(rng: &mut impl Rng) -> Self {
         ALL_SHIRT_STYLES[rng.gen_range(0..ALL_SHIRT_STYLES.len())]
+    }
+
+    pub fn index(&self) -> usize {
+        ALL_SHIRT_STYLES.iter().position(|s| s == self).unwrap()
     }
 
     pub fn group_id(&self) -> &'static str {
@@ -226,9 +256,162 @@ const SKIN_TONES: [[f32; 3]; 8] = [
     [0.25, 0.16, 0.10],
 ];
 
+// ── Secondary color enum ────────────────────────────────────────────────────
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub enum SecondaryColor {
+    /// Use the pilot's drone color (default).
+    #[default]
+    DroneColor,
+    /// An explicit palette color chosen by the user.
+    Chosen([f32; 3]),
+}
+
 // ── Portrait descriptor ─────────────────────────────────────────────────────
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Helper struct for backward-compatible deserialization of `PortraitDescriptor`.
+/// Old RON files have the bool+Option pattern; new ones use `SecondaryColor`.
+#[derive(Deserialize)]
+struct PortraitDescriptorRaw {
+    #[serde(default)]
+    face_shape: FaceShape,
+    #[serde(default)]
+    eyes: EyeStyle,
+    #[serde(default)]
+    mouth: MouthStyle,
+    #[serde(default)]
+    hair: HairStyle,
+    #[serde(default)]
+    shirt: ShirtStyle,
+    #[serde(default)]
+    accessory: Option<Accessory>,
+    #[serde(default)]
+    skin_tone: [f32; 3],
+    #[serde(default)]
+    hair_color: [f32; 3],
+    #[serde(default)]
+    eye_color: [f32; 3],
+    #[serde(default)]
+    accessory_color: [f32; 3],
+    #[serde(default)]
+    shirt_color: [f32; 3],
+    // New fields
+    #[serde(default)]
+    skin_secondary: SecondaryColor,
+    #[serde(default)]
+    acc_secondary: SecondaryColor,
+    /// Handles both old `Option<[f32;3]>` and new `SecondaryColor` formats.
+    #[serde(default, deserialize_with = "deserialize_eye_secondary_compat")]
+    eye_secondary: SecondaryColor,
+    // Old fields (legacy format — used for migration when new fields are absent)
+    #[serde(default)]
+    skin_highlight: Option<[f32; 3]>,
+    #[serde(default)]
+    acc_shadow: Option<[f32; 3]>,
+    #[serde(default)]
+    generated: bool,
+}
+
+/// Deserialize `eye_secondary` from either old `Option<[f32;3]>` or new `SecondaryColor`.
+fn deserialize_eye_secondary_compat<'de, D>(
+    deserializer: D,
+) -> Result<SecondaryColor, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de;
+
+    struct EyeSecVisitor;
+
+    impl<'de> de::Visitor<'de> for EyeSecVisitor {
+        type Value = SecondaryColor;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "SecondaryColor, Option<[f32; 3]>, or None")
+        }
+
+        fn visit_enum<A: de::EnumAccess<'de>>(self, access: A) -> Result<Self::Value, A::Error> {
+            let (variant, data): (String, _) = access.variant()?;
+            match variant.as_str() {
+                "DroneColor" => {
+                    de::VariantAccess::unit_variant(data)?;
+                    Ok(SecondaryColor::DroneColor)
+                }
+                "Chosen" => {
+                    let arr: [f32; 3] = de::VariantAccess::newtype_variant(data)?;
+                    Ok(SecondaryColor::Chosen(arr))
+                }
+                "None" => {
+                    de::VariantAccess::unit_variant(data)?;
+                    Ok(SecondaryColor::DroneColor)
+                }
+                "Some" => {
+                    // Old format: Some((x, y, z)) — inner value is [f32; 3]
+                    let arr: [f32; 3] = de::VariantAccess::newtype_variant(data)?;
+                    Ok(SecondaryColor::Chosen(arr))
+                }
+                other => Err(de::Error::unknown_variant(
+                    other,
+                    &["DroneColor", "Chosen", "None", "Some"],
+                )),
+            }
+        }
+
+        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(SecondaryColor::DroneColor)
+        }
+
+        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(SecondaryColor::DroneColor)
+        }
+
+        fn visit_some<D2: Deserializer<'de>>(self, d: D2) -> Result<Self::Value, D2::Error> {
+            SecondaryColor::deserialize(d)
+        }
+    }
+
+    deserializer.deserialize_any(EyeSecVisitor)
+}
+
+fn migrate_secondary(
+    new_field: SecondaryColor,
+    old_color: Option<[f32; 3]>,
+) -> SecondaryColor {
+    // If the new field is the default (DroneColor) and an old explicit color
+    // exists, prefer the legacy value.
+    if matches!(new_field, SecondaryColor::DroneColor)
+        && let Some(c) = old_color
+    {
+        return SecondaryColor::Chosen(c);
+    }
+    new_field
+}
+
+impl<'de> Deserialize<'de> for PortraitDescriptor {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = PortraitDescriptorRaw::deserialize(deserializer)?;
+
+        Ok(PortraitDescriptor {
+            face_shape: raw.face_shape,
+            eyes: raw.eyes,
+            mouth: raw.mouth,
+            hair: raw.hair,
+            shirt: raw.shirt,
+            accessory: raw.accessory,
+            skin_tone: raw.skin_tone,
+            hair_color: raw.hair_color,
+            eye_color: raw.eye_color,
+            accessory_color: raw.accessory_color,
+            shirt_color: raw.shirt_color,
+            skin_secondary: migrate_secondary(raw.skin_secondary, raw.skin_highlight),
+            acc_secondary: migrate_secondary(raw.acc_secondary, raw.acc_shadow),
+            eye_secondary: migrate_secondary(raw.eye_secondary, None),
+            generated: raw.generated,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct PortraitDescriptor {
     #[serde(default = "default_face_shape")]
     pub face_shape: FaceShape,
@@ -253,43 +436,13 @@ pub struct PortraitDescriptor {
     #[serde(default)]
     pub shirt_color: [f32; 3],
     #[serde(default)]
-    pub skin_highlight: Option<[f32; 3]>,
+    pub skin_secondary: SecondaryColor,
     #[serde(default)]
-    pub acc_shadow: Option<[f32; 3]>,
-    /// Visor frame color (secondary). When `None`, auto-derived as `compute_shadow(eye_color)`.
+    pub acc_secondary: SecondaryColor,
     #[serde(default)]
-    pub eye_secondary: Option<[f32; 3]>,
-    /// When true, skin_highlight resolves to the pilot's drone color at render time.
-    #[serde(default)]
-    pub skin_highlight_drone: bool,
-    /// When true, acc_shadow resolves to the pilot's drone color at render time.
-    #[serde(default)]
-    pub acc_shadow_drone: bool,
-    /// When true, eye_secondary resolves to the pilot's drone color at render time.
-    #[serde(default)]
-    pub eye_secondary_drone: bool,
+    pub eye_secondary: SecondaryColor,
     #[serde(default)]
     pub generated: bool,
-}
-
-fn default_face_shape() -> FaceShape {
-    FaceShape::Oval
-}
-
-fn default_eye_style() -> EyeStyle {
-    EyeStyle::Normal
-}
-
-fn default_mouth_style() -> MouthStyle {
-    MouthStyle::Neutral
-}
-
-fn default_hair_style() -> HairStyle {
-    HairStyle::ShortCrop
-}
-
-fn default_shirt_style() -> ShirtStyle {
-    ShirtStyle::Crew
 }
 
 impl Default for PortraitDescriptor {
@@ -306,91 +459,30 @@ impl Default for PortraitDescriptor {
             eye_color: [0.0; 3],
             accessory_color: [0.0; 3],
             shirt_color: [0.0; 3],
-            skin_highlight: None,
-            acc_shadow: None,
-            eye_secondary: None,
-            skin_highlight_drone: false,
-            acc_shadow_drone: false,
-            eye_secondary_drone: false,
+            skin_secondary: SecondaryColor::DroneColor,
+            acc_secondary: SecondaryColor::DroneColor,
+            eye_secondary: SecondaryColor::DroneColor,
             generated: false,
         }
     }
 }
 
 impl PortraitDescriptor {
-    /// Generate a randomized portrait descriptor.
-    ///
-    /// `primary_color` is the pilot's drone color in sRGB [0..1],
-    /// used to derive the accessory color.
+    /// Generate a randomized portrait descriptor using default palette config.
     pub fn generate(rng: &mut impl Rng, primary_color: [f32; 3]) -> Self {
-        let face_shape = FaceShape::random(rng);
-        let eyes = EyeStyle::random(rng);
-        let mouth = MouthStyle::random(rng);
-        let hair = HairStyle::random(rng);
-        let shirt = ShirtStyle::random(rng);
-
-        // 50% chance of an accessory
-        let accessory = if rng.gen_bool(0.5) {
-            Some(Accessory::random(rng))
-        } else {
-            None
-        };
-
-        // Skin tone: pick a preset and add per-channel jitter
-        let base_skin = SKIN_TONES[rng.gen_range(0..SKIN_TONES.len())];
-        let skin_tone = [
-            (base_skin[0] + rng.gen_range(-0.05..=0.05)).clamp(0.0, 1.0),
-            (base_skin[1] + rng.gen_range(-0.05..=0.05)).clamp(0.0, 1.0),
-            (base_skin[2] + rng.gen_range(-0.05..=0.05)).clamp(0.0, 1.0),
-        ];
-
-        // Hair color: random HSL
-        let hair_color = hsl_to_srgb(
-            rng.gen_range(0.0..360.0),
-            rng.gen_range(0.3..0.9),
-            rng.gen_range(0.2..0.8),
-        );
-
-        // Eye color: random HSL
-        let eye_color = hsl_to_srgb(
-            rng.gen_range(0.0..360.0),
-            rng.gen_range(0.4..0.8),
-            rng.gen_range(0.3..0.6),
-        );
-
-        // Accessory color: shift primary hue by +30 deg, slightly desaturate
-        let accessory_color = derive_accessory_color(primary_color);
-
-        // Shirt color: lighter, desaturated version of pilot primary
-        let shirt_color = derive_shirt_color(primary_color);
-
-        Self {
-            face_shape,
-            eyes,
-            mouth,
-            hair,
-            shirt,
-            accessory,
-            skin_tone,
-            hair_color,
-            eye_color,
-            accessory_color,
-            shirt_color,
-            skin_highlight: None,
-            acc_shadow: None,
-            eye_secondary: None,
-            skin_highlight_drone: false,
-            acc_shadow_drone: false,
-            eye_secondary_drone: false,
-            generated: true,
-        }
+        use crate::dev_menu::portrait_config::PALETTE_COLORS;
+        Self::generate_with_config(
+            rng,
+            primary_color,
+            &PALETTE_COLORS,
+            &crate::dev_menu::portrait_config::PortraitPaletteConfig::default(),
+        )
     }
 
     /// Generate a randomized portrait using a palette configuration.
     ///
     /// Colors are picked from non-vetoed palette entries. Secondary colors
-    /// use explicit complementary mappings when available, falling back to
-    /// algorithmic derivation.
+    /// use explicit complementary mappings when available.
     pub fn generate_with_config(
         rng: &mut impl Rng,
         primary_color: [f32; 3],
@@ -412,11 +504,11 @@ impl PortraitDescriptor {
         };
 
         // Compute variant indices for variant-aware veto/complementary lookups
-        let face_vi = Some(ALL_FACE_SHAPES.iter().position(|s| *s == face_shape).unwrap_or(0));
-        let eye_vi = Some(ALL_EYE_STYLES.iter().position(|s| *s == eyes).unwrap_or(0));
-        let hair_vi = Some(ALL_HAIR_STYLES.iter().position(|s| *s == hair).unwrap_or(0));
-        let shirt_vi = Some(ALL_SHIRT_STYLES.iter().position(|s| *s == shirt).unwrap_or(0));
-        let acc_vi = accessory.and_then(|a| ALL_ACCESSORIES.iter().position(|x| *x == a));
+        let face_vi = Some(face_shape.index());
+        let eye_vi = Some(eyes.index());
+        let hair_vi = Some(hair.index());
+        let shirt_vi = Some(shirt.index());
+        let acc_vi = accessory.map(|a| a.index());
 
         let mut pick =
             |slot: PortraitColorSlot, vi: Option<usize>, fallback: [f32; 3]| -> (usize, [f32; 3]) {
@@ -443,29 +535,28 @@ impl PortraitDescriptor {
             derive_accessory_color(primary_color),
         );
 
-        // Secondary colors: check complementary map, else fall back to auto-derived.
+        // Secondary colors: check complementary map.
         // A sentinel value of DRONE_COLOR_INDEX means "use pilot drone color."
         use crate::dev_menu::portrait_config::DRONE_COLOR_INDEX;
 
+        let resolve_comp = |comp: Option<usize>| -> SecondaryColor {
+            match comp {
+                Some(i) if i == DRONE_COLOR_INDEX => SecondaryColor::DroneColor,
+                Some(i) => SecondaryColor::Chosen(palette_colors[i].1),
+                None => SecondaryColor::DroneColor,
+            }
+        };
+
         let skin_comp = config.get_complementary_for(PortraitColorSlot::Skin, face_vi, skin_idx);
-        let skin_highlight_drone = skin_comp == Some(DRONE_COLOR_INDEX);
-        let skin_highlight = skin_comp
-            .filter(|&i| i != DRONE_COLOR_INDEX)
-            .map(|i| palette_colors[i].1);
+        let skin_secondary = resolve_comp(skin_comp);
 
         let eye_color = eye_color_fallback;
         let eye_comp = config.get_complementary_for(PortraitColorSlot::Eye, eye_vi, _eye_idx);
-        let eye_secondary_drone = eye_comp == Some(DRONE_COLOR_INDEX);
-        let eye_secondary = eye_comp
-            .filter(|&i| i != DRONE_COLOR_INDEX)
-            .map(|i| palette_colors[i].1);
+        let eye_secondary = resolve_comp(eye_comp);
 
         let acc_comp =
             config.get_complementary_for(PortraitColorSlot::Accessory, acc_vi, acc_idx);
-        let acc_shadow_drone = acc_comp == Some(DRONE_COLOR_INDEX);
-        let acc_shadow = acc_comp
-            .filter(|&i| i != DRONE_COLOR_INDEX)
-            .map(|i| palette_colors[i].1);
+        let acc_secondary = resolve_comp(acc_comp);
 
         Self {
             face_shape,
@@ -479,12 +570,9 @@ impl PortraitDescriptor {
             eye_color,
             accessory_color: acc_color_from_palette,
             shirt_color: shirt_color_from_palette,
-            skin_highlight,
-            acc_shadow,
+            skin_secondary,
+            acc_secondary,
             eye_secondary,
-            skin_highlight_drone,
-            acc_shadow_drone,
-            eye_secondary_drone,
             generated: true,
         }
     }
