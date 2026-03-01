@@ -14,7 +14,8 @@ use crate::pilot::portrait::{
 use crate::states::AppState;
 
 use super::portrait_config::{
-    MIN_DRONE_COLORS, PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS, save_config,
+    MIN_DRONE_COLORS, PALETTE_COLORS, PortraitColorSlot, PortraitPaletteConfig,
+    auto_secondary_index, save_config,
 };
 
 // ── Colors ──────────────────────────────────────────────────────────────────
@@ -232,14 +233,9 @@ pub struct PrimaryColorCell(pub usize);
 #[derive(Component)]
 pub struct SecondaryColorCell(pub usize);
 
+/// Secondary cell in paired grid; stores the *primary* palette index it corresponds to.
 #[derive(Component)]
-pub struct PairingPanel;
-
-#[derive(Component)]
-pub struct PairingListPanel;
-
-#[derive(Component)]
-pub struct PairingRow(pub usize);
+pub struct SecondaryPairingCell(pub usize);
 
 #[derive(Component)]
 pub struct PairingPickerPanel;
@@ -249,9 +245,6 @@ pub struct PairingPickerCell(pub usize);
 
 #[derive(Component)]
 pub struct AutoAssignAllButton;
-
-#[derive(Component)]
-pub struct PairingProgressLabel;
 
 #[derive(Component)]
 pub struct AllowedGridPanel;
@@ -538,7 +531,7 @@ fn build_ui(
                             ..default()
                         })
                         .with_children(|color_row| {
-                            // Primary color grid (two-column: allowed / vetoed) — left side
+                            // Primary color grid (two-column: allowed / vetoed)
                             color_row
                                 .spawn((
                                     PrimarySection,
@@ -554,16 +547,55 @@ fn build_ui(
                                     },
                                 ))
                                 .with_children(|section| {
-                                    section.spawn((
-                                        Text::new(
-                                            "Primary Color (left-click = select, right-click = move)",
-                                        ),
-                                        TextFont {
-                                            font_size: 12.0,
+                                    // Header row: label + auto-assign (for pairing tabs)
+                                    section
+                                        .spawn(Node {
+                                            flex_direction: FlexDirection::Row,
+                                            column_gap: Val::Px(8.0),
+                                            align_items: AlignItems::Center,
                                             ..default()
-                                        },
-                                        TextColor(palette::SIDEWALK),
-                                    ));
+                                        })
+                                        .with_children(|hdr| {
+                                            hdr.spawn((
+                                                Text::new(
+                                                    "Primary Color (left-click = select, right-click = move)",
+                                                ),
+                                                TextFont {
+                                                    font_size: 12.0,
+                                                    ..default()
+                                                },
+                                                TextColor(palette::SIDEWALK),
+                                            ));
+                                            hdr.spawn((
+                                                Button,
+                                                AutoAssignAllButton,
+                                                Node {
+                                                    height: Val::Px(20.0),
+                                                    padding: UiRect::horizontal(Val::Px(6.0)),
+                                                    justify_content: JustifyContent::Center,
+                                                    align_items: AlignItems::Center,
+                                                    border: UiRect::all(Val::Px(1.0)),
+                                                    ..default()
+                                                },
+                                                BackgroundColor(palette::INDIGO),
+                                                BorderColor::all(palette::STEEL),
+                                                if state.show_pairing() {
+                                                    Visibility::Visible
+                                                } else {
+                                                    Visibility::Hidden
+                                                },
+                                            ))
+                                            .with_children(|btn| {
+                                                btn.spawn((
+                                                    Text::new("Auto-pair"),
+                                                    TextFont {
+                                                        font_size: 11.0,
+                                                        ..default()
+                                                    },
+                                                    TextColor(palette::VANILLA),
+                                                ));
+                                            });
+                                        });
                                     section
                                         .spawn((
                                             PrimaryGridPanel,
@@ -639,82 +671,9 @@ fn build_ui(
                                                     ));
                                                 });
                                         });
-                                });
 
-                            // Pairing panel (Skin/Accessory) — right side
-                            color_row
-                                .spawn((
-                                    PairingPanel,
-                                    Node {
-                                        flex_direction: FlexDirection::Column,
-                                        row_gap: Val::Px(4.0),
-                                        ..default()
-                                    },
-                                    if state.show_pairing() {
-                                        Visibility::Visible
-                                    } else {
-                                        Visibility::Hidden
-                                    },
-                                ))
-                                .with_children(|panel| {
-                                    // Header row with progress + auto-assign button
-                                    panel
-                                        .spawn(Node {
-                                            flex_direction: FlexDirection::Row,
-                                            column_gap: Val::Px(8.0),
-                                            align_items: AlignItems::Center,
-                                            ..default()
-                                        })
-                                        .with_children(|row| {
-                                            row.spawn((
-                                                PairingProgressLabel,
-                                                Text::new("Color Pairings"),
-                                                TextFont {
-                                                    font_size: 12.0,
-                                                    ..default()
-                                                },
-                                                TextColor(palette::SIDEWALK),
-                                            ));
-                                            row.spawn((
-                                                Button,
-                                                AutoAssignAllButton,
-                                                Node {
-                                                    height: Val::Px(20.0),
-                                                    padding: UiRect::horizontal(Val::Px(6.0)),
-                                                    justify_content: JustifyContent::Center,
-                                                    align_items: AlignItems::Center,
-                                                    border: UiRect::all(Val::Px(1.0)),
-                                                    ..default()
-                                                },
-                                                BackgroundColor(palette::INDIGO),
-                                                BorderColor::all(palette::STEEL),
-                                            ))
-                                            .with_children(|btn| {
-                                                btn.spawn((
-                                                    Text::new("Auto-assign All"),
-                                                    TextFont {
-                                                        font_size: 11.0,
-                                                        ..default()
-                                                    },
-                                                    TextColor(palette::VANILLA),
-                                                ));
-                                            });
-                                        });
-
-                                    // Scrollable pairing list
-                                    panel.spawn((
-                                        PairingListPanel,
-                                        Node {
-                                            flex_direction: FlexDirection::Column,
-                                            row_gap: Val::Px(2.0),
-                                            max_height: Val::Px(280.0),
-                                            overflow: Overflow::scroll_y(),
-                                            ..default()
-                                        },
-                                    ));
-
-                                    // Picker grid (hidden until a row is selected)
-                                    panel.spawn((
+                                    // Inline picker (hidden until a secondary cell is clicked)
+                                    section.spawn((
                                         PairingPickerPanel,
                                         Node {
                                             flex_direction: FlexDirection::Row,
@@ -725,8 +684,12 @@ fn build_ui(
                                                 (COLOR_CELL_SIZE + 2.0)
                                                     * COLOR_GRID_COLS as f32,
                                             ),
+                                            padding: UiRect::all(Val::Px(4.0)),
+                                            border: UiRect::all(Val::Px(1.0)),
                                             ..default()
                                         },
+                                        BackgroundColor(Color::srgba(0.05, 0.05, 0.1, 0.95)),
+                                        BorderColor::all(palette::SUNSHINE),
                                         Visibility::Hidden,
                                     ));
                                 });
@@ -1218,18 +1181,24 @@ pub fn handle_make_unique_button(
 
 // ── Pairing interaction handlers ─────────────────────────────────────────────
 
-pub fn handle_pairing_row_click(
-    query: Query<(&Interaction, &PairingRow), Changed<Interaction>>,
+/// Clicking a secondary pairing cell opens the picker for that primary color.
+pub fn handle_secondary_pairing_click(
+    query: Query<(&Interaction, &SecondaryPairingCell), Changed<Interaction>>,
     mut state: ResMut<PortraitEditorState>,
 ) {
-    for (interaction, row) in &query {
+    for (interaction, cell) in &query {
         if *interaction == Interaction::Pressed {
-            state.selected_pairing_primary = Some(row.0);
-            state.preview_dirty = true;
+            if state.selected_pairing_primary == Some(cell.0) {
+                // Toggle off if clicking the same cell
+                state.selected_pairing_primary = None;
+            } else {
+                state.selected_pairing_primary = Some(cell.0);
+            }
         }
     }
 }
 
+/// Clicking a color in the picker sets the complementary and closes the picker.
 pub fn handle_pairing_picker_click(
     query: Query<(&Interaction, &PairingPickerCell), Changed<Interaction>>,
     mut state: ResMut<PortraitEditorState>,
@@ -1248,6 +1217,33 @@ pub fn handle_pairing_picker_click(
             state.preview_dirty = true;
         }
     }
+}
+
+/// Dismiss the pairing picker when clicking outside it.
+pub fn dismiss_pairing_picker(
+    mouse: Res<ButtonInput<MouseButton>>,
+    mut state: ResMut<PortraitEditorState>,
+    picker_cells: Query<&Interaction, With<PairingPickerCell>>,
+    secondary_cells: Query<&Interaction, With<SecondaryPairingCell>>,
+) {
+    if state.selected_pairing_primary.is_none() {
+        return;
+    }
+    if !mouse.just_pressed(MouseButton::Left) {
+        return;
+    }
+    // Don't dismiss if hovering over picker or secondary cells
+    for interaction in &picker_cells {
+        if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
+            return;
+        }
+    }
+    for interaction in &secondary_cells {
+        if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
+            return;
+        }
+    }
+    state.selected_pairing_primary = None;
 }
 
 pub fn handle_auto_assign_all(
@@ -1413,6 +1409,7 @@ pub fn rebuild_primary_grid(
     allowed_panel: Query<Entity, With<AllowedGridPanel>>,
     vetoed_panel: Query<Entity, With<VetoedGridPanel>>,
     section_panel: Query<Entity, With<PrimarySection>>,
+    auto_btn: Query<Entity, With<AutoAssignAllButton>>,
 ) {
     if !state.is_changed() && !config.is_changed() {
         return;
@@ -1420,10 +1417,20 @@ pub fn rebuild_primary_grid(
     let slot = state.active_tab.color_slot();
     let vi = state.current_variant_index();
     let selected = slot.and_then(|s| state.primary_colors.get(&s).copied());
+    let needs_pairing = slot.is_some_and(|s| s.needs_pairing());
 
     // Hide entire primary color section when tab has no color slot (e.g. Mouth)
     for entity in &section_panel {
         commands.entity(entity).insert(if slot.is_some() {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        });
+    }
+
+    // Show/hide auto-pair button
+    for entity in &auto_btn {
+        commands.entity(entity).insert(if needs_pairing {
             Visibility::Visible
         } else {
             Visibility::Hidden
@@ -1435,16 +1442,90 @@ pub fn rebuild_primary_grid(
         .map(|s| config.allowed_indices_for(s, vi).into_iter().collect())
         .unwrap_or_default();
 
+    // Collect allowed indices in palette order
+    let allowed_ordered: Vec<usize> = PALETTE_COLORS
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| allowed_set.contains(i))
+        .map(|(i, _)| i)
+        .collect();
+
     for entity in &allowed_panel {
         commands.entity(entity).despawn_children();
-        commands.entity(entity).with_children(|parent| {
-            for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
-                if !allowed_set.contains(&i) {
-                    continue;
+
+        if needs_pairing {
+            // Paired layout: chunk into rows with secondary row below each primary row
+            commands.entity(entity).insert(Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(6.0),
+                ..default()
+            });
+            let slot = slot.unwrap();
+            commands.entity(entity).with_children(|parent| {
+                for chunk in allowed_ordered.chunks(COLOR_GRID_COLS) {
+                    // Row pair container
+                    parent
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(1.0),
+                            ..default()
+                        })
+                        .with_children(|pair| {
+                            // Primary row
+                            pair.spawn(Node {
+                                flex_direction: FlexDirection::Row,
+                                column_gap: Val::Px(2.0),
+                                ..default()
+                            })
+                            .with_children(|row| {
+                                for &i in chunk {
+                                    let rgb = &PALETTE_COLORS[i].1;
+                                    spawn_color_cell(row, i, rgb, selected == Some(i));
+                                }
+                            });
+                            // Secondary row
+                            pair.spawn(Node {
+                                flex_direction: FlexDirection::Row,
+                                column_gap: Val::Px(2.0),
+                                ..default()
+                            })
+                            .with_children(|row| {
+                                for &i in chunk {
+                                    let explicit = config.get_complementary_for(slot, vi, i);
+                                    let sec_idx = explicit
+                                        .unwrap_or_else(|| auto_secondary_index(slot, i));
+                                    let rgb = &PALETTE_COLORS[sec_idx].1;
+                                    let is_active =
+                                        state.selected_pairing_primary == Some(i);
+                                    spawn_secondary_pairing_cell(
+                                        row,
+                                        i,
+                                        rgb,
+                                        explicit.is_some(),
+                                        is_active,
+                                    );
+                                }
+                            });
+                        });
                 }
-                spawn_color_cell(parent, i, rgb, selected == Some(i));
-            }
-        });
+            });
+        } else {
+            // Flat wrapping layout for non-pairing tabs
+            commands.entity(entity).insert(Node {
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: Val::Px(2.0),
+                row_gap: Val::Px(2.0),
+                max_width: Val::Px((COLOR_CELL_SIZE + 2.0) * COLOR_GRID_COLS as f32),
+                ..default()
+            });
+            commands.entity(entity).with_children(|parent| {
+                for &i in &allowed_ordered {
+                    let rgb = &PALETTE_COLORS[i].1;
+                    spawn_color_cell(parent, i, rgb, selected == Some(i));
+                }
+            });
+        }
     }
 
     for entity in &vetoed_panel {
@@ -1484,68 +1565,51 @@ fn spawn_color_cell(
     ));
 }
 
-pub fn rebuild_pairing_panel(
-    state: Res<PortraitEditorState>,
-    config: Res<PortraitPaletteConfig>,
-    mut commands: Commands,
-    pairing_panel: Query<Entity, With<PairingPanel>>,
-    list_panel: Query<Entity, With<PairingListPanel>>,
-    picker_panel: Query<Entity, With<PairingPickerPanel>>,
-    mut progress_query: Query<&mut Text, With<PairingProgressLabel>>,
+fn spawn_secondary_pairing_cell(
+    parent: &mut ChildSpawnerCommands,
+    primary_index: usize,
+    rgb: &[f32; 3],
+    is_explicit: bool,
+    is_active: bool,
 ) {
-    if !state.is_changed() && !config.is_changed() {
+    let border = if is_active {
+        SELECTED_BORDER
+    } else if is_explicit {
+        COMPLEMENTARY_BORDER
+    } else {
+        Color::srgba(0.3, 0.3, 0.3, 0.5)
+    };
+    parent.spawn((
+        Button,
+        SecondaryPairingCell(primary_index),
+        Node {
+            width: Val::Px(COLOR_CELL_SIZE),
+            height: Val::Px(COLOR_CELL_SIZE),
+            border: UiRect::all(Val::Px(if is_active { 2.0 } else { 1.0 })),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(rgb[0], rgb[1], rgb[2])),
+        BorderColor::all(border),
+    ));
+}
+
+pub fn rebuild_pairing_picker(
+    state: Res<PortraitEditorState>,
+    mut commands: Commands,
+    picker_panel: Query<Entity, With<PairingPickerPanel>>,
+) {
+    if !state.is_changed() {
         return;
     }
-
-    let show = state.show_pairing();
-    for entity in &pairing_panel {
+    let show = state.selected_pairing_primary.is_some() && state.show_pairing();
+    for entity in &picker_panel {
         commands.entity(entity).insert(if show {
             Visibility::Visible
         } else {
             Visibility::Hidden
         });
-    }
-
-    let Some(slot) = state.active_tab.color_slot() else {
-        return;
-    };
-    if !slot.needs_pairing() {
-        return;
-    }
-
-    // Update progress label
-    let vi = state.current_variant_index();
-    let (mapped, total) = config.pairing_progress_for(slot, vi);
-    for mut text in &mut progress_query {
-        let msg = format!("Color Pairings ({mapped}/{total})");
-        if text.0 != msg {
-            text.0 = msg;
-        }
-    }
-
-    // Rebuild pairing list
-    let allowed = config.allowed_indices_for(slot, vi);
-    for entity in &list_panel {
         commands.entity(entity).despawn_children();
-        commands.entity(entity).with_children(|parent| {
-            for &idx in &allowed {
-                let secondary_idx = config.get_complementary_for(slot, vi, idx);
-                let is_selected = state.selected_pairing_primary == Some(idx);
-                spawn_pairing_row(parent, idx, secondary_idx, is_selected);
-            }
-        });
-    }
-
-    // Show/hide picker panel and rebuild if a row is selected
-    let show_picker = state.selected_pairing_primary.is_some();
-    for entity in &picker_panel {
-        commands.entity(entity).insert(if show_picker {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        });
-        commands.entity(entity).despawn_children();
-        if show_picker {
+        if show {
             commands.entity(entity).with_children(|parent| {
                 for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
                     parent.spawn((
@@ -1564,93 +1628,6 @@ pub fn rebuild_pairing_panel(
             });
         }
     }
-}
-
-const PAIRING_CELL_SIZE: f32 = 18.0;
-
-fn spawn_pairing_row(
-    parent: &mut ChildSpawnerCommands,
-    primary_idx: usize,
-    secondary_idx: Option<usize>,
-    is_selected: bool,
-) {
-    let (_, primary_rgb) = PALETTE_COLORS[primary_idx];
-    parent
-        .spawn((
-            Button,
-            PairingRow(primary_idx),
-            Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(4.0),
-                align_items: AlignItems::Center,
-                padding: UiRect::all(Val::Px(2.0)),
-                border: UiRect::all(Val::Px(if is_selected { 2.0 } else { 1.0 })),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.05, 0.05, 0.1, 0.8)),
-            BorderColor::all(if is_selected {
-                SELECTED_BORDER
-            } else {
-                Color::srgba(0.2, 0.2, 0.2, 0.5)
-            }),
-        ))
-        .with_children(|row| {
-            // Primary swatch
-            row.spawn(Node {
-                width: Val::Px(PAIRING_CELL_SIZE),
-                height: Val::Px(PAIRING_CELL_SIZE),
-                ..default()
-            })
-            .insert(BackgroundColor(Color::srgb(
-                primary_rgb[0],
-                primary_rgb[1],
-                primary_rgb[2],
-            )));
-
-            // Arrow
-            row.spawn((
-                Text::new("\u{2192}"),
-                TextFont {
-                    font_size: 12.0,
-                    ..default()
-                },
-                TextColor(palette::SIDEWALK),
-            ));
-
-            // Secondary swatch or "?"
-            if let Some(sec_idx) = secondary_idx {
-                let (_, sec_rgb) = PALETTE_COLORS[sec_idx];
-                row.spawn(Node {
-                    width: Val::Px(PAIRING_CELL_SIZE),
-                    height: Val::Px(PAIRING_CELL_SIZE),
-                    ..default()
-                })
-                .insert(BackgroundColor(Color::srgb(
-                    sec_rgb[0], sec_rgb[1], sec_rgb[2],
-                )));
-            } else {
-                row.spawn((
-                    Node {
-                        width: Val::Px(PAIRING_CELL_SIZE),
-                        height: Val::Px(PAIRING_CELL_SIZE),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgba(0.2, 0.2, 0.2, 0.5)),
-                ))
-                .with_children(|cell| {
-                    cell.spawn((
-                        Text::new("?"),
-                        TextFont {
-                            font_size: 11.0,
-                            ..default()
-                        },
-                        TextColor(palette::SIDEWALK),
-                    ));
-                });
-            }
-        });
 }
 
 pub fn rebuild_secondary_grid(
@@ -1738,9 +1715,11 @@ pub fn update_drone_warning(
 pub fn update_color_name_on_hover(
     primary_query: Query<(&Interaction, &PrimaryColorCell)>,
     secondary_query: Query<(&Interaction, &SecondaryColorCell)>,
-    pairing_row_query: Query<(&Interaction, &PairingRow)>,
+    pairing_cell_query: Query<(&Interaction, &SecondaryPairingCell)>,
     pairing_picker_query: Query<(&Interaction, &PairingPickerCell)>,
     mut label_query: Query<&mut Text, With<ColorNameLabel>>,
+    state: Res<PortraitEditorState>,
+    config: Res<PortraitPaletteConfig>,
 ) {
     let mut name = "";
     for (interaction, cell) in &primary_query {
@@ -1757,10 +1736,16 @@ pub fn update_color_name_on_hover(
             }
         }
     }
-    if name.is_empty() {
-        for (interaction, row) in &pairing_row_query {
+    if name.is_empty()
+        && let Some(slot) = state.active_tab.color_slot()
+    {
+        let vi = state.current_variant_index();
+        for (interaction, cell) in &pairing_cell_query {
             if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
-                name = PALETTE_COLORS[row.0].0;
+                let sec_idx = config
+                    .get_complementary_for(slot, vi, cell.0)
+                    .unwrap_or_else(|| auto_secondary_index(slot, cell.0));
+                name = PALETTE_COLORS[sec_idx].0;
                 break;
             }
         }

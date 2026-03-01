@@ -226,20 +226,6 @@ impl PortraitPaletteConfig {
         self.clear_complementary(slot, primary_index);
     }
 
-    pub fn pairing_progress_for(
-        &self,
-        slot: PortraitColorSlot,
-        variant_idx: Option<usize>,
-    ) -> (usize, usize) {
-        let allowed = self.allowed_indices_for(slot, variant_idx);
-        let total = allowed.len();
-        let mapped = allowed
-            .iter()
-            .filter(|&&i| self.get_complementary_for(slot, variant_idx, i).is_some())
-            .count();
-        (mapped, total)
-    }
-
     pub fn auto_assign_all_for(&mut self, slot: PortraitColorSlot, variant_idx: Option<usize>) {
         let allowed = self.allowed_indices_for(slot, variant_idx);
         for &primary_idx in &allowed {
@@ -249,16 +235,22 @@ impl PortraitPaletteConfig {
             {
                 continue;
             }
-            let primary_rgb = PALETTE_COLORS[primary_idx].1;
-            let target = match slot {
-                PortraitColorSlot::Skin => compute_highlight(primary_rgb),
-                PortraitColorSlot::Accessory => compute_shadow(primary_rgb),
-                _ => continue,
-            };
-            let nearest = nearest_palette_index(&target);
+            let nearest = auto_secondary_index(slot, primary_idx);
             self.set_complementary_for(slot, variant_idx, primary_idx, nearest);
         }
     }
+}
+
+/// Returns the palette index of the algorithmically-computed secondary color
+/// for a given slot and primary index (highlight for Skin, shadow for Accessory).
+pub fn auto_secondary_index(slot: PortraitColorSlot, primary_idx: usize) -> usize {
+    let primary_rgb = PALETTE_COLORS[primary_idx].1;
+    let target = match slot {
+        PortraitColorSlot::Skin => compute_highlight(primary_rgb),
+        PortraitColorSlot::Accessory => compute_shadow(primary_rgb),
+        _ => return primary_idx,
+    };
+    nearest_palette_index(&target)
 }
 
 fn nearest_palette_index(target: &[f32; 3]) -> usize {

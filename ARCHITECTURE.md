@@ -74,11 +74,11 @@ src/
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
 │   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance, update_wander_targets (FixedUpdate, spline-based)
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
-│   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio (ExplosionParticle, ParticleKind, ExplosionSounds, ExplosionMeshes)
-│   ├── fireworks.rs     Victory fireworks on first finish: placed emitter-based or auto gate 0 confetti + shell bursts (FireworkParticle, FireworkEmitter, FireworkMeshes, FireworkSounds, PendingShell)
-│   ├── interpolation.rs PreviousTranslation/PreviousRotation, PhysicsTranslation/PhysicsRotation, visual transform interpolation (FixedFirst restore, FixedPostUpdate save, PostUpdate interpolate)
-│   ├── paths.rs         RacePath, spline generation (race/drone/return), compute_start_positions, adaptive_approach_offset
-│   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems, DRONE_COLORS/DRONE_NAMES
+│   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio
+│   ├── fireworks.rs     Victory fireworks on first finish: placed emitter-based or auto gate 0
+│   ├── interpolation.rs Visual transform interpolation (FixedFirst restore, FixedPostUpdate save, PostUpdate interpolate)
+│   ├── paths.rs         RacePath, spline generation (race/drone/return), compute_start_positions
+│   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems
 ├── race/                Race mechanics
 │   ├── gate.rs          GateIndex, GateForward, GatePlanes, plane-crossing gate detection
 │   ├── collision.rs     ObstacleCollisionCache, swept segment vs OBB collision, crash_drone helper
@@ -89,7 +89,7 @@ src/
 │   ├── chase.rs         Broadcast-style pack-follow camera (Chase mode, default in Race)
 │   ├── fpv.rs           Stabilized close-follow camera on target drone (FPV mode)
 │   ├── spectator.rs     RTS-style orbit controls: middle-mouse orbit, scroll zoom, WASD pan
-│   ├── switching.rs     CameraMode/CameraState/CourseCameras, key switching (1-0=CourseCamera, 2=Chase, Shift+F=FPV, Shift+S=Spectator)
+│   ├── switching.rs     CameraMode/CameraState/CourseCameras, key switching
 │   ├── orbit.rs         Orbit math (shared between Spectator and Course Editor)
 │   └── settings.rs      CameraSettings resource (FOV, sensitivity, zoom)
 └── results/             Race results display
@@ -136,91 +136,6 @@ CourseData ──► spawn obstacles + firework emitters + drones + build Course
               All finished/crashed → RacePhase::Finished
 ```
 
-## Key Types
-
-| Type | Kind | Module | Purpose |
-|------|------|--------|---------|
-| `ObstacleId` | Data | obstacle/definition | Unique string ID for obstacle types |
-| `ObstacleDef` | Data | obstacle/definition | glb scene name + trigger volume config |
-| `ObstacleLibrary` | Resource | obstacle/library | All loaded obstacle definitions |
-| `CourseData` | Resource | course/data | All obstacle placements for a course |
-| `TriggerVolume` | Component | obstacle/spawning | AABB hitbox on gate entities |
-| `GateIndex` | Component | race/gate | Gate sequence order |
-| `GateForward` | Component | race/gate | World-space forward direction for gate validation |
-| `GatePlanes` | Resource | race/gate | Cached per-gate plane data (center, normal, axes, half-extents) built once at race start for plane-crossing detection |
-| `CollisionVolumeConfig` | Data | obstacle/definition | Local-space AABB (offset + half_extents) for obstacle collision volumes |
-| `ObstacleCollisionVolume` | Component | obstacle/spawning | Runtime collision volume on obstacle entities (offset, half_extents, is_gate) |
-| `ObstacleCollisionCache` | Resource | race/collision | Cached world-space OBBs for all obstacles with collision volumes, built once at race start |
-| `RaceProgress` | Resource | race/progress | Per-drone gate/finish/crash tracking |
-| `DroneRaceState` | Data | race/progress | Per-drone state: next_gate, gates_passed, finished, finish_time, crashed, dnf_reason |
-| `RacePhase` | Resource | race/lifecycle | WaitingToStart → Countdown → Racing → Finished |
-| `CountdownTimer` | Resource | race/lifecycle | 3-second countdown timer (inserted on Countdown, removed on Racing) |
-| `RaceClock` | Resource | race/timing | Elapsed race time, running flag |
-| `CelMaterial` | Asset | rendering/cel_material | Cel-shading material with halftone transition and hue-shifted highlights/shadows |
-| `SkyboxMaterial` | Asset | rendering/skybox | Procedural TRON night sky (stars, moon, neon horizon glow) |
-| `CelLightDir` | Resource | rendering/mod | World-space light direction shared by all CelMaterial instances |
-| `SkyboxEntity` | Component | rendering/skybox | Marker on the skybox sphere entity |
-| `CameraState` | Resource | camera/switching | Current camera mode + FPV target drone standings index |
-| `CameraMode` | Enum | camera/switching | Chase (pack follow), Fpv (drone-mounted), Spectator (free-fly), CourseCamera(usize) (placed cameras) |
-| `CourseCameras` | Resource | camera/switching | Course camera entries built from CourseData at race start (primary first) |
-| `CourseCameraEntry` | Data | camera/switching | Pre-computed Transform + optional label for a placed course camera |
-| `CameraInstance` | Data | course/data | Serialized camera placement: translation, rotation, is_primary, optional label |
-| `ChaseState` | Resource | camera/chase | Smoothed center/velocity for broadcast-style pack-follow camera |
-| `SpectatorSettings` | Resource | camera/spectator | Movement speed + mouse sensitivity |
-| `RaceResults` | Resource | race/progress | Snapshot of final standings, persists Race→Results state transition |
-| `RaceResultEntry` | Data | race/progress | Per-drone result: index, finished, finish_time, crashed, gates_passed |
-| `ResultsTransitionTimer` | Resource | race/lifecycle | Brief delay (0.5s) before auto-transitioning Race→Results |
-| `AvailableCourses` | Resource | menu/ui | Discovered course files (Menu state only) |
-| `SelectedCourse` | Resource | course/loader | User's course selection for racing |
-| `WorkshopState` | Resource | editor/workshop | Current obstacle being edited (scene, trigger config, preview) |
-| `PreviewObstacle` | Component | editor/workshop | Marker on the 3D preview entity in the workshop |
-| `PlacementState` | Resource | editor/course_editor | Selected palette obstacle/prop, active tab, dragging entity, drag height, gate order mode |
-| `PlacedObstacle` | Component | editor/course_editor | Marker on every obstacle entity spawned in the course editor; carries `obstacle_id` and `gate_order` |
-| `PlacedProp` | Component | editor/course_editor | Marker on every prop entity spawned in the course editor; carries `PropKind` and optional `color_override` |
-| `PlacedCamera` | Component | editor/course_editor | Marker on every camera entity spawned in the course editor; carries `is_primary` and optional `label` |
-| `EditorTab` | Enum | editor/course_editor | Obstacles (default), Props, or Cameras — switches the left-panel palette |
-| `PropEditorMeshes` | Resource | editor/course_editor/ui | Shared mesh+material handles for prop placeholder cubes in the editor |
-| `CameraEditorMeshes` | Resource | editor/course_editor/ui | Shared mesh+material handles for camera placeholder cubes in the editor (sky/sunshine colors) |
-| `CameraPreview` | Resource | editor/course_editor/preview | Holds camera entity for render-to-texture PiP preview |
-| `PreviewCamera` | Component | editor/course_editor/preview | Marker on the secondary Camera3d used for PiP render-to-texture |
-| `PropKind` | Enum | course/data | ConfettiEmitter or ShellBurstEmitter — firework emitter type |
-| `PropInstance` | Data | course/data | Per-prop placement: kind, translation, rotation, optional color_override |
-| `FireworkEmitter` | Component | drone/fireworks | Race-time marker entity spawned from course props; carries `PropKind` and optional `Color` override |
-| `PreviousTranslation` | Component | drone/interpolation | Drone translation from previous FixedUpdate tick (for visual interpolation) |
-| `PreviousRotation` | Component | drone/interpolation | Drone rotation from previous FixedUpdate tick (for visual interpolation) |
-| `PhysicsTranslation` | Component | drone/interpolation | Authoritative physics translation saved after each FixedUpdate tick |
-| `PhysicsRotation` | Component | drone/interpolation | Authoritative physics rotation saved after each FixedUpdate tick |
-| `DroneAssets` | Resource | drone/spawning | Shared mesh/material handles for all drone entities (from glTF or placeholder) |
-| `DroneGltfHandle` | Resource | drone/spawning | Handle to the loaded drone glTF asset |
-| `DesiredPosition` | Component | drone/components | AI→PID bridge: target position + velocity hint + curvature-aware speed limit |
-| `DronePhase` | Component | drone/components | Per-drone lifecycle: Idle, Racing, Returning, Wandering, Crashed |
-| `WanderState` | Component | drone/components | Per-drone wandering state: target position, dwell timer, step counter |
-| `WanderBounds` | Resource | drone/ai | Bounding box for post-race wandering area (computed from course obstacle positions + padding) |
-| `ExplosionParticle` | Component | drone/explosion | Velocity, lifetime, remaining time, and `ParticleKind` (Debris/HotSmoke/DarkSmoke) for crash particles |
-| `ExplosionSounds` | Resource | drone/explosion | 4 handles to explosion audio variants (assets/sounds/explosion_{1..4}.wav) |
-| `ExplosionMeshes` | Resource | drone/explosion | Pre-allocated mesh handles for debris (3 sizes), hot smoke, dark smoke — shared across all explosions |
-| `FireworkParticle` | Component | drone/fireworks | Velocity, lifetime, remaining time, and `FireworkKind` (Spark/Willow/Confetti) for victory firework particles |
-| `FireworkMeshes` | Resource | drone/fireworks | Pre-allocated mesh handles for spark, willow, confetti particle sizes |
-| `FireworkSounds` | Resource | drone/fireworks | Handle to firework burst audio (assets/sounds/firework.wav) |
-| `FireworksTriggered` | Resource | drone/fireworks | Marker preventing re-triggering of fireworks after first drone finishes |
-| `PendingShell` | Component | drone/fireworks | Staggered detonation timer for overhead shell bursts (position, delay, colors) |
-| `ReturnPath` | Component | drone/components | Non-cyclic spline for post-race return flight (inserted Racing→Returning, removed Returning→Idle) |
-| `AiTuningParams` | Resource | drone/components | Runtime-tunable AI/physics constants (14 params: speed, curvature, look-ahead, tilt, battery sag, dirty air strength, proximity avoidance radius/strength, velocity feedforward blend). Persists across race restarts. Exposed via dev dashboard (F4) |
-| `LeaderboardRoot` | Component | race/ui | Marker on the race leaderboard panel (top-left standings display, 12 rows with color bars, names, times) |
-| `Pilot` | Data | pilot/mod | Persistent pilot identity: gamertag, personality traits, skill profile, color scheme, stats |
-| `PilotId` | Data | pilot/mod | Unique u64 identifier for a pilot |
-| `PilotRoster` | Resource | pilot/roster | All generated pilots, persisted to `assets/pilots/roster.pilots.ron` |
-| `SelectedPilots` | Resource | pilot/mod | 12 pilots chosen for the current race, indexed by drone slot |
-| `PilotConfigs` | Resource | pilot/mod | Pre-computed DroneConfigs from selected pilots' skill+personality |
-| `DroneIdentity` | Component | drone/components | Per-drone name and color, set from SelectedPilots at spawn |
-| `PersonalityTrait` | Enum | pilot/personality | Aggressive, Cautious, Flashy, Methodical, Reckless, Smooth, Technical, Hotdog |
-| `SkillProfile` | Data | pilot/skill | Per-pilot skill: level + speed/cornering/consistency axes |
-| `PortraitDescriptor` | Data | pilot/portrait | Face/eyes/mouth/hair/shirt/accessory slots + colors (6 slot enums), `generate()` for random creation |
-| `PortraitCache` | Resource | pilot/portrait/cache | Cached `Handle<Image>` per pilot, persists across races, built `OnEnter(Race)` |
-| `PortraitPaletteConfig` | Resource | dev_menu/portrait_config | Per-slot vetoed color indices and complementary color mappings, persisted to RON |
-| `PortraitColorSlot` | Enum | dev_menu/portrait_config | Color pool categories: Skin, Hair, Eye, Shirt, Accessory |
-| `PortraitEditorState` | Resource | dev_menu/portrait_editor | Active tab, variant selections, color selections, preview dirty flag |
-
 ## Assets
 
 ```
@@ -238,53 +153,25 @@ assets/
 
 ## Performance Design
 
-- All drone physics in `FixedUpdate` (64Hz default), `.chain()`-ed for correctness. Visual rendering decoupled via PostUpdate transform interpolation (Previous* → Physics* slerp/lerp) for smooth motion between ticks without compromising physics determinism
-- Gate trigger checks: O(drones) = O(12) plane-crossing tests per frame (each drone only checks its next expected gate)
-- Obstacle collision checks: O(drones × obstacles) = O(12 × ~15) = ~180 slab tests/frame (~2000 flops, negligible)
+- All drone physics in `FixedUpdate` (64Hz default), `.chain()`-ed for correctness. Visual rendering decoupled via PostUpdate transform interpolation
+- Gate trigger checks: O(12) plane-crossing tests per frame (each drone only checks its next expected gate)
+- Obstacle collision checks: O(12 × ~15) = ~180 slab tests/frame (~2000 flops, negligible)
 - AI spline sampling: O(12) per fixed tick (polynomial eval per drone, 5 curvature samples for speed limiting)
-- Dirty air perturbation: O(12²) = O(144) distance/dot-product checks per fixed tick (negligible)
-- Proximity avoidance: O(12²) = O(144) distance checks per fixed tick (negligible)
+- Dirty air + proximity avoidance: O(12²) = O(144) distance checks per fixed tick (negligible)
 - Firework particles: ~180 total (one-shot on first finish), peak ~80 alive at once, O(n) update
 - No system ordering constraints between unrelated plugins — maximum parallelism
 - `DespawnOnExit` for automatic entity cleanup on state transitions
 
-## Drone Pipeline
-```
-Blender ──► drone.glb ──► DroneGltfHandle (OnEnter(Race) load)
-                                │
-                          DroneAssets (run_if drone_gltf_ready)
-                                │
-CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve (editor preview)
-        (paths.rs)  │
-                    └──► generate_drone_race_path() ──► per-drone unique CubicCurve (12x)
-                         (midleg lateral shift + gate 2D offset + approach scaling)
-                                                                   │
-                                                        spawn_drones() ──► 12 Drone entities
-                                                                   │
-                                                        FixedFirst: restore_physics_transforms (undo visual interp)
-                                                        FixedPreUpdate: save_previous_transforms
-                                                        FixedUpdate chain (11-system, thrust-through-body):
-                                                        update_ai_targets → compute_racing_line
-                                                        → proximity_avoidance → update_wander_targets
-                                                        → hover_target → position_pid
-                                                        → attitude_controller → dirty_air_perturbation → motor_lag
-                                                        → apply_forces → integrate_motion → clamp_transform
-                                                        FixedPostUpdate: save_physics_transforms
-                                                        PostUpdate: interpolate_visual_transforms
+## Detailed References
 
-                                                        Post-race: Racing → Returning (per-drone)
-                                                        → generate_return_path() → non-cyclic spline
-                                                        → smoothstep deceleration → return to start
-                                                        → Returning → Idle (hover)
-
-                                                        Results state: VictoryLap → Wandering
-                                                        → deterministic waypoint generation (Fibonacci hash)
-                                                        → dwell at waypoint → pick next → continuous flight
-```
-
-The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior. Aerodynamic perturbations (dirty air from leading drones, prop wash on descent) add angular wobble that the PD must fight, producing visible instability in dirty air. Battery sag linearly reduces max thrust over the race duration.
-
-Drone spawning uses `run_if` conditions with `AssetServer::is_loaded_with_dependencies()`: `setup_drone_assets` only runs when the glTF is fully loaded and `DroneAssets` doesn't yet exist; `spawn_drones` only runs when both `DroneAssets` and `CourseData` are available. The same pattern applies to course obstacle spawning (`obstacles_gltf_ready`) and workshop node list population.
+| Document | Contents |
+|----------|----------|
+| [`docs/types-reference.md`](docs/types-reference.md) | Full type/resource/component table (80+ entries) |
+| [`docs/drone-system.md`](docs/drone-system.md) | Drone pipeline diagram, physics model, AI, effects |
+| [`docs/race-system.md`](docs/race-system.md) | Gate detection, collision, race flow details |
+| [`docs/editor-system.md`](docs/editor-system.md) | Workshop, course editor, props, cameras |
+| [`docs/pilot-system.md`](docs/pilot-system.md) | Pilot roster, portraits, dev menu |
+| [`docs/camera-system.md`](docs/camera-system.md) | Camera modes and switching |
 
 ## Testing
 
@@ -296,22 +183,22 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `course::loader` | 11 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course, camera roundtrip, backward compat (no cameras field) |
 | `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
-| `drone::paths` | 25 | Race path/spline generation (sort, filter, empty, single gate, passes-through-gates, tangent nonzero/alignment, flipped gate), per-drone path generation (paths differ, passes near gates, tangent alignment, gate offset 2D spread, neutral matches base), start positions (count, behind gate, hover height, gate width, no overlap, rotation), return path generation (valid spline, per-drone variation) |
-| `drone::spawning` | 2 | Config randomization bounds (100-iteration stress test), PID variation application |
-| `drone::ai` | 8 | safe_speed_for_curvature (zero/tiny/high/moderate curvature, lateral accel scaling), cyclic_curvature (circle constancy, straight-line low) |
-| `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, is_active, standings sorting (finished by time, finished before crashed, crashed by gates passed) |
-| `race::gate` | 16 | Point-in-trigger-volume AABB: identity, translated, rotated, scaled transforms (inside + outside). Plane-crossing: front-to-back pass, back-to-front rejection, horizontal/vertical out-of-bounds, same-side no-crossing, edge graze with margin, rotated gate, flipped gate |
-| `race::collision` | 15 | segment_obb_intersection (through center, miss, parallel inside/outside, starts inside, too short, rotated OBB hit/miss, expansion widens hit, hit point on surface), point_in_gate_opening (center, inside bounds, outside width/height, different depth, rotated axes), integration (gate opening exempted, frame not exempted, miss entirely) |
-| `pilot::gamertag` | 4 | 100 unique tags generation, non-empty, reasonable length, leetspeak |
-| `pilot::personality` | 5 | Catchphrase pools, modifier bounds, incompatibility symmetry, specific pairs |
-| `pilot::skill` | 4 | Config within bounds (100 iterations), high skill tighter ranges, extreme levels valid, traits modify config |
-| `pilot::roster` | 10 | Save/load roundtrip, roster size, unique IDs, load error, backward compat (stats+portrait), migration backfill, deterministic migration, skip-already-generated, incompatible filter |
+| `drone::paths` | 25 | Race path/spline generation, per-drone path generation, start positions, return path generation |
+| `drone::spawning` | 2 | Config randomization bounds, PID variation application |
+| `drone::ai` | 8 | safe_speed_for_curvature, cyclic_curvature |
+| `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, standings sorting |
+| `race::gate` | 16 | Point-in-trigger-volume AABB, plane-crossing detection |
+| `race::collision` | 15 | segment_obb_intersection, point_in_gate_opening, integration tests |
+| `pilot::gamertag` | 4 | Unique tags generation, non-empty, reasonable length, leetspeak |
+| `pilot::personality` | 5 | Catchphrase pools, modifier bounds, incompatibility symmetry |
+| `pilot::skill` | 4 | Config within bounds, high skill tighter ranges, traits modify config |
+| `pilot::roster` | 10 | Save/load roundtrip, roster size, unique IDs, backward compat, migration |
 | `pilot::mod` | 1 | ColorScheme roundtrip |
-| `pilot::portrait` | 16 | Generation bounds, HSL roundtrip, serde compat, enum reachability, accessory rate |
-| `pilot::portrait::loader` | 9 | Master SVG layer parsing, nested children, empty layers, PortraitParts get/get_by_label |
-| `pilot::portrait::fragments` | 18 | Color helpers, SVG assembly, per-layer color replacement, layer ordering |
-| `pilot::portrait::rasterize` | 7 | Solid color images, unpremultiply alpha, rasterization output dimensions |
-| `rendering::cel_material` | 3 | Hue-shift algorithm: highlight warmth, shadow coolness, color clamping |
+| `pilot::portrait` | 16 | Generation bounds, HSL roundtrip, serde compat, enum reachability |
+| `pilot::portrait::loader` | 9 | Master SVG layer parsing, PortraitParts get/get_by_label |
+| `pilot::portrait::fragments` | 18 | Color helpers, SVG assembly, per-layer color replacement |
+| `pilot::portrait::rasterize` | 7 | Solid color images, unpremultiply alpha, rasterization output |
+| `rendering::cel_material` | 3 | Hue-shift algorithm: highlight warmth, shadow coolness |
 
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
