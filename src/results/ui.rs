@@ -74,7 +74,7 @@ pub fn setup_results_ui(
             ));
 
             // Standings — two columns
-            let half = (results.standings.len() + 1) / 2;
+            let half = results.standings.len().div_ceil(2);
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Row,
@@ -222,7 +222,7 @@ pub fn setup_results_ui(
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "RACE AGAIN", RaceAgainButton, 200.0);
+                    ui_theme::spawn_menu_button(row, "START NEXT RACE", RaceAgainButton, 200.0);
                     ui_theme::spawn_menu_button(row, "MAIN MENU", MainMenuButton, 200.0);
                 });
         });

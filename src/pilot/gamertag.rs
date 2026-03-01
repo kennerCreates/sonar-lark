@@ -24,18 +24,39 @@ const ROOTS: &[&str] = &[
     "Coral", "Marina", "Dove", "Lark", "Sparrow", "Petal", "Briar", "Roslyn", "Meadow", "Clover",
 ];
 
+const DIVIDERS: &[char] = &['-', '_', '.'];
+
 /// Gamertag formatting styles.
 #[derive(Clone, Copy)]
 enum Style {
-    /// "Sh4d0wV0rt3x"
-    LeetRoot,
+    /// "V0rt3x"
+    Leet,
     /// "VortexPulse"
-    DoubleRoot,
-    /// "Vortex42"
-    BareRoot,
+    PascalDouble,
+    /// "vortexPulse"
+    CamelDouble,
+    /// "VORTEX"
+    AllCaps,
+    /// "VORTEXPULSE"
+    ScreamDouble,
+    /// "vortex-pulse"
+    AllLower,
+    /// "Vortex_Pulse"
+    Separated,
+    /// "roseHAWK"
+    LowerUpper,
 }
 
-const ALL_STYLES: [Style; 3] = [Style::LeetRoot, Style::DoubleRoot, Style::BareRoot];
+const ALL_STYLES: [Style; 8] = [
+    Style::Leet,
+    Style::PascalDouble,
+    Style::CamelDouble,
+    Style::AllCaps,
+    Style::ScreamDouble,
+    Style::AllLower,
+    Style::Separated,
+    Style::LowerUpper,
+];
 
 /// Generate a unique gamertag. `existing` prevents collisions with already-used tags.
 pub fn generate_gamertag(rng: &mut impl Rng, existing: &HashSet<String>) -> String {
@@ -45,32 +66,57 @@ pub fn generate_gamertag(rng: &mut impl Rng, existing: &HashSet<String>) -> Stri
             return tag;
         }
     }
-    // Fallback: append random digits until unique
+    // Fallback: triple-root combination
     loop {
-        let tag = format!("{}{}", generate_one(rng), rng.gen_range(1000..9999));
+        let a = pick_root(rng);
+        let b = pick_root(rng);
+        let c = pick_root(rng);
+        let tag = format!("{a}{b}{c}");
         if !existing.contains(&tag) {
             return tag;
         }
     }
 }
 
+fn pick_root(rng: &mut impl Rng) -> &'static str {
+    ROOTS[rng.gen_range(0..ROOTS.len())]
+}
+
 fn generate_one(rng: &mut impl Rng) -> String {
     let style = ALL_STYLES[rng.gen_range(0..ALL_STYLES.len())];
     match style {
-        Style::LeetRoot => {
-            let root = ROOTS[rng.gen_range(0..ROOTS.len())];
-            leetspeak(root, rng)
-        }
-        Style::DoubleRoot => {
-            let a = ROOTS[rng.gen_range(0..ROOTS.len())];
-            let b = ROOTS[rng.gen_range(0..ROOTS.len())];
+        Style::Leet => leetspeak(pick_root(rng), rng),
+        Style::PascalDouble => {
+            let a = pick_root(rng);
+            let b = pick_root(rng);
             format!("{a}{b}")
         }
-        Style::BareRoot => {
-            let root = ROOTS[rng.gen_range(0..ROOTS.len())];
-            // Add a number to keep it gamer-tag-like
-            let n: u32 = rng.gen_range(1..=999);
-            format!("{root}{n}")
+        Style::CamelDouble => {
+            let a = pick_root(rng).to_lowercase();
+            let b = pick_root(rng);
+            format!("{a}{b}")
+        }
+        Style::AllCaps => pick_root(rng).to_uppercase(),
+        Style::ScreamDouble => {
+            let a = pick_root(rng).to_uppercase();
+            let b = pick_root(rng).to_uppercase();
+            format!("{a}{b}")
+        }
+        Style::AllLower => {
+            let a = pick_root(rng).to_lowercase();
+            let b = pick_root(rng).to_lowercase();
+            let sep = DIVIDERS[rng.gen_range(0..DIVIDERS.len())];
+            format!("{a}{sep}{b}")
+        }
+        Style::Separated => {
+            let a = pick_root(rng);
+            let b = pick_root(rng);
+            format!("{a}_{b}")
+        }
+        Style::LowerUpper => {
+            let a = pick_root(rng).to_lowercase();
+            let b = pick_root(rng).to_uppercase();
+            format!("{a}{b}")
         }
     }
 }

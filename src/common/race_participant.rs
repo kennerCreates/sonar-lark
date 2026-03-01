@@ -1,11 +1,8 @@
 use bevy::prelude::*;
 
 /// Marker for any entity participating in a race (AI drone, future player drone).
-/// Carries the participant's index for correlating with RaceProgress.
 #[derive(Component)]
-pub struct RaceParticipant {
-    pub index: u8,
-}
+pub struct RaceParticipant;
 
 /// Per-drone lifecycle phase.
 #[derive(Component, Default, PartialEq, Eq, Clone, Copy, Debug)]

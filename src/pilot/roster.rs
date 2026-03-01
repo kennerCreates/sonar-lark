@@ -55,8 +55,8 @@ pub fn load_or_generate_roster(mut commands: Commands) {
             }
         }
     } else {
-        info!("No pilot roster found, generating initial roster");
-        generate_initial_roster()
+        info!("No pilot roster found, starting with empty roster");
+        PilotRoster::default()
     };
 
     // Migrate Phase 1 rosters: backfill empty portraits
@@ -159,7 +159,7 @@ fn generate_initial_roster() -> PilotRoster {
     roster
 }
 
-fn pick_personality_traits(rng: &mut impl Rng) -> Vec<PersonalityTrait> {
+pub(crate) fn pick_personality_traits(rng: &mut impl Rng) -> Vec<PersonalityTrait> {
     let mut selected: Vec<PersonalityTrait> = personality::ALL_TRAITS.to_vec();
     selected.shuffle(rng);
 

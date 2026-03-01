@@ -451,13 +451,13 @@ pub fn tick_firework_shells(
                 shell.accent_color,
             );
 
-            if let Some(ref sounds) = firework_sounds {
-                if let Some(handle) = sounds.0.first() {
-                    commands.spawn((
-                        AudioPlayer::new(handle.clone()),
-                        PlaybackSettings::DESPAWN,
-                    ));
-                }
+            if let Some(ref sounds) = firework_sounds
+                && let Some(handle) = sounds.0.first()
+            {
+                commands.spawn((
+                    AudioPlayer::new(handle.clone()),
+                    PlaybackSettings::DESPAWN,
+                ));
             }
 
             commands.entity(entity).despawn();

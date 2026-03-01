@@ -1,21 +1,23 @@
+pub mod color_picker_data;
+pub mod pilot_generator;
 pub mod portrait_config;
 pub mod portrait_editor;
-pub mod color_picker_data;
 
 use bevy::prelude::*;
 
-use crate::states::AppState;
+use crate::states::DevMenuPage;
 
 pub struct DevMenuPlugin;
 
 impl Plugin for DevMenuPlugin {
     fn build(&self, app: &mut App) {
+        // ── Portrait Palette Editor (PaletteEditor page) ───────────────
         app.add_systems(
-            OnEnter(AppState::DevMenu),
+            OnEnter(DevMenuPage::PaletteEditor),
             portrait_editor::setup_portrait_editor,
         )
         .add_systems(
-            OnExit(AppState::DevMenu),
+            OnExit(DevMenuPage::PaletteEditor),
             portrait_editor::cleanup_portrait_editor,
         )
         .add_systems(
@@ -33,7 +35,7 @@ impl Plugin for DevMenuPlugin {
                 portrait_editor::handle_save_button,
                 portrait_editor::handle_reset_slot_button,
             )
-                .run_if(in_state(AppState::DevMenu)),
+                .run_if(in_state(DevMenuPage::PaletteEditor)),
         )
         .add_systems(
             Update,
@@ -50,7 +52,30 @@ impl Plugin for DevMenuPlugin {
                 portrait_editor::update_color_name_on_hover,
                 portrait_editor::handle_button_hover_visuals,
             )
-                .run_if(in_state(AppState::DevMenu)),
+                .run_if(in_state(DevMenuPage::PaletteEditor)),
+        );
+
+        // ── Pilot Generator (PilotGenerator page — default) ───────────
+        app.add_systems(
+            OnEnter(DevMenuPage::PilotGenerator),
+            pilot_generator::setup_pilot_generator,
+        )
+        .add_systems(
+            OnExit(DevMenuPage::PilotGenerator),
+            pilot_generator::cleanup_pilot_generator,
+        )
+        .add_systems(
+            Update,
+            (
+                pilot_generator::handle_back_button,
+                pilot_generator::handle_palette_editor_button,
+                pilot_generator::handle_reroll_portrait_button,
+                pilot_generator::handle_reroll_gamertag_button,
+                pilot_generator::handle_accept_button,
+                pilot_generator::update_preview,
+                pilot_generator::update_pilot_info,
+            )
+                .run_if(in_state(DevMenuPage::PilotGenerator)),
         );
     }
 }

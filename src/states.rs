@@ -18,6 +18,14 @@ pub enum EditorMode {
     CourseEditor,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, SubStates)]
+#[source(AppState = AppState::DevMenu)]
+pub enum DevMenuPage {
+    #[default]
+    PilotGenerator,
+    PaletteEditor,
+}
+
 /// Inserted before entering the editor to request auto-loading a specific course.
 /// Consumed by `auto_load_pending_course` once glTF assets are ready.
 #[derive(Resource)]

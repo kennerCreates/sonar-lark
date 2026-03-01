@@ -153,7 +153,7 @@ pub fn spawn_drones(
             transform,
             Visibility::default(),
             Drone { index: i },
-            RaceParticipant { index: i },
+            RaceParticipant,
             pid,
             attitude_pd,
             dynamics,

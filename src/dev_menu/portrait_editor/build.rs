@@ -5,7 +5,7 @@ use crate::pilot::portrait::{
     ALL_ACCESSORIES, ALL_EYE_STYLES, ALL_FACE_SHAPES, ALL_HAIR_STYLES, ALL_MOUTH_STYLES,
     ALL_SHIRT_STYLES,
 };
-use crate::states::AppState;
+use crate::states::DevMenuPage;
 
 use crate::dev_menu::portrait_config::PortraitPaletteConfig;
 use super::{
@@ -33,7 +33,7 @@ pub fn build_ui(
                 ..default()
             },
             BackgroundColor(PANEL_BG),
-            DespawnOnExit(AppState::DevMenu),
+            DespawnOnExit(DevMenuPage::PaletteEditor),
         ))
         .with_children(|root| {
             // Header row

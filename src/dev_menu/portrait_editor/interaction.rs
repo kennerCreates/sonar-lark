@@ -5,7 +5,7 @@ use crate::pilot::portrait::{
     ALL_ACCESSORIES, ALL_EYE_STYLES, ALL_FACE_SHAPES, ALL_HAIR_STYLES, ALL_MOUTH_STYLES,
     ALL_SHIRT_STYLES,
 };
-use crate::states::AppState;
+use crate::states::DevMenuPage;
 
 use crate::dev_menu::portrait_config::{
     DRONE_COLOR_INDEX, MIN_DRONE_COLORS, PortraitColorSlot,
@@ -21,11 +21,11 @@ use super::{
 
 pub fn handle_back_button(
     query: Query<&Interaction, (Changed<Interaction>, With<BackButton>)>,
-    mut next_state: ResMut<NextState<AppState>>,
+    mut next_state: ResMut<NextState<DevMenuPage>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            next_state.set(AppState::Menu);
+            next_state.set(DevMenuPage::PilotGenerator);
         }
     }
 }
