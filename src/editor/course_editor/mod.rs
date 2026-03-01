@@ -31,6 +31,8 @@ pub enum TransformMode {
     Scale,
 }
 
+pub const DEFAULT_COURSE_NAME: &str = "new_course";
+
 // --- Resources ---
 
 #[derive(Resource, Default)]
@@ -55,7 +57,7 @@ pub struct EditorCourse {
 impl Default for EditorCourse {
     fn default() -> Self {
         Self {
-            name: "new_course".to_string(),
+            name: DEFAULT_COURSE_NAME.to_string(),
             editing_name: false,
         }
     }
@@ -92,6 +94,21 @@ pub struct PlacedCamera {
 
 /// Query filter matching any editor-placed entity (obstacle, prop, or camera).
 type PlacedFilter = Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>;
+
+/// Resets editor state to defaults: clears selection, resets course name,
+/// and disables gate-order mode.
+pub fn reset_editor_to_default(
+    selection: &mut EditorSelection,
+    course_state: &mut EditorCourse,
+    transform_state: &mut EditorTransform,
+) {
+    selection.entity = None;
+    selection.palette_id = None;
+    course_state.name = DEFAULT_COURSE_NAME.to_string();
+    course_state.editing_name = false;
+    transform_state.gate_order_mode = false;
+    transform_state.next_gate_order = 0;
+}
 
 // --- Plugin ---
 

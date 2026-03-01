@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::course::loader::{delete_course, save_course};
 use crate::editor::course_editor::{
-    EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
+    self, EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
 };
 use crate::palette;
 use crate::states::{AppState, EditorMode, LastEditedCourse};
@@ -56,12 +56,11 @@ pub fn handle_new_course_button(
             commands.entity(entity).despawn();
         }
 
-        selection.entity = None;
-        selection.palette_id = None;
-        course_state.name = "new_course".to_string();
-        course_state.editing_name = false;
-        transform_state.next_gate_order = 0;
-        transform_state.gate_order_mode = false;
+        course_editor::reset_editor_to_default(
+            &mut selection,
+            &mut course_state,
+            &mut transform_state,
+        );
 
         commands.remove_resource::<LastEditedCourse>();
         info!("Cleared editor for new course");
@@ -290,10 +289,11 @@ pub fn handle_confirm_delete(
                     for entity in &placed_query {
                         commands.entity(entity).despawn();
                     }
-                    selection.entity = None;
-                    selection.palette_id = None;
-                    course_state.name = "new_course".to_string();
-                    transform_state.next_gate_order = 0;
+                    course_editor::reset_editor_to_default(
+                        &mut selection,
+                        &mut course_state,
+                        &mut transform_state,
+                    );
                 }
 
                 // If the deleted course was the last edited, remove that resource

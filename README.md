@@ -14,7 +14,10 @@ Define obstacle types by importing 3D models from Blender, build race courses by
 - **Camera Modes** — Editor-placed course cameras (up to 9), chase camera (pack-follow), FPV (drone-mounted with target cycling), and Spectator (RTS orbit), with PiP preview in the editor
 - **Post-Race Wandering** — Drones transition to ambient wandering with deterministic Fibonacci-hashed waypoints after results, replacing static victory laps
 - **Victory Effects** — Confetti fans and staggered shell bursts from course-placed firework emitter props
-- **Dev Dashboard** — F4 toggleable tuning panel with 14 parameters for AI behavior, aerodynamics, and proximity avoidance
+- **Procedural Pilots** — 24 generated pilots with unique gamertags (6 naming styles), 8 personality traits that modify flying behavior, skill profiles (level/speed/cornering/consistency), and persistent stats (races, wins, crashes, best times)
+- **Procedural Portraits** — SVG-assembled pilot portraits with 7 visual layers (face, eyes, mouth, hair, shirt, accessory, drone accent), dynamic color replacement, and per-pilot deterministic generation from seeded RNG
+- **Sound Design** — Ambient drone sound loops with cross-fading and volume scaling by active drone count, crash sounds, race start/end audio, and firework victory effects
+- **Dev Menu** — F4 toggleable tuning dashboard with 14 parameters for AI behavior, aerodynamics, and proximity avoidance; portrait palette editor with primary/secondary color pickers, complementary color pairing, live preview, and make-unique button
 
 ## Getting Started
 
@@ -39,6 +42,8 @@ cargo run --release
 
 - Obstacle definitions: `assets/library/default.obstacles.ron`
 - Courses: `assets/courses/*.course.ron`
+- Pilot roster: `assets/pilots/roster.pilots.ron`
+- Portrait palettes: `assets/pilots/portrait_palette.ron`
 - Shaders: `assets/shaders/`
 
 All persistent data is serialized as [RON](https://github.com/ron-rs/ron).
@@ -73,22 +78,41 @@ Menu  ──►  Editor  ──►  Race  ──►  Results
 
 ## Development Milestones
 
+### Foundation
 - **Skeleton** — State machine, common systems, main.rs wiring
 - **Data Layer** — Obstacle and course data with RON serialization
-- **Obstacle Workshop** — Scene browser, trigger gizmo, save/load/delete
 - **Unit Tests** — 22 tests covering obstacle library, course data, and menu discovery
-- **Course Editor** — Click-to-place, XZ drag, Q/E height, gate ordering, trigger gizmos, gate sequence lines, save/load
-- **Drone Physics** — 12 drones with randomized PID/configs, thrust-through-body model in FixedUpdate, AI waypoint tracking
-- **Drone Realism** — Motor lag, attitude underdamping, per-drone variation, dirty air, prop wash, battery sag, expanded dev dashboard
-- **Race System** — Gate validation, timing, lifecycle (countdown, race clock, completion detection, crash/DNF)
-- **Rendering Overhaul** — Cel-shaded materials, halftone gradients, hue shifting, procedural TRON night skybox, custom WGSL shaders
-- **Results & Cameras** — Results screen, chase camera, FPV camera, camera mode switching, full gameplay loop
-- **Course Props** — Firework emitter props, tabbed editor UI, confetti/shell burst effects at race finish
-- **Code Health** — File splitting, async poll replacement, UI unit tests, spline rebuild optimization
+
+### Editor
+- **Obstacle Workshop** — Scene browser, trigger gizmo, save/load/delete
+- **Course Editor** — Click-to-place, drag, height adjust, gate ordering, save/load
+- **Course Props** — Firework emitter props, tabbed editor UI, confetti/shell effects
+- **Course Cameras** — Editor-placed cameras with frustum gizmos and PiP preview
+- **Editor Gizmo Rework** — Entity-local axes, move/rotate/scale modes, modifier keys, snapping
+
+### Flight & Racing
+- **Drone Physics** — 12 drones, thrust-through-body model, cascaded PID, AI waypoint tracking
+- **Drone Realism** — Motor lag, dirty air, prop wash, battery sag, per-drone variation
 - **Drone Models** — Blender-exported visual models replacing placeholders
-- **Obstacle Collision** — Swept OBB collision detection, gate opening exemption, Workshop collision volume editor, crash effects
-- **Course Cameras & Wandering** — Editor-placed cameras with frustum gizmos and PiP preview, race-time camera switching (1–0 keys), post-race ambient drone wandering
-- **Editor Gizmo Rework** — Entity-local gizmo axes (follow Y rotation), XZ-plane/Y-axis move modes, 5-degree rotation snapping, uniform/per-axis scale, modifier keys (Shift/Ctrl), 1.5x larger gizmos with thicker lines
+- **Obstacle Collision** — Swept OBB detection, gate opening exemption, crash effects
+- **Race System** — Gate validation, timing, countdown, completion detection, crash/DNF
+- **Post-Race Wandering** — Ambient wandering with Fibonacci-hashed waypoints after results
+
+### Presentation
+- **Rendering Overhaul** — Cel-shaded materials, halftone gradients, procedural TRON skybox
+- **Results & Cameras** — Results screen, chase/FPV/spectator cameras, full gameplay loop
+- **Sound Effects** — Ambient drone loops, crash/start/end audio, firework sounds
+- **Visual Interpolation** — Lerp/slerp between physics ticks for smooth 60fps rendering
+- **Victory Effects** — Confetti fans and staggered shell bursts from firework emitter props
+
+### Pilots & Portraits
+- **Procedural Pilots** — 8 personality traits, skill profiles, gamertag generation, persistent roster
+- **Procedural Portraits** — SVG fragment assembly with 7 layers, color replacement, per-pilot caching
+- **Dev Menu & Portrait Editor** — Dev mode, palette editor with color pickers and live preview
+
+### Code Health
+- **Code Health I** — File splitting, async poll replacement, UI unit tests, spline optimization
+- **Code Health II** — UI theme consolidation, cross-module decoupling, course discovery unification
 
 ## Architecture
 

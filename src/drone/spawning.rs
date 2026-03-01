@@ -102,49 +102,21 @@ pub fn spawn_drones(
         return;
     }
 
-    let Some(race_path) = generate_race_path(&course, &library) else {
-        warn!("Not enough gates for a race path — drones will not spawn");
+    let Some((race_path, start_positions)) = prepare_race_paths(&course, &library) else {
+        warn!("Course has no valid gates — drones will not spawn");
         commands.insert_resource(NoGatesCourse);
         return;
     };
 
-    let first_gate_inst = course
-        .instances
-        .iter()
-        .filter_map(|inst| inst.gate_order.map(|order| (order, inst)))
-        .min_by_key(|(order, _)| *order)
-        .map(|(_, inst)| inst);
-    let Some(first_gate) = first_gate_inst else {
-        warn!("No gate instances found in course — drones will not spawn");
-        commands.insert_resource(NoGatesCourse);
-        return;
-    };
-    let gate_half_width = library
-        .get(&first_gate.obstacle_id)
-        .and_then(|def| def.trigger_volume.as_ref())
-        .map(|tv| tv.half_extents.x)
-        .unwrap_or(5.0);
-    let start_positions = compute_start_positions(
-        first_gate.translation,
-        first_gate.rotation,
-        gate_half_width,
-        race_path.gate_forwards[0],
-        DRONE_COUNT,
-    );
     let mut rng = rand::thread_rng();
     let race_seed = rng.gen_range(0u32..=u32::MAX);
     commands.insert_resource(RaceSeed(race_seed));
 
-    // Shuffle grid slot order so drones don't always line up the same way
     let mut grid_slots: Vec<u8> = (0..DRONE_COUNT).collect();
     grid_slots.shuffle(&mut rng);
 
     for i in 0..DRONE_COUNT {
-        let config = if let Some(ref configs) = pilot_configs {
-            configs.configs[i as usize].clone()
-        } else {
-            randomize_drone_config(&mut rng)
-        };
+        let config = build_drone_config(pilot_configs.as_deref(), &mut rng, i);
 
         // Generate per-drone unique spline path
         let drone_path = generate_drone_race_path(&course, &library, &config, i, race_seed)
@@ -229,17 +201,13 @@ pub fn spawn_drones(
             color: drone_color,
         });
 
-        let drone_mat =
-            cel_materials.add(cel_material_from_color(drone_color, light_dir.0));
-        entity_cmd.with_children(|children| {
-            for mesh in &assets.mesh_primitives {
-                children.spawn((
-                    Mesh3d(mesh.clone()),
-                    MeshMaterial3d(drone_mat.clone()),
-                    assets.mesh_transform,
-                ));
-            }
-        });
+        assemble_drone_visuals(
+            &mut entity_cmd,
+            &assets,
+            &mut cel_materials,
+            drone_color,
+            light_dir.0,
+        );
     }
 
     info!(
@@ -257,6 +225,70 @@ pub fn cleanup_drone_resources(mut commands: Commands) {
 }
 
 // --- Private helpers ---
+
+/// Generates the shared race path and computes start grid positions.
+/// Returns `None` if the course has no valid gates.
+fn prepare_race_paths(
+    course: &CourseData,
+    library: &ObstacleLibrary,
+) -> Option<(RacePath, Vec<Vec3>)> {
+    let race_path = generate_race_path(course, library)?;
+
+    let first_gate = course
+        .instances
+        .iter()
+        .filter_map(|inst| inst.gate_order.map(|order| (order, inst)))
+        .min_by_key(|(order, _)| *order)
+        .map(|(_, inst)| inst)?;
+
+    let gate_half_width = library
+        .get(&first_gate.obstacle_id)
+        .and_then(|def| def.trigger_volume.as_ref())
+        .map(|tv| tv.half_extents.x)
+        .unwrap_or(5.0);
+
+    let start_positions = compute_start_positions(
+        first_gate.translation,
+        first_gate.rotation,
+        gate_half_width,
+        race_path.gate_forwards[0],
+        DRONE_COUNT,
+    );
+
+    Some((race_path, start_positions))
+}
+
+fn build_drone_config(
+    pilot_configs: Option<&PilotConfigs>,
+    rng: &mut impl Rng,
+    index: u8,
+) -> DroneConfig {
+    if let Some(configs) = pilot_configs {
+        configs.configs[index as usize].clone()
+    } else {
+        randomize_drone_config(rng)
+    }
+}
+
+/// Attaches drone mesh primitives with cel-shaded material as children of the drone entity.
+fn assemble_drone_visuals(
+    entity_cmd: &mut EntityCommands,
+    assets: &DroneAssets,
+    cel_materials: &mut Assets<CelMaterial>,
+    color: Color,
+    light_dir: Vec3,
+) {
+    let drone_mat = cel_materials.add(cel_material_from_color(color, light_dir));
+    entity_cmd.with_children(|children| {
+        for mesh in &assets.mesh_primitives {
+            children.spawn((
+                Mesh3d(mesh.clone()),
+                MeshMaterial3d(drone_mat.clone()),
+                assets.mesh_transform,
+            ));
+        }
+    });
+}
 
 fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
     // Generate cornering_aggression first — path params derive from it

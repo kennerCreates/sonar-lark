@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::course::data::{CourseData, PropKind};
 use crate::course::loader::load_course_from_file;
 use crate::editor::course_editor::{
-    EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
+    self, EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
 };
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
@@ -40,8 +40,7 @@ fn load_course_into_editor(
         commands.entity(entity).despawn();
     }
 
-    selection.entity = None;
-    selection.palette_id = None;
+    course_editor::reset_editor_to_default(selection, course_state, transform_state);
     course_state.name = course.name.clone();
     transform_state.next_gate_order = next_gate_order_from_instances(&course.instances);
 
