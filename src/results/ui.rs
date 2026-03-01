@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::common::drone_identity::{resolve_drone_color, resolve_drone_name};
 use crate::drone::components::{Drone, DroneIdentity};
 use crate::palette;
 use crate::pilot::SelectedPilots;
@@ -84,18 +85,11 @@ pub fn setup_results_ui(
                 .with_children(|container| {
                     for (pos, entry) in results.standings.iter().enumerate() {
                         let drone_idx = entry.drone_index;
-                        let (name, color) = if let Some(ref pilots) = selected {
-                            pilots
-                                .pilots
-                                .get(drone_idx)
-                                .map(|p| (p.gamertag.as_str(), p.color))
-                                .unwrap_or(("???", palette::VANILLA))
-                        } else {
-                            drones.iter()
-                                .find(|(d, _)| d.index as usize == drone_idx)
-                                .map(|(_, id)| (id.name.as_str(), id.color))
-                                .unwrap_or(("???", palette::VANILLA))
-                        };
+                        let identity = drones.iter()
+                            .find(|(d, _)| d.index as usize == drone_idx)
+                            .map(|(_, id)| id);
+                        let name = resolve_drone_name(selected.as_deref(), drone_idx, identity);
+                        let color = resolve_drone_color(selected.as_deref(), drone_idx, identity);
 
                         let is_winner = pos == 0 && entry.finished;
 

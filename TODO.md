@@ -18,13 +18,7 @@ Complete. Pilot avatars using hand-drawn Inkscape SVG fragments assembled at run
 
 #### 4. ~~Move `POINTS_PER_GATE` and `FINISH_EXTENSION` to `common/`~~ ✅
 
-#### 5. Extract drone name/color resolution helper
-The pattern of looking up drone display name and color via `SelectedPilots` with fallback to `DroneIdentity` is copy-pasted across 4+ systems (leaderboard, results, camera HUD, overlays).
-
-- [ ] Add `resolve_drone_name(selected: Option<&SelectedPilots>, index: usize, identity: &DroneIdentity) -> &str` and `resolve_drone_color(...)` to `common/drone_identity.rs`.
-- [ ] Replace the ~7 inline occurrences in `race/leaderboard.rs`, `results/ui.rs`, `race/camera_hud.rs`.
-
-Files: `common/drone_identity.rs`, `race/leaderboard.rs`, `results/ui.rs`, `race/camera_hud.rs`
+#### 5. ~~Extract drone name/color resolution helper~~ ✅
 
 #### 6. Promote `fmt_time()` to shared utility
 The time format `"{:01}:{:05.2}"` is duplicated in `race/leaderboard.rs:255`, `race/overlays.rs:97`, `results/ui.rs:175`.

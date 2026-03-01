@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use rand::Rng;
 
+use crate::common::drone_identity::resolve_drone_color;
 use crate::course::data::PropKind;
 use super::components::{Drone, DroneIdentity};
 use crate::palette;
@@ -141,16 +142,10 @@ pub fn detect_first_finish(
         return;
     };
 
-    let drone_color = selected_pilots
-        .as_ref()
-        .and_then(|s| s.pilots.get(winner_idx))
-        .map(|p| p.color)
-        .unwrap_or_else(|| {
-            drones.iter()
-                .find(|(d, _)| d.index as usize == winner_idx)
-                .map(|(_, id)| id.color)
-                .unwrap_or(palette::VANILLA)
-        });
+    let identity = drones.iter()
+        .find(|(d, _)| d.index as usize == winner_idx)
+        .map(|(_, id)| id);
+    let drone_color = resolve_drone_color(selected_pilots.as_deref(), winner_idx, identity);
     let accent_color = palette::SUNSHINE;
 
     let has_emitters = !emitters.is_empty();

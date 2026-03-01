@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::common::drone_identity::{resolve_drone_color, resolve_drone_name};
 use crate::drone::components::{Drone, DroneIdentity};
 use crate::palette;
 use crate::pilot::SelectedPilots;
@@ -64,19 +65,11 @@ pub fn setup_leaderboard(
                         ..default()
                     })
                     .with_children(|row| {
-                        let (init_name, init_color) =
-                            if let Some(ref pilots) = selected {
-                                (
-                                    pilots.pilots[i].gamertag.as_str(),
-                                    pilots.pilots[i].color,
-                                )
-                            } else {
-                                // Drones may not be spawned yet; update_leaderboard corrects this
-                                drones.iter()
-                                    .find(|(d, _)| d.index as usize == i)
-                                    .map(|(_, id)| (id.name.as_str(), id.color))
-                                    .unwrap_or(("---", palette::VANILLA))
-                            };
+                        let identity = drones.iter()
+                            .find(|(d, _)| d.index as usize == i)
+                            .map(|(_, id)| id);
+                        let init_name = resolve_drone_name(selected.as_deref(), i, identity);
+                        let init_color = resolve_drone_color(selected.as_deref(), i, identity);
                         // Portrait thumbnail
                         let portrait_handle = selected.as_ref()
                             .and_then(|s| s.pilots.get(i))
@@ -198,17 +191,10 @@ pub fn update_leaderboard(
                 }
             } else {
                 // Fallback: update background color
-                let color = selected
-                    .as_ref()
-                    .and_then(|s| s.pilots.get(drone_idx))
-                    .map(|p| p.color)
-                    .unwrap_or_else(|| {
-                        drones.iter()
-                            .find(|(d, _)| d.index as usize == drone_idx)
-                            .map(|(_, id)| id.color)
-                            .unwrap_or(palette::VANILLA)
-                    });
-                *bg = BackgroundColor(color);
+                let identity = drones.iter()
+                    .find(|(d, _)| d.index as usize == drone_idx)
+                    .map(|(_, id)| id);
+                *bg = BackgroundColor(resolve_drone_color(selected.as_deref(), drone_idx, identity));
             }
         }
     }
@@ -216,16 +202,10 @@ pub fn update_leaderboard(
         let pos = nt.0;
         if pos < 12 && row_data[pos].1 {
             let (drone_idx, _, _, crashed, _) = row_data[pos];
-            let name = selected
-                .as_ref()
-                .and_then(|s| s.pilots.get(drone_idx))
-                .map(|p| p.gamertag.as_str())
-                .unwrap_or_else(|| {
-                    drones.iter()
-                        .find(|(d, _)| d.index as usize == drone_idx)
-                        .map(|(_, id)| id.name.as_str())
-                        .unwrap_or("???")
-                });
+            let identity = drones.iter()
+                .find(|(d, _)| d.index as usize == drone_idx)
+                .map(|(_, id)| id);
+            let name = resolve_drone_name(selected.as_deref(), drone_idx, identity);
             text.0 = format!("{:>2}  {}", pos + 1, name);
             *tc = if crashed {
                 TextColor(palette::STONE)

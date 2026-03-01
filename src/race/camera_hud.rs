@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::camera::switching::{CameraMode, CameraState, CourseCameras};
+use crate::common::drone_identity::resolve_drone_name;
 use crate::drone::components::{Drone, DroneIdentity};
 use crate::palette;
 use crate::pilot::SelectedPilots;
@@ -87,16 +88,10 @@ pub fn update_camera_hud(
                         .target_standings_index
                         .min(standings.len().saturating_sub(1));
                     standings.get(idx).map(|&(drone_idx, _)| {
-                        selected
-                            .as_ref()
-                            .and_then(|s| s.pilots.get(drone_idx))
-                            .map(|p| p.gamertag.as_str())
-                            .unwrap_or_else(|| {
-                                drones.iter()
-                                    .find(|(d, _)| d.index as usize == drone_idx)
-                                    .map(|(_, id)| id.name.as_str())
-                                    .unwrap_or("???")
-                            })
+                        let identity = drones.iter()
+                            .find(|(d, _)| d.index as usize == drone_idx)
+                            .map(|(_, id)| id);
+                        resolve_drone_name(selected.as_deref(), drone_idx, identity)
                     })
                 })
                 .unwrap_or("---");
