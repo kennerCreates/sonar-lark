@@ -3,10 +3,10 @@ use std::path::Path;
 
 use crate::course::loader::{delete_course, save_course};
 use crate::editor::course_editor::{
-    LastEditedCourse, PlacedCamera, PlacedObstacle, PlacedProp, PlacementState,
+    EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
 };
 use crate::palette;
-use crate::states::{AppState, EditorMode};
+use crate::states::{AppState, EditorMode, LastEditedCourse};
 use crate::ui_theme;
 
 use super::discover::discover_existing_courses;
@@ -39,7 +39,9 @@ pub fn handle_back_to_menu(
 pub fn handle_new_course_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<NewCourseButton>)>,
-    mut state: ResMut<PlacementState>,
+    mut selection: ResMut<EditorSelection>,
+    mut course_state: ResMut<EditorCourse>,
+    mut transform_state: ResMut<EditorTransform>,
     placed_query: Query<
         Entity,
         Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
@@ -54,12 +56,12 @@ pub fn handle_new_course_button(
             commands.entity(entity).despawn();
         }
 
-        state.selected_entity = None;
-        state.selected_palette_id = None;
-        state.course_name = "new_course".to_string();
-        state.next_gate_order = 0;
-        state.gate_order_mode = false;
-        state.editing_name = false;
+        selection.entity = None;
+        selection.palette_id = None;
+        course_state.name = "new_course".to_string();
+        course_state.editing_name = false;
+        transform_state.next_gate_order = 0;
+        transform_state.gate_order_mode = false;
 
         commands.remove_resource::<LastEditedCourse>();
         info!("Cleared editor for new course");
@@ -162,7 +164,7 @@ fn spawn_delete_confirmation(commands: &mut Commands, container: Entity, display
 pub fn handle_save_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<SaveCourseButton>)>,
-    state: Res<PlacementState>,
+    course_state: Res<EditorCourse>,
     placed_query: Query<(&PlacedObstacle, &Transform)>,
     prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
     camera_placed_query: Query<
@@ -176,7 +178,7 @@ pub fn handle_save_button(
             continue;
         }
 
-        if state.course_name.is_empty() {
+        if course_state.name.is_empty() {
             warn!("Cannot save: course name is empty");
             continue;
         }
@@ -189,19 +191,19 @@ pub fn handle_save_button(
         }
 
         let course = build_course_data(
-            state.course_name.clone(),
+            course_state.name.clone(),
             placed_query.iter(),
             prop_query.iter(),
             camera_placed_query.iter(),
         );
 
-        let path_str = format!("assets/courses/{}.course.ron", state.course_name);
+        let path_str = format!("assets/courses/{}.course.ron", course_state.name);
         let path = std::path::Path::new(&path_str);
         match save_course(&course, path) {
             Ok(()) => {
                 info!(
                     "Saved course '{}' ({} obstacles) to {}",
-                    state.course_name,
+                    course_state.name,
                     course.instances.len(),
                     path_str
                 );
@@ -261,7 +263,9 @@ pub fn handle_confirm_delete(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<ConfirmDeleteYesButton>)>,
     pending: Option<Res<PendingCourseDelete>>,
-    mut state: ResMut<PlacementState>,
+    mut selection: ResMut<EditorSelection>,
+    mut course_state: ResMut<EditorCourse>,
+    mut transform_state: ResMut<EditorTransform>,
     placed_query: Query<
         Entity,
         Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
@@ -282,14 +286,14 @@ pub fn handle_confirm_delete(
                 info!("Deleted course '{}'", pending.display_name);
 
                 // If we deleted the currently loaded course, clear the editor
-                if state.course_name == pending.display_name {
+                if course_state.name == pending.display_name {
                     for entity in &placed_query {
                         commands.entity(entity).despawn();
                     }
-                    state.selected_entity = None;
-                    state.selected_palette_id = None;
-                    state.course_name = "new_course".to_string();
-                    state.next_gate_order = 0;
+                    selection.entity = None;
+                    selection.palette_id = None;
+                    course_state.name = "new_course".to_string();
+                    transform_state.next_gate_order = 0;
                 }
 
                 // If the deleted course was the last edited, remove that resource
@@ -338,30 +342,31 @@ pub fn handle_cancel_delete(
 }
 
 pub fn handle_gate_order_toggle(
-    mut state: ResMut<PlacementState>,
+    mut transform_state: ResMut<EditorTransform>,
+    mut selection: ResMut<EditorSelection>,
     query: Query<&Interaction, (Changed<Interaction>, With<GateOrderModeButton>)>,
     placed_query: Query<&PlacedObstacle>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            state.gate_order_mode = !state.gate_order_mode;
-            if state.gate_order_mode {
+            transform_state.gate_order_mode = !transform_state.gate_order_mode;
+            if transform_state.gate_order_mode {
                 // Continue from max existing gate order so the user can add gates
                 // incrementally without losing previous assignments.
-                state.next_gate_order = placed_query
+                transform_state.next_gate_order = placed_query
                     .iter()
                     .filter_map(|p| p.gate_order)
                     .max()
                     .map(|m| m + 1)
                     .unwrap_or(0);
-                state.selected_entity = None;
+                selection.entity = None;
             }
         }
     }
 }
 
 pub fn handle_clear_gate_orders_button(
-    mut state: ResMut<PlacementState>,
+    mut transform_state: ResMut<EditorTransform>,
     query: Query<&Interaction, (Changed<Interaction>, With<ClearGateOrdersButton>)>,
     mut placed_query: Query<&mut PlacedObstacle>,
 ) {
@@ -372,7 +377,7 @@ pub fn handle_clear_gate_orders_button(
         for mut placed in &mut placed_query {
             placed.gate_order = None;
         }
-        state.next_gate_order = 0;
+        transform_state.next_gate_order = 0;
         info!("Cleared all gate orders");
     }
 }

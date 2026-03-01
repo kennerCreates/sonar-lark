@@ -6,7 +6,7 @@ use crate::editor::gizmos::{
     yaw_quat_from_transform, Axis,
 };
 
-use crate::editor::course_editor::{PlacedFilter, PlacementState, TransformMode};
+use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedFilter, TransformMode};
 
 use super::{
     MoveDragMode, MoveWidgetState, ARROW_HIT_THRESHOLD, ARROW_LENGTH, PLANE_INDICATOR_FRAC,
@@ -14,15 +14,16 @@ use super::{
 
 pub(in crate::editor::course_editor) fn draw_move_gizmo(
     mut gizmos: Gizmos,
-    state: Res<PlacementState>,
+    transform_state: Res<EditorTransform>,
+    selection: Res<EditorSelection>,
     widget: Res<MoveWidgetState>,
     placed_query: Query<&Transform, PlacedFilter>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    if state.transform_mode != TransformMode::Move {
+    if transform_state.mode != TransformMode::Move {
         return;
     }
-    let Some(entity) = state.selected_entity else {
+    let Some(entity) = selection.entity else {
         return;
     };
     let Ok(transform) = placed_query.get(entity) else {
@@ -72,17 +73,18 @@ pub(in crate::editor::course_editor) fn handle_move_gizmo(
     keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
-    state: Res<PlacementState>,
+    transform_state: Res<EditorTransform>,
+    selection: Res<EditorSelection>,
     mut widget: ResMut<MoveWidgetState>,
     mut placed_query: Query<&mut Transform, PlacedFilter>,
     interaction_query: Query<&Interaction>,
 ) {
-    if state.transform_mode != TransformMode::Move {
+    if transform_state.mode != TransformMode::Move {
         widget.active_drag = None;
         widget.hovered = false;
         return;
     }
-    let Some(entity) = state.selected_entity else {
+    let Some(entity) = selection.entity else {
         widget.active_drag = None;
         widget.hovered = false;
         return;

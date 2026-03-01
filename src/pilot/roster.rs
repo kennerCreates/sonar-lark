@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fs;
 use std::path::Path;
 
 use bevy::prelude::*;
@@ -86,21 +85,11 @@ fn backfill_empty_portraits(roster: &mut PilotRoster) -> bool {
 }
 
 pub fn load_roster_from_file(path: &Path) -> Result<PilotRoster, String> {
-    let contents =
-        fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
-    ron::from_str(&contents).map_err(|e| format!("Failed to parse {}: {e}", path.display()))
+    crate::persistence::load_ron(path)
 }
 
 pub fn save_roster(roster: &PilotRoster, path: &Path) -> Result<(), String> {
-    let pretty = ron::ser::PrettyConfig::default();
-    let contents = ron::ser::to_string_pretty(roster, pretty)
-        .map_err(|e| format!("Failed to serialize roster: {e}"))?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory {}: {e}", parent.display()))?;
-    }
-    fs::write(path, contents)
-        .map_err(|e| format!("Failed to write roster to {}: {e}", path.display()))
+    crate::persistence::save_ron(roster, path)
 }
 
 pub fn save_roster_to_default(roster: &PilotRoster) {

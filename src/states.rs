@@ -17,3 +17,17 @@ pub enum EditorMode {
     #[default]
     CourseEditor,
 }
+
+/// Inserted before entering the editor to request auto-loading a specific course.
+/// Consumed by `auto_load_pending_course` once glTF assets are ready.
+#[derive(Resource)]
+pub struct PendingEditorCourse {
+    pub path: String,
+}
+
+/// Tracks the last course loaded or saved in the editor.
+/// Persists across states so the editor can reopen it.
+#[derive(Resource)]
+pub struct LastEditedCourse {
+    pub path: String,
+}

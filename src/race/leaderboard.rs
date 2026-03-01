@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::drone::spawning::{DRONE_COLORS, DRONE_NAMES};
+use crate::drone::components::{Drone, DroneIdentity};
 use crate::palette;
 use crate::pilot::SelectedPilots;
 use crate::pilot::portrait::cache::PortraitCache;
@@ -33,6 +33,7 @@ pub fn setup_leaderboard(
     mut commands: Commands,
     selected: Option<Res<SelectedPilots>>,
     portrait_cache: Option<Res<PortraitCache>>,
+    drones: Query<(&Drone, &DroneIdentity)>,
 ) {
     commands
         .spawn((
@@ -70,7 +71,11 @@ pub fn setup_leaderboard(
                                     pilots.pilots[i].color,
                                 )
                             } else {
-                                (DRONE_NAMES[i], DRONE_COLORS[i])
+                                // Drones may not be spawned yet; update_leaderboard corrects this
+                                drones.iter()
+                                    .find(|(d, _)| d.index as usize == i)
+                                    .map(|(_, id)| (id.name.as_str(), id.color))
+                                    .unwrap_or(("---", palette::VANILLA))
                             };
                         // Portrait thumbnail
                         let portrait_handle = selected.as_ref()
@@ -142,6 +147,7 @@ pub fn update_leaderboard(
     clock: Option<Res<RaceClock>>,
     selected: Option<Res<SelectedPilots>>,
     portrait_cache: Option<Res<PortraitCache>>,
+    drones: Query<(&Drone, &DroneIdentity)>,
     mut root_vis: Query<&mut Visibility, With<LeaderboardRoot>>,
     mut name_texts: Query<
         (&LbNameText, &mut Text, &mut TextColor),
@@ -196,7 +202,12 @@ pub fn update_leaderboard(
                     .as_ref()
                     .and_then(|s| s.pilots.get(drone_idx))
                     .map(|p| p.color)
-                    .unwrap_or(DRONE_COLORS[drone_idx]);
+                    .unwrap_or_else(|| {
+                        drones.iter()
+                            .find(|(d, _)| d.index as usize == drone_idx)
+                            .map(|(_, id)| id.color)
+                            .unwrap_or(palette::VANILLA)
+                    });
                 *bg = BackgroundColor(color);
             }
         }
@@ -209,7 +220,12 @@ pub fn update_leaderboard(
                 .as_ref()
                 .and_then(|s| s.pilots.get(drone_idx))
                 .map(|p| p.gamertag.as_str())
-                .unwrap_or(DRONE_NAMES[drone_idx]);
+                .unwrap_or_else(|| {
+                    drones.iter()
+                        .find(|(d, _)| d.index as usize == drone_idx)
+                        .map(|(_, id)| id.name.as_str())
+                        .unwrap_or("???")
+                });
             text.0 = format!("{:>2}  {}", pos + 1, name);
             *tc = if crashed {
                 TextColor(palette::STONE)

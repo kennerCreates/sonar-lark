@@ -4,6 +4,7 @@ use std::path::Path;
 use bevy::prelude::*;
 
 use crate::drone::fireworks::FireworkEmitter;
+use crate::persistence;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{spawn_obstacle, ObstacleMarker, ObstaclesGltfHandle};
 use crate::rendering::{CelLightDir, CelMaterial};
@@ -130,10 +131,7 @@ pub fn despawn_course_obstacles(
 }
 
 pub fn load_course_from_file(path: &Path) -> Result<CourseData, String> {
-    let contents = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {e}", path.display()))?;
-    ron::from_str(&contents)
-        .map_err(|e| format!("Failed to parse {}: {e}", path.display()))
+    persistence::load_ron(path)
 }
 
 pub fn delete_course(path: &Path) -> Result<(), String> {
@@ -142,18 +140,7 @@ pub fn delete_course(path: &Path) -> Result<(), String> {
 }
 
 pub fn save_course(course: &CourseData, path: &Path) -> Result<(), String> {
-    let pretty = ron::ser::PrettyConfig::default();
-    let contents = ron::ser::to_string_pretty(course, pretty)
-        .map_err(|e| format!("Failed to serialize course: {e}"))?;
-
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory {}: {e}", parent.display()))?;
-    }
-    fs::write(path, contents)
-        .map_err(|e| format!("Failed to write course to {}: {e}", path.display()))?;
-
-    Ok(())
+    persistence::save_ron(course, path)
 }
 
 #[cfg(test)]

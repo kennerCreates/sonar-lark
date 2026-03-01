@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::camera::switching::{CameraMode, CameraState, CourseCameras};
-use crate::drone::spawning::DRONE_NAMES;
+use crate::drone::components::{Drone, DroneIdentity};
 use crate::palette;
 use crate::pilot::SelectedPilots;
 use crate::states::AppState;
@@ -59,6 +59,7 @@ pub fn update_camera_hud(
     progress: Option<Res<RaceProgress>>,
     course_cameras: Option<Res<CourseCameras>>,
     selected: Option<Res<SelectedPilots>>,
+    drones: Query<(&Drone, &DroneIdentity)>,
     mut mode_text: Query<&mut Text, (With<CameraHudModeText>, Without<CameraHudHintText>)>,
     mut hint_text: Query<&mut Text, (With<CameraHudHintText>, Without<CameraHudModeText>)>,
 ) {
@@ -90,9 +91,12 @@ pub fn update_camera_hud(
                             .as_ref()
                             .and_then(|s| s.pilots.get(drone_idx))
                             .map(|p| p.gamertag.as_str())
-                            .unwrap_or(
-                                DRONE_NAMES.get(drone_idx).copied().unwrap_or("???"),
-                            )
+                            .unwrap_or_else(|| {
+                                drones.iter()
+                                    .find(|(d, _)| d.index as usize == drone_idx)
+                                    .map(|(_, id)| id.name.as_str())
+                                    .unwrap_or("???")
+                            })
                     })
                 })
                 .unwrap_or("---");

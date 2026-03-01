@@ -10,7 +10,7 @@
 
 ## Drone Lifecycle
 
-`DronePhase` tracks state: `Idle → Racing → Returning → Idle` (or `Racing → Crashed` on DNF). On Results entry: `VictoryLap → Wandering` (deterministic waypoints via Fibonacci hashing, `WanderState` component, `WanderBounds` resource from course extents). Crashed drones: hidden, zero velocity, skipped by physics/AI. `ReturnPath` component holds return spline. `drones_are_active()` run condition keeps AI alive during Racing + Returning + Wandering.
+`DronePhase` (defined in `common::race_participant`, re-exported from `drone::components`) tracks state: `Idle → Racing → VictoryLap → Wandering` (or `Racing → Crashed` on DNF). On Results entry: `VictoryLap → Wandering` (deterministic waypoints via Fibonacci hashing, `WanderState` component, `WanderBounds` resource from course extents). Crashed drones: hidden, zero velocity, skipped by physics/AI. `ReturnPath` component holds return spline. `drones_are_active()` run condition keeps AI alive during Racing + VictoryLap + Wandering.
 
 ## Physics Pipeline
 

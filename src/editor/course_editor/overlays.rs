@@ -8,7 +8,7 @@ use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::TriggerVolume;
 use crate::palette;
 
-use super::{PlacedCamera, PlacedFilter, PlacedObstacle, PlacedProp, PlacementState};
+use super::{EditorSelection, PlacedCamera, PlacedFilter, PlacedObstacle, PlacedProp};
 
 // --- Gizmo group ---
 
@@ -107,10 +107,10 @@ pub(super) fn draw_gate_forward_arrows(
 
 pub(super) fn draw_selection_highlight(
     mut gizmos: Gizmos<CourseGizmoGroup>,
-    state: Res<PlacementState>,
+    selection: Res<EditorSelection>,
     placed_query: Query<&Transform, PlacedFilter>,
 ) {
-    let Some(entity) = state.selected_entity else {
+    let Some(entity) = selection.entity else {
         return;
     };
     let Ok(transform) = placed_query.get(entity) else {

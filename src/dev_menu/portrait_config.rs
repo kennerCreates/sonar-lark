@@ -243,13 +243,7 @@ pub fn load_config() -> PortraitPaletteConfig {
 }
 
 fn load_config_from(path: &Path) -> PortraitPaletteConfig {
-    match std::fs::read_to_string(path) {
-        Ok(text) => ron::from_str(&text).unwrap_or_else(|e| {
-            warn!("Failed to parse portrait palette config: {e}");
-            PortraitPaletteConfig::default()
-        }),
-        Err(_) => PortraitPaletteConfig::default(),
-    }
+    crate::persistence::load_ron_or_default(path)
 }
 
 pub fn save_config(config: &PortraitPaletteConfig) {
@@ -257,19 +251,9 @@ pub fn save_config(config: &PortraitPaletteConfig) {
 }
 
 fn save_config_to(config: &PortraitPaletteConfig, path: &Path) {
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let pretty = ron::ser::PrettyConfig::default();
-    match ron::ser::to_string_pretty(config, pretty) {
-        Ok(text) => {
-            if let Err(e) = std::fs::write(path, text) {
-                warn!("Failed to write portrait palette config: {e}");
-            } else {
-                info!("Portrait palette config saved to {}", path.display());
-            }
-        }
-        Err(e) => warn!("Failed to serialize portrait palette config: {e}"),
+    match crate::persistence::save_ron(config, path) {
+        Ok(()) => info!("Portrait palette config saved to {}", path.display()),
+        Err(e) => warn!("Failed to save portrait palette config: {e}"),
     }
 }
 

@@ -2,10 +2,9 @@ use bevy::prelude::*;
 use rand::Rng;
 use rand::seq::SliceRandom;
 
-// Re-export for backward compatibility with existing imports.
-pub use crate::common::drone_identity::{DRONE_COLORS, DRONE_NAMES};
-
+use crate::common::drone_identity::{DRONE_COLORS, DRONE_NAMES};
 use crate::common::drone_identity::DRONE_COUNT;
+use crate::common::RaceParticipant;
 use crate::course::data::CourseData;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::pilot::{PilotConfigs, SelectedPilots};
@@ -183,6 +182,7 @@ pub fn spawn_drones(
             transform,
             Visibility::default(),
             Drone { index: i },
+            RaceParticipant { index: i },
             pid,
             attitude_pd,
             dynamics,

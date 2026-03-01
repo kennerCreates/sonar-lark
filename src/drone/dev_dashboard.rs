@@ -94,7 +94,7 @@ fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
             ));
 
             // Parameter rows
-            for (i, meta) in PARAM_META.iter().enumerate() {
+            for (i, meta) in AiTuningParams::PARAM_META.iter().enumerate() {
                 let bg = if i % 2 == 0 { ROW_BG } else { ROW_BG_ALT };
                 let value = tuning.get(i);
                 let is_modified = (value - defaults.get(i)).abs() > 0.001;
@@ -257,7 +257,7 @@ pub fn update_param_labels(
     let defaults = AiTuningParams::default();
     for (param, mut text, mut color) in &mut query {
         let value = tuning.get(param.0);
-        let meta = &PARAM_META[param.0];
+        let meta = &AiTuningParams::PARAM_META[param.0];
         text.0 = format_value(value, meta.step);
 
         let is_modified = (value - defaults.get(param.0)).abs() > 0.001;

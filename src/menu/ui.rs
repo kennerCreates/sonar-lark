@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::course::loader::SelectedCourse;
-use crate::editor::course_editor::{LastEditedCourse, PendingEditorCourse};
+use crate::states::{LastEditedCourse, PendingEditorCourse};
 use crate::palette;
 use crate::states::AppState;
 use crate::ui_theme;

@@ -16,7 +16,8 @@ use crate::course::data::PropKind;
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
-use crate::states::EditorMode;
+use crate::editor::types::EditorTab;
+use crate::states::{EditorMode, PendingEditorCourse};
 
 use transform_gizmos::{MoveWidgetState, RotateWidgetState, ScaleWidgetState};
 
@@ -32,53 +33,37 @@ pub enum TransformMode {
 
 // --- Resources ---
 
-/// Inserted before entering the editor to request auto-loading a specific course.
-/// Consumed by `auto_load_pending_course` once glTF assets are ready.
-#[derive(Resource)]
-pub struct PendingEditorCourse {
-    pub path: String,
+#[derive(Resource, Default)]
+pub struct EditorSelection {
+    pub palette_id: Option<ObstacleId>,
+    pub entity: Option<Entity>,
 }
 
-/// Tracks the last course loaded or saved in the editor.
-/// Persists across states so the editor can reopen it.
-#[derive(Resource)]
-pub struct LastEditedCourse {
-    pub path: String,
-}
-
-#[derive(Resource)]
-pub struct PlacementState {
-    /// Obstacle selected in the palette for placing.
-    pub selected_palette_id: Option<ObstacleId>,
-    /// The placed entity currently selected for editing.
-    pub selected_entity: Option<Entity>,
-    /// Which transform gizmo is active.
-    pub transform_mode: TransformMode,
-    /// When true, LMB on any placed obstacle assigns the next gate order.
+#[derive(Resource, Default)]
+pub struct EditorTransform {
+    pub mode: TransformMode,
     pub gate_order_mode: bool,
-    /// Auto-incrementing counter for gate order assignment.
     pub next_gate_order: u32,
-    /// Course name for save path.
-    pub course_name: String,
-    /// Whether the course name text field has keyboard focus.
-    pub editing_name: bool,
-    /// Active tab in the left panel palette.
-    pub active_tab: EditorTab,
 }
 
-impl Default for PlacementState {
+#[derive(Resource)]
+pub struct EditorCourse {
+    pub name: String,
+    pub editing_name: bool,
+}
+
+impl Default for EditorCourse {
     fn default() -> Self {
         Self {
-            selected_palette_id: None,
-            selected_entity: None,
-            transform_mode: TransformMode::default(),
-            gate_order_mode: false,
-            next_gate_order: 0,
-            course_name: "new_course".to_string(),
+            name: "new_course".to_string(),
             editing_name: false,
-            active_tab: EditorTab::default(),
         }
     }
+}
+
+#[derive(Resource, Default)]
+pub struct EditorUI {
+    pub active_tab: EditorTab,
 }
 
 // --- Components ---
@@ -103,14 +88,6 @@ pub struct PlacedProp {
 pub struct PlacedCamera {
     pub is_primary: bool,
     pub label: Option<String>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum EditorTab {
-    #[default]
-    Obstacles,
-    Props,
-    Cameras,
 }
 
 /// Query filter matching any editor-placed entity (obstacle, prop, or camera).
@@ -249,7 +226,10 @@ fn setup_course_editor(
 ) {
     let existing_courses = ui::discover_existing_courses();
     ui::build_course_editor_ui(&mut commands, &library, &existing_courses);
-    commands.insert_resource(PlacementState::default());
+    commands.insert_resource(EditorSelection::default());
+    commands.insert_resource(EditorTransform::default());
+    commands.insert_resource(EditorCourse::default());
+    commands.insert_resource(EditorUI::default());
     commands.insert_resource(MoveWidgetState::default());
     commands.insert_resource(RotateWidgetState::default());
     commands.insert_resource(ScaleWidgetState::default());
@@ -264,7 +244,10 @@ fn cleanup_course_editor(
     placed_query: Query<Entity, PlacedFilter>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
-    commands.remove_resource::<PlacementState>();
+    commands.remove_resource::<EditorSelection>();
+    commands.remove_resource::<EditorTransform>();
+    commands.remove_resource::<EditorCourse>();
+    commands.remove_resource::<EditorUI>();
     commands.remove_resource::<MoveWidgetState>();
     commands.remove_resource::<RotateWidgetState>();
     commands.remove_resource::<ScaleWidgetState>();
@@ -284,7 +267,9 @@ fn cleanup_course_editor(
 // --- Placement and Selection ---
 
 fn handle_placement_and_selection(
-    mut state: ResMut<PlacementState>,
+    mut selection: ResMut<EditorSelection>,
+    mut course_state: ResMut<EditorCourse>,
+    mut transform_state: ResMut<EditorTransform>,
     move_widget: Res<MoveWidgetState>,
     rotate_widget: Res<RotateWidgetState>,
     scale_widget: Res<ScaleWidgetState>,
@@ -309,9 +294,9 @@ fn handle_placement_and_selection(
     let over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
 
     // Clicking in the 3D viewport while editing the course name unfocuses the text field.
-    if state.editing_name {
+    if course_state.editing_name {
         if mouse_buttons.just_pressed(MouseButton::Left) && !over_ui {
-            state.editing_name = false;
+            course_state.editing_name = false;
         }
         return;
     }
@@ -342,49 +327,51 @@ fn handle_placement_and_selection(
         &parent_query,
     );
 
-    if state.gate_order_mode {
+    if transform_state.gate_order_mode {
         if let Some(entity) = nearest
             && let Ok((_, mut placed)) = obstacle_query.get_mut(entity)
         {
-            let order = state.next_gate_order;
+            let order = transform_state.next_gate_order;
             placed.gate_order = Some(order);
-            state.next_gate_order += 1;
+            transform_state.next_gate_order += 1;
             info!("Assigned gate order {order} to {:?}", entity);
         }
         return;
     }
 
     if let Some(entity) = nearest {
-        state.selected_entity = Some(entity);
+        selection.entity = Some(entity);
     } else {
-        state.selected_entity = None;
+        selection.entity = None;
     }
 }
 
 fn handle_delete_key(
     mut commands: Commands,
-    mut state: ResMut<PlacementState>,
+    mut selection: ResMut<EditorSelection>,
+    course_state: Res<EditorCourse>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    if state.editing_name {
+    if course_state.editing_name {
         return;
     }
 
     if keyboard.just_pressed(KeyCode::Delete)
-        && let Some(entity) = state.selected_entity.take()
+        && let Some(entity) = selection.entity.take()
     {
         commands.entity(entity).despawn();
     }
 }
 
 fn handle_transform_mode_keys(
-    mut state: ResMut<PlacementState>,
+    mut transform_state: ResMut<EditorTransform>,
+    course_state: Res<EditorCourse>,
     mut move_widget: ResMut<MoveWidgetState>,
     mut rotate_widget: ResMut<RotateWidgetState>,
     mut scale_widget: ResMut<ScaleWidgetState>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    if state.editing_name {
+    if course_state.editing_name {
         return;
     }
 
@@ -399,7 +386,7 @@ fn handle_transform_mode_keys(
     };
 
     if let Some(mode) = new_mode {
-        state.transform_mode = mode;
+        transform_state.mode = mode;
         move_widget.active_drag = None;
         move_widget.hovered = false;
         rotate_widget.active = false;
@@ -411,17 +398,18 @@ fn handle_transform_mode_keys(
 }
 
 fn handle_flip_gate_key(
-    state: Res<PlacementState>,
+    selection: Res<EditorSelection>,
+    course_state: Res<EditorCourse>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut placed_query: Query<&mut PlacedObstacle>,
 ) {
-    if state.editing_name {
+    if course_state.editing_name {
         return;
     }
     if !keyboard.just_pressed(KeyCode::KeyF) {
         return;
     }
-    let Some(entity) = state.selected_entity else {
+    let Some(entity) = selection.entity else {
         return;
     };
     let Ok(mut placed) = placed_query.get_mut(entity) else {

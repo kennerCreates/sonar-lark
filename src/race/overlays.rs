@@ -2,9 +2,8 @@ use bevy::prelude::*;
 
 use crate::course::loader::SelectedCourse;
 use crate::drone::spawning::NoGatesCourse;
-use crate::editor::course_editor::PendingEditorCourse;
 use crate::palette;
-use crate::states::AppState;
+use crate::states::{AppState, PendingEditorCourse};
 use crate::ui_theme;
 
 use super::lifecycle::{CountdownTimer, RacePhase};

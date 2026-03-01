@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::course::data::PropKind;
-use crate::drone::spawning::DRONE_COLORS;
+use super::components::{Drone, DroneIdentity};
 use crate::palette;
 use crate::pilot::SelectedPilots;
 use crate::race::gate::{GateForward, GateIndex};
@@ -110,6 +110,7 @@ pub fn detect_first_finish(
     firework_meshes: Option<Res<FireworkMeshes>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     selected_pilots: Option<Res<SelectedPilots>>,
+    drones: Query<(&Drone, &DroneIdentity)>,
     gates: Query<(&GlobalTransform, &GateIndex, Option<&GateForward>)>,
     emitters: Query<(&Transform, &FireworkEmitter)>,
     race_end_sound: Option<Res<RaceEndSound>>,
@@ -144,7 +145,12 @@ pub fn detect_first_finish(
         .as_ref()
         .and_then(|s| s.pilots.get(winner_idx))
         .map(|p| p.color)
-        .unwrap_or(DRONE_COLORS[winner_idx % DRONE_COLORS.len()]);
+        .unwrap_or_else(|| {
+            drones.iter()
+                .find(|(d, _)| d.index as usize == winner_idx)
+                .map(|(_, id)| id.color)
+                .unwrap_or(palette::VANILLA)
+        });
     let accent_color = palette::SUNSHINE;
 
     let has_emitters = !emitters.is_empty();

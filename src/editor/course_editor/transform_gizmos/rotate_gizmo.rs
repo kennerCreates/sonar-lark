@@ -5,7 +5,7 @@ use crate::editor::gizmos::{
     ray_intersect_plane, rotated_perpendicular_basis, yaw_quat_from_transform, Axis,
 };
 
-use crate::editor::course_editor::{PlacedFilter, PlacementState, TransformMode};
+use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedFilter, TransformMode};
 
 use super::{
     sample_ring_screen_dist, RotateWidgetState, RING_HIT_THRESHOLD, RING_RADIUS, RING_SAMPLES,
@@ -36,15 +36,16 @@ fn angle_in_ring_plane(point: Vec3, center: Vec3, axis: Axis) -> f32 {
 
 pub(in crate::editor::course_editor) fn draw_rotate_gizmo(
     mut gizmos: Gizmos,
-    state: Res<PlacementState>,
+    transform_state: Res<EditorTransform>,
+    selection: Res<EditorSelection>,
     widget: Res<RotateWidgetState>,
     placed_query: Query<&Transform, PlacedFilter>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    if state.transform_mode != TransformMode::Rotate {
+    if transform_state.mode != TransformMode::Rotate {
         return;
     }
-    let Some(entity) = state.selected_entity else {
+    let Some(entity) = selection.entity else {
         return;
     };
     let Ok(transform) = placed_query.get(entity) else {
@@ -78,17 +79,18 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
     keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
-    state: Res<PlacementState>,
+    transform_state: Res<EditorTransform>,
+    selection: Res<EditorSelection>,
     mut widget: ResMut<RotateWidgetState>,
     mut placed_query: Query<&mut Transform, PlacedFilter>,
     interaction_query: Query<&Interaction>,
 ) {
-    if state.transform_mode != TransformMode::Rotate {
+    if transform_state.mode != TransformMode::Rotate {
         widget.active = false;
         widget.hovered = false;
         return;
     }
-    let Some(entity) = state.selected_entity else {
+    let Some(entity) = selection.entity else {
         widget.active = false;
         widget.hovered = false;
         return;

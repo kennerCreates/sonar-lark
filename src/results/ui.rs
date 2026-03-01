@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::drone::spawning::{DRONE_COLORS, DRONE_NAMES};
+use crate::drone::components::{Drone, DroneIdentity};
 use crate::palette;
 use crate::pilot::SelectedPilots;
 use crate::pilot::portrait::cache::PortraitCache;
@@ -19,6 +19,7 @@ pub fn setup_results_ui(
     results: Option<Res<RaceResults>>,
     selected: Option<Res<SelectedPilots>>,
     portrait_cache: Option<Res<PortraitCache>>,
+    drones: Query<(&Drone, &DroneIdentity)>,
 ) {
     let Some(results) = results else {
         warn!("No RaceResults resource found, skipping results UI.");
@@ -90,13 +91,10 @@ pub fn setup_results_ui(
                                 .map(|p| (p.gamertag.as_str(), p.color))
                                 .unwrap_or(("???", palette::VANILLA))
                         } else {
-                            (
-                                DRONE_NAMES.get(drone_idx).copied().unwrap_or("???"),
-                                DRONE_COLORS
-                                    .get(drone_idx)
-                                    .copied()
-                                    .unwrap_or(palette::VANILLA),
-                            )
+                            drones.iter()
+                                .find(|(d, _)| d.index as usize == drone_idx)
+                                .map(|(_, id)| (id.name.as_str(), id.color))
+                                .unwrap_or(("???", palette::VANILLA))
                         };
 
                         let is_winner = pos == 0 && entry.finished;

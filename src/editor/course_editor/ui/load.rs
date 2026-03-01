@@ -3,13 +3,12 @@ use bevy::prelude::*;
 use crate::course::data::{CourseData, PropKind};
 use crate::course::loader::load_course_from_file;
 use crate::editor::course_editor::{
-    LastEditedCourse, PendingEditorCourse, PlacedCamera, PlacedObstacle, PlacedProp,
-    PlacementState,
+    EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
 };
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::rendering::{CelLightDir, CelMaterial};
-use crate::states::AppState;
+use crate::states::{AppState, LastEditedCourse, PendingEditorCourse};
 
 use super::data::next_gate_order_from_instances;
 use super::types::{CameraEditorMeshes, ExistingCourseButton, PropEditorMeshes};
@@ -18,7 +17,9 @@ use super::types::{CameraEditorMeshes, ExistingCourseButton, PropEditorMeshes};
 #[allow(clippy::too_many_arguments)]
 fn load_course_into_editor(
     commands: &mut Commands,
-    state: &mut PlacementState,
+    selection: &mut EditorSelection,
+    course_state: &mut EditorCourse,
+    transform_state: &mut EditorTransform,
     placed_query: &Query<
         Entity,
         Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
@@ -39,10 +40,10 @@ fn load_course_into_editor(
         commands.entity(entity).despawn();
     }
 
-    state.selected_entity = None;
-    state.selected_palette_id = None;
-    state.course_name = course.name.clone();
-    state.next_gate_order = next_gate_order_from_instances(&course.instances);
+    selection.entity = None;
+    selection.palette_id = None;
+    course_state.name = course.name.clone();
+    transform_state.next_gate_order = next_gate_order_from_instances(&course.instances);
 
     for instance in &course.instances {
         let Some(def) = library.get(&instance.obstacle_id) else {
@@ -155,7 +156,9 @@ fn load_course_into_editor(
 pub fn handle_load_button(
     mut commands: Commands,
     query: Query<(&Interaction, &ExistingCourseButton), Changed<Interaction>>,
-    mut state: ResMut<PlacementState>,
+    mut selection: ResMut<EditorSelection>,
+    mut course_state: ResMut<EditorCourse>,
+    mut transform_state: ResMut<EditorTransform>,
     placed_query: Query<
         Entity,
         Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
@@ -192,7 +195,9 @@ pub fn handle_load_button(
 
         load_course_into_editor(
             &mut commands,
-            &mut state,
+            &mut selection,
+            &mut course_state,
+            &mut transform_state,
             &placed_query,
             &library,
             handle,
@@ -219,7 +224,9 @@ pub fn handle_load_button(
 pub fn auto_load_pending_course(
     mut commands: Commands,
     pending: Res<PendingEditorCourse>,
-    mut state: ResMut<PlacementState>,
+    mut selection: ResMut<EditorSelection>,
+    mut course_state: ResMut<EditorCourse>,
+    mut transform_state: ResMut<EditorTransform>,
     placed_query: Query<
         Entity,
         Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
@@ -248,7 +255,9 @@ pub fn auto_load_pending_course(
 
     load_course_into_editor(
         &mut commands,
-        &mut state,
+        &mut selection,
+        &mut course_state,
+        &mut transform_state,
         &placed_query,
         &library,
         &gltf_handle,

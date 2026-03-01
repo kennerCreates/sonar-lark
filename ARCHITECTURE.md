@@ -27,9 +27,10 @@ src/
 │   ├── cel_material.rs  CelMaterial (cel-shading with halftone + hue shifting)
 │   └── skybox.rs        SkyboxMaterial, procedural TRON night sky
 ├── ui_theme.rs          Shared button styling constants, interaction helpers, spawn helpers
-├── common/              Environment setup (light, ground, skybox)
-│   ├── mod.rs           CommonPlugin, drone_identity re-export
-│   └── drone_identity.rs DRONE_COLORS, DRONE_NAMES, DRONE_COUNT (shared across modules)
+├── common/              Environment setup, shared race types (light, ground, skybox)
+│   ├── mod.rs           CommonPlugin, re-exports for drone_identity & race_participant
+│   ├── drone_identity.rs DRONE_COLORS, DRONE_NAMES, DRONE_COUNT (shared across modules)
+│   └── race_participant.rs RaceParticipant (marker for race entities), DronePhase (lifecycle enum)
 ├── menu/                Menu UI, state navigation
 │   ├── mod.rs           MenuPlugin, system registration
 │   ├── discover.rs      Re-exports from course::discovery
@@ -96,7 +97,7 @@ src/
 │       ├── rasterize.rs resvg pipeline: SVG → tiny_skia::Pixmap → Bevy Image (48×48)
 │       └── cache.rs     PortraitCache resource (HashMap<PilotId, Handle<Image>>), setup system
 ├── drone/               Drone simulation
-│   ├── components.rs    Drone, DroneIdentity, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
+│   ├── components.rs    Drone, DroneIdentity, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition (re-exports DronePhase from common)
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
 │   ├── ai/              AI targeting and racing line (FixedUpdate, spline-based)
 │   │   ├── mod.rs       update_ai_targets, spline math helpers, curvature/speed functions

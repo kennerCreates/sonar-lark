@@ -9,6 +9,7 @@ mod editor;
 mod menu;
 mod obstacle;
 pub mod palette;
+mod persistence;
 mod pilot;
 mod race;
 mod rendering;

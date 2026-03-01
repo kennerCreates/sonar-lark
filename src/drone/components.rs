@@ -14,7 +14,6 @@ pub struct Drone {
 /// Per-drone identity info, set during spawn from SelectedPilots.
 /// Decouples drone identity from array-index lookups into DRONE_NAMES/DRONE_COLORS.
 #[derive(Component)]
-#[allow(dead_code)]
 pub struct DroneIdentity {
     pub name: String,
     pub color: Color,
@@ -169,18 +168,7 @@ pub struct DroneStartPosition {
 #[derive(Resource)]
 pub struct RaceSeed(pub u32);
 
-/// Per-drone lifecycle phase.
-#[derive(Component, Default, PartialEq, Eq, Clone, Copy, Debug)]
-pub enum DronePhase {
-    #[default]
-    Idle,
-    Racing,
-    /// Drone has finished the race and is continuing to lap the course.
-    VictoryLap,
-    /// Drone wanders freely in the Results screen.
-    Wandering,
-    Crashed,
-}
+pub use crate::common::race_participant::DronePhase;
 
 /// Wandering state: drone picks random waypoints within the course bounding box.
 #[derive(Component)]
@@ -188,47 +176,6 @@ pub struct WanderState {
     pub target: Vec3,
     pub dwell_timer: f32,
     pub step: u32,
-}
-
-/// Runtime-tunable AI and physics parameters. Exposed via the dev dashboard (F4).
-/// Persists across race restarts so tweaked values carry over.
-#[derive(Resource)]
-pub struct AiTuningParams {
-    pub safe_lateral_accel: f32,
-    pub curvature_look_ahead_scale: f32,
-    pub min_look_ahead_fraction: f32,
-    pub min_curvature_speed: f32,
-    pub min_advance_speed_fraction: f32,
-    pub speed_curvature_range: f32,
-    pub look_ahead_t: f32,
-    pub max_speed: f32,
-    pub max_tilt_angle: f32,
-    pub battery_sag_factor: f32,
-    pub dirty_air_strength: f32,
-    pub avoidance_radius: f32,
-    pub avoidance_strength: f32,
-    pub feedforward_blend: f32,
-}
-
-impl Default for AiTuningParams {
-    fn default() -> Self {
-        Self {
-            safe_lateral_accel: 50.0,
-            curvature_look_ahead_scale: 30.0,
-            min_look_ahead_fraction: 0.33,
-            min_curvature_speed: 14.0,
-            min_advance_speed_fraction: 0.25,
-            speed_curvature_range: 1.25,
-            look_ahead_t: 0.3,
-            max_speed: 55.0,
-            max_tilt_angle: 1.45,
-            battery_sag_factor: 0.15,
-            dirty_air_strength: 0.0,
-            avoidance_radius: 8.0,
-            avoidance_strength: 0.0,
-            feedforward_blend: 0.85,
-        }
-    }
 }
 
 /// Metadata for each tunable parameter: display name, step size, min, max.
@@ -239,66 +186,63 @@ pub struct ParamMeta {
     pub max: f32,
 }
 
-/// Ordered list of parameter metadata matching `AiTuningParams` field order.
-pub const PARAM_META: [ParamMeta; 14] = [
-    ParamMeta { name: "Lateral Accel",   step: 2.0,  min: 5.0,   max: 100.0 },
-    ParamMeta { name: "Curv Look Scale", step: 2.0,  min: 5.0,   max: 80.0 },
-    ParamMeta { name: "Min Look Frac",   step: 0.05, min: 0.1,   max: 1.0 },
-    ParamMeta { name: "Min Curv Speed",  step: 1.0,  min: 2.0,   max: 40.0 },
-    ParamMeta { name: "Min Advance",     step: 0.05, min: 0.05,  max: 1.0 },
-    ParamMeta { name: "Speed Curv Range",step: 0.25, min: 0.25,  max: 5.0 },
-    ParamMeta { name: "Look Ahead T",    step: 0.05, min: 0.05,  max: 1.0 },
-    ParamMeta { name: "Max Speed",       step: 1.0,  min: 10.0,  max: 100.0 },
-    ParamMeta { name: "Max Tilt Angle",  step: 0.05, min: 0.5,   max: 1.57 },
-    ParamMeta { name: "Battery Sag",     step: 0.05, min: 0.0,   max: 0.4 },
-    ParamMeta { name: "Dirty Air Str",   step: 1.0,  min: 0.0,   max: 20.0 },
-    ParamMeta { name: "Avoid Radius",    step: 1.0,  min: 2.0,   max: 15.0 },
-    ParamMeta { name: "Avoid Strength",  step: 1.0,  min: 0.0,   max: 30.0 },
-    ParamMeta { name: "FF Blend",        step: 0.05, min: 0.0,   max: 1.0 },
-];
-
-impl AiTuningParams {
-    /// Get the value of the i-th parameter (field order matches PARAM_META).
-    pub fn get(&self, index: usize) -> f32 {
-        match index {
-            0 => self.safe_lateral_accel,
-            1 => self.curvature_look_ahead_scale,
-            2 => self.min_look_ahead_fraction,
-            3 => self.min_curvature_speed,
-            4 => self.min_advance_speed_fraction,
-            5 => self.speed_curvature_range,
-            6 => self.look_ahead_t,
-            7 => self.max_speed,
-            8 => self.max_tilt_angle,
-            9 => self.battery_sag_factor,
-            10 => self.dirty_air_strength,
-            11 => self.avoidance_radius,
-            12 => self.avoidance_strength,
-            13 => self.feedforward_blend,
-            _ => 0.0,
+/// Generates `AiTuningParams` struct, its `Default` impl, and indexed `get`/`set`
+/// from a single field list. Adding a new tunable parameter is a single line.
+macro_rules! tuning_params {
+    ($( $field:ident, $name:literal, $step:literal, $min:literal, $max:literal, $default:literal );+ $(;)?) => {
+        /// Runtime-tunable AI and physics parameters. Exposed via the dev dashboard (F4).
+        /// Persists across race restarts so tweaked values carry over.
+        #[derive(Resource)]
+        pub struct AiTuningParams {
+            $(pub $field: f32,)+
         }
-    }
 
-    /// Set the i-th parameter, clamping to its valid range.
-    pub fn set(&mut self, index: usize, value: f32) {
-        let meta = &PARAM_META[index];
-        let clamped = value.clamp(meta.min, meta.max);
-        match index {
-            0 => self.safe_lateral_accel = clamped,
-            1 => self.curvature_look_ahead_scale = clamped,
-            2 => self.min_look_ahead_fraction = clamped,
-            3 => self.min_curvature_speed = clamped,
-            4 => self.min_advance_speed_fraction = clamped,
-            5 => self.speed_curvature_range = clamped,
-            6 => self.look_ahead_t = clamped,
-            7 => self.max_speed = clamped,
-            8 => self.max_tilt_angle = clamped,
-            9 => self.battery_sag_factor = clamped,
-            10 => self.dirty_air_strength = clamped,
-            11 => self.avoidance_radius = clamped,
-            12 => self.avoidance_strength = clamped,
-            13 => self.feedforward_blend = clamped,
-            _ => {}
+        impl Default for AiTuningParams {
+            fn default() -> Self {
+                Self { $($field: $default,)+ }
+            }
         }
-    }
+
+        impl AiTuningParams {
+            pub const PARAM_META: &[ParamMeta] = &[
+                $(ParamMeta { name: $name, step: $step, min: $min, max: $max },)+
+            ];
+
+            /// Get the value of the i-th parameter (field order matches PARAM_META).
+            pub fn get(&self, index: usize) -> f32 {
+                let values = [$(self.$field,)+];
+                values.get(index).copied().unwrap_or(0.0)
+            }
+
+            /// Set the i-th parameter, clamping to its valid range.
+            #[allow(unused_assignments)]
+            pub fn set(&mut self, index: usize, value: f32) {
+                if let Some(meta) = Self::PARAM_META.get(index) {
+                    let clamped = value.clamp(meta.min, meta.max);
+                    let mut i = 0usize;
+                    $(
+                        if index == i { self.$field = clamped; return; }
+                        i += 1;
+                    )+
+                }
+            }
+        }
+    };
+}
+
+tuning_params! {
+    safe_lateral_accel,         "Lateral Accel",    2.0,  5.0,   100.0, 50.0;
+    curvature_look_ahead_scale, "Curv Look Scale",  2.0,  5.0,   80.0,  30.0;
+    min_look_ahead_fraction,    "Min Look Frac",    0.05, 0.1,   1.0,   0.33;
+    min_curvature_speed,        "Min Curv Speed",   1.0,  2.0,   40.0,  14.0;
+    min_advance_speed_fraction, "Min Advance",      0.05, 0.05,  1.0,   0.25;
+    speed_curvature_range,      "Speed Curv Range", 0.25, 0.25,  5.0,   1.25;
+    look_ahead_t,               "Look Ahead T",     0.05, 0.05,  1.0,   0.3;
+    max_speed,                  "Max Speed",        1.0,  10.0,  100.0, 55.0;
+    max_tilt_angle,             "Max Tilt Angle",   0.05, 0.5,   1.57,  1.45;
+    battery_sag_factor,         "Battery Sag",      0.05, 0.0,   0.4,   0.15;
+    dirty_air_strength,         "Dirty Air Str",    1.0,  0.0,   20.0,  0.0;
+    avoidance_radius,           "Avoid Radius",     1.0,  2.0,   15.0,  8.0;
+    avoidance_strength,         "Avoid Strength",   1.0,  0.0,   30.0,  0.0;
+    feedforward_blend,          "FF Blend",         0.05, 0.0,   1.0,   0.85;
 }

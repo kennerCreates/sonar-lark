@@ -5,7 +5,7 @@ use crate::editor::gizmos::{
     closest_point_on_axis, point_to_segment_distance, yaw_quat_from_transform, Axis,
 };
 
-use crate::editor::course_editor::{PlacedFilter, PlacementState, TransformMode};
+use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedFilter, TransformMode};
 
 use super::{
     ScaleDragMode, ScaleWidgetState, SCALE_CUBE_SIZE, SCALE_HANDLE_LENGTH, SCALE_HIT_THRESHOLD,
@@ -14,15 +14,16 @@ use super::{
 
 pub(in crate::editor::course_editor) fn draw_scale_gizmo(
     mut gizmos: Gizmos,
-    state: Res<PlacementState>,
+    transform_state: Res<EditorTransform>,
+    selection: Res<EditorSelection>,
     widget: Res<ScaleWidgetState>,
     placed_query: Query<&Transform, PlacedFilter>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    if state.transform_mode != TransformMode::Scale {
+    if transform_state.mode != TransformMode::Scale {
         return;
     }
-    let Some(entity) = state.selected_entity else {
+    let Some(entity) = selection.entity else {
         return;
     };
     let Ok(transform) = placed_query.get(entity) else {
@@ -72,18 +73,19 @@ pub(in crate::editor::course_editor) fn handle_scale_gizmo(
     keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
-    state: Res<PlacementState>,
+    transform_state: Res<EditorTransform>,
+    selection: Res<EditorSelection>,
     mut widget: ResMut<ScaleWidgetState>,
     mut placed_query: Query<&mut Transform, PlacedFilter>,
     interaction_query: Query<&Interaction>,
 ) {
-    if state.transform_mode != TransformMode::Scale {
+    if transform_state.mode != TransformMode::Scale {
         widget.active_drag = None;
         widget.hovered_axis = None;
         widget.hovered_center = false;
         return;
     }
-    let Some(entity) = state.selected_entity else {
+    let Some(entity) = selection.entity else {
         widget.active_drag = None;
         widget.hovered_axis = None;
         widget.hovered_center = false;

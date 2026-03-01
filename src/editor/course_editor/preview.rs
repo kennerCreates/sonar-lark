@@ -9,7 +9,7 @@ use crate::palette;
 use crate::rendering::{FOG_END, FOG_START, fog_color};
 use crate::states::EditorMode;
 
-use super::{PlacedCamera, PlacementState};
+use super::{EditorSelection, PlacedCamera};
 
 const PREVIEW_WIDTH: u32 = 384;
 const PREVIEW_HEIGHT: u32 = 216;
@@ -120,7 +120,7 @@ pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Im
 }
 
 pub fn sync_preview_camera(
-    state: Res<PlacementState>,
+    selection: Res<EditorSelection>,
     placed_cameras: Query<(&PlacedCamera, &Transform), Without<PreviewCamera>>,
     mut preview_camera: Query<
         (&mut Camera, &mut Transform, &mut Projection),
@@ -134,8 +134,8 @@ pub fn sync_preview_camera(
         return;
     };
 
-    let selected_camera = state
-        .selected_entity
+    let selected_camera = selection
+        .entity
         .and_then(|e| placed_cameras.get(e).ok());
 
     match selected_camera {

@@ -1,6 +1,9 @@
 pub mod workshop;
 pub mod course_editor;
 pub(crate) mod gizmos;
+pub mod types;
+
+pub use types::EditorTab;
 
 use bevy::prelude::*;
 

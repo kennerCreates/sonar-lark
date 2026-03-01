@@ -1,4 +1,7 @@
 pub mod drone_identity;
+pub mod race_participant;
+
+pub use race_participant::RaceParticipant;
 
 use bevy::picking::Pickable;
 use bevy::prelude::*;

@@ -9,8 +9,3 @@ After completing each implementation phase:
 5. **Manual testing feedback form**: After all automated checks pass, present a structured feedback form for manual testing. The form must include:
    - A checklist of every manually-testable behavior introduced or changed in the phase (specific actions, expected results).
    - Edge cases and error scenarios to verify (e.g., invalid input, rapid state transitions, boundary values).
-   - Performance observations to watch for (frame drops, hitches, visual artifacts).
-   - A "Pass / Fail / Notes" column for each item so the user can report results inline.
-   - Regression checks: key existing behaviors that should still work unchanged.
-
-   Format the form as a markdown table or checklist that can be filled out directly in chat.
