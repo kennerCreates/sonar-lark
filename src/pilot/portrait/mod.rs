@@ -176,6 +176,11 @@ impl Accessory {
             Accessory::NecklacePendant => "necklace_pendant",
         }
     }
+
+    /// Whether this accessory uses a secondary (shadow) color in its SVG.
+    pub fn has_shadow(&self) -> bool {
+        matches!(self, Accessory::NecklacePendant)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -251,6 +256,18 @@ pub struct PortraitDescriptor {
     pub skin_highlight: Option<[f32; 3]>,
     #[serde(default)]
     pub acc_shadow: Option<[f32; 3]>,
+    /// Visor frame color (secondary). When `None`, auto-derived as `compute_shadow(eye_color)`.
+    #[serde(default)]
+    pub eye_secondary: Option<[f32; 3]>,
+    /// When true, skin_highlight resolves to the pilot's drone color at render time.
+    #[serde(default)]
+    pub skin_highlight_drone: bool,
+    /// When true, acc_shadow resolves to the pilot's drone color at render time.
+    #[serde(default)]
+    pub acc_shadow_drone: bool,
+    /// When true, eye_secondary resolves to the pilot's drone color at render time.
+    #[serde(default)]
+    pub eye_secondary_drone: bool,
     #[serde(default)]
     pub generated: bool,
 }
@@ -291,6 +308,10 @@ impl Default for PortraitDescriptor {
             shirt_color: [0.0; 3],
             skin_highlight: None,
             acc_shadow: None,
+            eye_secondary: None,
+            skin_highlight_drone: false,
+            acc_shadow_drone: false,
+            eye_secondary_drone: false,
             generated: false,
         }
     }
@@ -357,6 +378,10 @@ impl PortraitDescriptor {
             shirt_color,
             skin_highlight: None,
             acc_shadow: None,
+            eye_secondary: None,
+            skin_highlight_drone: false,
+            acc_shadow_drone: false,
+            eye_secondary_drone: false,
             generated: true,
         }
     }
@@ -418,18 +443,28 @@ impl PortraitDescriptor {
             derive_accessory_color(primary_color),
         );
 
-        // Secondary colors: check complementary map, else fall back to auto-derived
-        let skin_highlight = config
-            .get_complementary_for(PortraitColorSlot::Skin, face_vi, skin_idx)
+        // Secondary colors: check complementary map, else fall back to auto-derived.
+        // A sentinel value of DRONE_COLOR_INDEX means "use pilot drone color."
+        use crate::dev_menu::portrait_config::DRONE_COLOR_INDEX;
+
+        let skin_comp = config.get_complementary_for(PortraitColorSlot::Skin, face_vi, skin_idx);
+        let skin_highlight_drone = skin_comp == Some(DRONE_COLOR_INDEX);
+        let skin_highlight = skin_comp
+            .filter(|&i| i != DRONE_COLOR_INDEX)
             .map(|i| palette_colors[i].1);
 
-        let eye_color = config
-            .get_complementary_for(PortraitColorSlot::Eye, eye_vi, _eye_idx)
-            .map(|i| palette_colors[i].1)
-            .unwrap_or(eye_color_fallback);
+        let eye_color = eye_color_fallback;
+        let eye_comp = config.get_complementary_for(PortraitColorSlot::Eye, eye_vi, _eye_idx);
+        let eye_secondary_drone = eye_comp == Some(DRONE_COLOR_INDEX);
+        let eye_secondary = eye_comp
+            .filter(|&i| i != DRONE_COLOR_INDEX)
+            .map(|i| palette_colors[i].1);
 
-        let acc_shadow = config
-            .get_complementary_for(PortraitColorSlot::Accessory, acc_vi, acc_idx)
+        let acc_comp =
+            config.get_complementary_for(PortraitColorSlot::Accessory, acc_vi, acc_idx);
+        let acc_shadow_drone = acc_comp == Some(DRONE_COLOR_INDEX);
+        let acc_shadow = acc_comp
+            .filter(|&i| i != DRONE_COLOR_INDEX)
             .map(|i| palette_colors[i].1);
 
         Self {
@@ -446,6 +481,10 @@ impl PortraitDescriptor {
             shirt_color: shirt_color_from_palette,
             skin_highlight,
             acc_shadow,
+            eye_secondary,
+            skin_highlight_drone,
+            acc_shadow_drone,
+            eye_secondary_drone,
             generated: true,
         }
     }

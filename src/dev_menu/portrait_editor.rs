@@ -14,8 +14,8 @@ use crate::pilot::portrait::{
 use crate::states::AppState;
 
 use super::portrait_config::{
-    MIN_DRONE_COLORS, PALETTE_COLORS, PortraitColorSlot, PortraitPaletteConfig,
-    auto_secondary_index, save_config,
+    DRONE_COLOR_INDEX, MIN_DRONE_COLORS, PALETTE_COLORS, PortraitColorSlot,
+    PortraitPaletteConfig, auto_secondary_index, save_config,
 };
 
 // ── Colors ──────────────────────────────────────────────────────────────────
@@ -131,17 +131,26 @@ impl Default for PortraitEditorState {
 
 impl PortraitEditorState {
     /// Whether the current tab+state should show a secondary color grid.
-    /// Only Eye/Visor uses the old single-secondary grid.
+    /// Visor now uses the paired-row system, so this is always false.
     fn show_secondary(&self) -> bool {
-        matches!(self.active_tab.color_slot(), Some(PortraitColorSlot::Eye))
-            && self.eye_style == EyeStyle::Visor
+        false
     }
 
     /// Whether the current tab should show the paired swatch list.
     fn show_pairing(&self) -> bool {
-        self.active_tab
-            .color_slot()
-            .is_some_and(|s| s.needs_pairing())
+        let Some(slot) = self.active_tab.color_slot() else {
+            return false;
+        };
+        match slot {
+            PortraitColorSlot::Skin => true,
+            // Eye only shows pairing for the Visor variant
+            PortraitColorSlot::Eye => self.eye_style == EyeStyle::Visor,
+            // Accessory only shows pairing when the selected accessory uses a shadow
+            PortraitColorSlot::Accessory => {
+                self.accessory.is_some_and(|a| a.has_shadow())
+            }
+            _ => false,
+        }
     }
 
     /// Returns the variant index for the current tab's selected variant.
@@ -163,35 +172,34 @@ impl PortraitEditorState {
     fn build_descriptor(&self, config: &PortraitPaletteConfig) -> PortraitDescriptor {
         let skin_tone = PALETTE_COLORS[self.primary_colors[&PortraitColorSlot::Skin]].1;
         let hair_color = PALETTE_COLORS[self.primary_colors[&PortraitColorSlot::Hair]].1;
-        let eye_color = if self.eye_style == EyeStyle::Visor {
-            // Visor: use secondary eye color if set, fallback to primary
-            PALETTE_COLORS
-                .get(
-                    self.secondary_colors
-                        .get(&PortraitColorSlot::Eye)
-                        .copied()
-                        .unwrap_or(self.primary_colors[&PortraitColorSlot::Eye]),
-                )
-                .map(|c| c.1)
-                .unwrap_or(hair_color)
-        } else {
-            // Normal eyes: primary Eye pick = iris color
-            PALETTE_COLORS[self.primary_colors[&PortraitColorSlot::Eye]].1
-        };
+        let eye_idx = self.primary_colors[&PortraitColorSlot::Eye];
+        let eye_color = PALETTE_COLORS[eye_idx].1;
         let shirt_color = PALETTE_COLORS[self.primary_colors[&PortraitColorSlot::Shirt]].1;
         let acc_idx = self.primary_colors[&PortraitColorSlot::Accessory];
         let accessory_color = PALETTE_COLORS[acc_idx].1;
 
         let skin_idx = self.primary_colors[&PortraitColorSlot::Skin];
         let face_vi = ALL_FACE_SHAPES.iter().position(|s| *s == self.face_shape);
-        let skin_highlight = config
-            .get_complementary_for(PortraitColorSlot::Skin, face_vi, skin_idx)
+        let skin_comp = config.get_complementary_for(PortraitColorSlot::Skin, face_vi, skin_idx);
+        let skin_highlight_drone = skin_comp == Some(DRONE_COLOR_INDEX);
+        let skin_highlight = skin_comp
+            .filter(|&i| i != DRONE_COLOR_INDEX)
             .map(|i| PALETTE_COLORS[i].1);
+
+        let eye_vi = ALL_EYE_STYLES.iter().position(|s| *s == self.eye_style);
+        let eye_comp = config.get_complementary_for(PortraitColorSlot::Eye, eye_vi, eye_idx);
+        let eye_secondary_drone = eye_comp == Some(DRONE_COLOR_INDEX);
+        let eye_secondary = eye_comp
+            .filter(|&i| i != DRONE_COLOR_INDEX)
+            .map(|i| PALETTE_COLORS[i].1);
+
         let acc_vi = self
             .accessory
             .and_then(|a| ALL_ACCESSORIES.iter().position(|x| *x == a));
-        let acc_shadow = config
-            .get_complementary_for(PortraitColorSlot::Accessory, acc_vi, acc_idx)
+        let acc_comp = config.get_complementary_for(PortraitColorSlot::Accessory, acc_vi, acc_idx);
+        let acc_shadow_drone = acc_comp == Some(DRONE_COLOR_INDEX);
+        let acc_shadow = acc_comp
+            .filter(|&i| i != DRONE_COLOR_INDEX)
             .map(|i| PALETTE_COLORS[i].1);
 
         PortraitDescriptor {
@@ -208,6 +216,10 @@ impl PortraitEditorState {
             shirt_color,
             skin_highlight,
             acc_shadow,
+            eye_secondary,
+            skin_highlight_drone,
+            acc_shadow_drone,
+            eye_secondary_drone,
             generated: true,
         }
     }
@@ -242,6 +254,10 @@ pub struct PairingPickerPanel;
 
 #[derive(Component)]
 pub struct PairingPickerCell(pub usize);
+
+/// The special "drone color" cell in the pairing picker (rainbow).
+#[derive(Component)]
+pub struct DroneColorPickerCell;
 
 #[derive(Component)]
 pub struct AutoAssignAllButton;
@@ -1201,12 +1217,28 @@ pub fn handle_secondary_pairing_click(
 /// Clicking a color in the picker sets the complementary and closes the picker.
 pub fn handle_pairing_picker_click(
     query: Query<(&Interaction, &PairingPickerCell), Changed<Interaction>>,
+    drone_query: Query<&Interaction, (Changed<Interaction>, With<DroneColorPickerCell>)>,
     mut state: ResMut<PortraitEditorState>,
     mut config: ResMut<PortraitPaletteConfig>,
 ) {
     let Some(primary_idx) = state.selected_pairing_primary else {
         return;
     };
+
+    // Handle drone-color rainbow cell
+    for interaction in &drone_query {
+        if *interaction == Interaction::Pressed
+            && let Some(slot) = state.active_tab.color_slot()
+        {
+            let vi = state.current_variant_index();
+            config.set_complementary_for(slot, vi, primary_idx, DRONE_COLOR_INDEX);
+            state.selected_pairing_primary = None;
+            state.preview_dirty = true;
+            return;
+        }
+    }
+
+    // Handle normal palette cell
     for (interaction, cell) in &query {
         if *interaction == Interaction::Pressed
             && let Some(slot) = state.active_tab.color_slot()
@@ -1224,6 +1256,7 @@ pub fn dismiss_pairing_picker(
     mouse: Res<ButtonInput<MouseButton>>,
     mut state: ResMut<PortraitEditorState>,
     picker_cells: Query<&Interaction, With<PairingPickerCell>>,
+    drone_cell: Query<&Interaction, With<DroneColorPickerCell>>,
     secondary_cells: Query<&Interaction, With<SecondaryPairingCell>>,
 ) {
     if state.selected_pairing_primary.is_none() {
@@ -1232,8 +1265,13 @@ pub fn dismiss_pairing_picker(
     if !mouse.just_pressed(MouseButton::Left) {
         return;
     }
-    // Don't dismiss if hovering over picker or secondary cells
+    // Don't dismiss if hovering over picker, drone-color, or secondary cells
     for interaction in &picker_cells {
+        if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
+            return;
+        }
+    }
+    for interaction in &drone_cell {
         if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
             return;
         }
@@ -1253,8 +1291,8 @@ pub fn handle_auto_assign_all(
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed
+            && state.show_pairing()
             && let Some(slot) = state.active_tab.color_slot()
-            && slot.needs_pairing()
         {
             let vi = state.current_variant_index();
             config.auto_assign_all_for(slot, vi);
@@ -1417,7 +1455,7 @@ pub fn rebuild_primary_grid(
     let slot = state.active_tab.color_slot();
     let vi = state.current_variant_index();
     let selected = slot.and_then(|s| state.primary_colors.get(&s).copied());
-    let needs_pairing = slot.is_some_and(|s| s.needs_pairing());
+    let show_pairing = state.show_pairing();
 
     // Hide entire primary color section when tab has no color slot (e.g. Mouth)
     for entity in &section_panel {
@@ -1430,7 +1468,7 @@ pub fn rebuild_primary_grid(
 
     // Show/hide auto-pair button
     for entity in &auto_btn {
-        commands.entity(entity).insert(if needs_pairing {
+        commands.entity(entity).insert(if show_pairing {
             Visibility::Visible
         } else {
             Visibility::Hidden
@@ -1453,7 +1491,7 @@ pub fn rebuild_primary_grid(
     for entity in &allowed_panel {
         commands.entity(entity).despawn_children();
 
-        if needs_pairing {
+        if show_pairing {
             // Paired layout: chunk into rows with secondary row below each primary row
             commands.entity(entity).insert(Node {
                 flex_direction: FlexDirection::Column,
@@ -1492,18 +1530,25 @@ pub fn rebuild_primary_grid(
                             .with_children(|row| {
                                 for &i in chunk {
                                     let explicit = config.get_complementary_for(slot, vi, i);
-                                    let sec_idx = explicit
-                                        .unwrap_or_else(|| auto_secondary_index(slot, i));
-                                    let rgb = &PALETTE_COLORS[sec_idx].1;
                                     let is_active =
                                         state.selected_pairing_primary == Some(i);
-                                    spawn_secondary_pairing_cell(
-                                        row,
-                                        i,
-                                        rgb,
-                                        explicit.is_some(),
-                                        is_active,
-                                    );
+                                    if explicit == Some(DRONE_COLOR_INDEX) {
+                                        spawn_secondary_pairing_rainbow(
+                                            row, i, is_active,
+                                        );
+                                    } else {
+                                        let sec_idx = explicit.unwrap_or_else(|| {
+                                            auto_secondary_index(slot, i)
+                                        });
+                                        let rgb = &PALETTE_COLORS[sec_idx].1;
+                                        spawn_secondary_pairing_cell(
+                                            row,
+                                            i,
+                                            rgb,
+                                            explicit.is_some(),
+                                            is_active,
+                                        );
+                                    }
                                 }
                             });
                         });
@@ -1593,6 +1638,56 @@ fn spawn_secondary_pairing_cell(
     ));
 }
 
+fn spawn_secondary_pairing_rainbow(
+    parent: &mut ChildSpawnerCommands,
+    primary_index: usize,
+    is_active: bool,
+) {
+    let border = if is_active {
+        SELECTED_BORDER
+    } else {
+        COMPLEMENTARY_BORDER
+    };
+    parent
+        .spawn((
+            Button,
+            SecondaryPairingCell(primary_index),
+            Node {
+                width: Val::Px(COLOR_CELL_SIZE),
+                height: Val::Px(COLOR_CELL_SIZE),
+                border: UiRect::all(Val::Px(if is_active { 2.0 } else { 1.0 })),
+                flex_direction: FlexDirection::Column,
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK),
+            BorderColor::all(border),
+        ))
+        .with_children(|cell| {
+            let stripe_h = COLOR_CELL_SIZE / RAINBOW_STRIPES.len() as f32;
+            for &(r, g, b) in &RAINBOW_STRIPES {
+                cell.spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(stripe_h),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(r, g, b)),
+                ));
+            }
+        });
+}
+
+/// Rainbow stripe colors for the drone-color cell.
+const RAINBOW_STRIPES: [(f32, f32, f32); 6] = [
+    (1.0, 0.0, 0.0),   // red
+    (1.0, 0.5, 0.0),   // orange
+    (1.0, 1.0, 0.0),   // yellow
+    (0.0, 1.0, 0.0),   // green
+    (0.0, 0.4, 1.0),   // blue
+    (0.6, 0.0, 1.0),   // purple
+];
+
 pub fn rebuild_pairing_picker(
     state: Res<PortraitEditorState>,
     mut commands: Commands,
@@ -1611,6 +1706,9 @@ pub fn rebuild_pairing_picker(
         commands.entity(entity).despawn_children();
         if show {
             commands.entity(entity).with_children(|parent| {
+                // Drone-color rainbow cell (first option)
+                spawn_rainbow_cell(parent);
+
                 for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
                     parent.spawn((
                         Button,
@@ -1628,6 +1726,37 @@ pub fn rebuild_pairing_picker(
             });
         }
     }
+}
+
+fn spawn_rainbow_cell(parent: &mut ChildSpawnerCommands) {
+    parent
+        .spawn((
+            Button,
+            DroneColorPickerCell,
+            Node {
+                width: Val::Px(COLOR_CELL_SIZE),
+                height: Val::Px(COLOR_CELL_SIZE),
+                border: UiRect::all(Val::Px(1.0)),
+                flex_direction: FlexDirection::Column,
+                overflow: Overflow::clip(),
+                ..default()
+            },
+            BackgroundColor(Color::BLACK),
+            BorderColor::all(palette::VANILLA),
+        ))
+        .with_children(|cell| {
+            let stripe_h = COLOR_CELL_SIZE / RAINBOW_STRIPES.len() as f32;
+            for &(r, g, b) in &RAINBOW_STRIPES {
+                cell.spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Px(stripe_h),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(r, g, b)),
+                ));
+            }
+        });
 }
 
 pub fn rebuild_secondary_grid(
@@ -1717,11 +1846,18 @@ pub fn update_color_name_on_hover(
     secondary_query: Query<(&Interaction, &SecondaryColorCell)>,
     pairing_cell_query: Query<(&Interaction, &SecondaryPairingCell)>,
     pairing_picker_query: Query<(&Interaction, &PairingPickerCell)>,
+    drone_picker_query: Query<&Interaction, With<DroneColorPickerCell>>,
     mut label_query: Query<&mut Text, With<ColorNameLabel>>,
     state: Res<PortraitEditorState>,
     config: Res<PortraitPaletteConfig>,
 ) {
     let mut name = "";
+    for interaction in &drone_picker_query {
+        if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
+            name = "Drone Color";
+            break;
+        }
+    }
     for (interaction, cell) in &primary_query {
         if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
             name = PALETTE_COLORS[cell.0].0;
@@ -1742,10 +1878,14 @@ pub fn update_color_name_on_hover(
         let vi = state.current_variant_index();
         for (interaction, cell) in &pairing_cell_query {
             if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
-                let sec_idx = config
-                    .get_complementary_for(slot, vi, cell.0)
-                    .unwrap_or_else(|| auto_secondary_index(slot, cell.0));
-                name = PALETTE_COLORS[sec_idx].0;
+                let comp = config.get_complementary_for(slot, vi, cell.0);
+                if comp == Some(DRONE_COLOR_INDEX) {
+                    name = "Drone Color";
+                } else {
+                    let sec_idx =
+                        comp.unwrap_or_else(|| auto_secondary_index(slot, cell.0));
+                    name = PALETTE_COLORS[sec_idx].0;
+                }
                 break;
             }
         }

@@ -12,6 +12,9 @@ const CONFIG_PATH: &str = "assets/dev/portrait_palette.ron";
 /// Minimum number of allowed drone colors (one per race slot).
 pub const MIN_DRONE_COLORS: usize = 12;
 
+/// Sentinel index used in complementary maps to mean "use the pilot's drone color."
+pub const DRONE_COLOR_INDEX: usize = usize::MAX;
+
 /// Which color pool a portrait layer draws from.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PortraitColorSlot {
@@ -23,11 +26,6 @@ pub enum PortraitColorSlot {
     Drone,
 }
 
-impl PortraitColorSlot {
-    pub fn needs_pairing(self) -> bool {
-        matches!(self, PortraitColorSlot::Skin | PortraitColorSlot::Accessory)
-    }
-}
 
 /// Per-variant override for vetoes and complementary mappings.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -247,7 +245,7 @@ pub fn auto_secondary_index(slot: PortraitColorSlot, primary_idx: usize) -> usiz
     let primary_rgb = PALETTE_COLORS[primary_idx].1;
     let target = match slot {
         PortraitColorSlot::Skin => compute_highlight(primary_rgb),
-        PortraitColorSlot::Accessory => compute_shadow(primary_rgb),
+        PortraitColorSlot::Accessory | PortraitColorSlot::Eye => compute_shadow(primary_rgb),
         _ => return primary_idx,
     };
     nearest_palette_index(&target)

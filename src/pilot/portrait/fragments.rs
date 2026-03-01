@@ -77,7 +77,7 @@ struct PortraitColors {
     skin_highlight_hex: String,
     hair_hex: String,
     eye_hex: String,
-    eye_shadow_hex: String,
+    eye_secondary_hex: String,
     shirt_hex: String,
     acc_hex: String,
     acc_shadow_hex: String,
@@ -85,22 +85,34 @@ struct PortraitColors {
 
 impl PortraitColors {
     fn from_descriptor(desc: &PortraitDescriptor, bg_color: [f32; 3]) -> Self {
+        let skin_highlight = if desc.skin_highlight_drone {
+            bg_color
+        } else {
+            desc.skin_highlight
+                .unwrap_or_else(|| compute_highlight(desc.skin_tone))
+        };
+        let acc_shadow = if desc.acc_shadow_drone {
+            bg_color
+        } else {
+            desc.acc_shadow
+                .unwrap_or_else(|| compute_shadow(desc.accessory_color))
+        };
+        let eye_secondary = if desc.eye_secondary_drone {
+            bg_color
+        } else {
+            desc.eye_secondary
+                .unwrap_or_else(|| compute_shadow(desc.eye_color))
+        };
         Self {
             bg_hex: color_to_hex(bg_color),
             skin_hex: color_to_hex(desc.skin_tone),
-            skin_highlight_hex: color_to_hex(
-                desc.skin_highlight
-                    .unwrap_or_else(|| compute_highlight(desc.skin_tone)),
-            ),
+            skin_highlight_hex: color_to_hex(skin_highlight),
             hair_hex: color_to_hex(desc.hair_color),
             eye_hex: color_to_hex(desc.eye_color),
-            eye_shadow_hex: color_to_hex(compute_shadow(desc.eye_color)),
+            eye_secondary_hex: color_to_hex(eye_secondary),
             shirt_hex: color_to_hex(desc.shirt_color),
             acc_hex: color_to_hex(desc.accessory_color),
-            acc_shadow_hex: color_to_hex(
-                desc.acc_shadow
-                    .unwrap_or_else(|| compute_shadow(desc.accessory_color)),
-            ),
+            acc_shadow_hex: color_to_hex(acc_shadow),
         }
     }
 }
@@ -138,9 +150,9 @@ fn replace_layer_colors(content: &str, layer_type: LayerType, colors: &PortraitC
             replacements.push((SRC_GRAY_80, BLACK_HEX));
         }
         LayerType::EyesVisor => {
-            // Visor: WHITE = eye_color, BLACK = eye shadow (darker tint)
+            // Visor: WHITE = lens (primary eye color), BLACK = frame (secondary)
             replacements.push((SRC_WHITE, &colors.eye_hex));
-            replacements.push((SRC_BLACK, &colors.eye_shadow_hex));
+            replacements.push((SRC_BLACK, &colors.eye_secondary_hex));
             replacements.push((SRC_GRAY_50, VANILLA_HEX));
             replacements.push((SRC_GRAY_80, BLACK_HEX));
         }
@@ -406,6 +418,10 @@ mod tests {
             shirt_color: [0.8, 0.8, 0.85],
             skin_highlight: None,
             acc_shadow: None,
+            eye_secondary: None,
+            skin_highlight_drone: false,
+            acc_shadow_drone: false,
+            eye_secondary_drone: false,
             generated: true,
         }
     }
