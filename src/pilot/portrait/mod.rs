@@ -386,37 +386,50 @@ impl PortraitDescriptor {
             None
         };
 
-        let mut pick = |slot: PortraitColorSlot, fallback: [f32; 3]| -> (usize, [f32; 3]) {
-            let allowed = config.allowed_indices(slot);
-            if allowed.is_empty() {
-                return (0, fallback);
-            }
-            let idx = allowed[rng.gen_range(0..allowed.len())];
-            (idx, palette_colors[idx].1)
-        };
+        // Compute variant indices for variant-aware veto/complementary lookups
+        let face_vi = Some(ALL_FACE_SHAPES.iter().position(|s| *s == face_shape).unwrap_or(0));
+        let eye_vi = Some(ALL_EYE_STYLES.iter().position(|s| *s == eyes).unwrap_or(0));
+        let hair_vi = Some(ALL_HAIR_STYLES.iter().position(|s| *s == hair).unwrap_or(0));
+        let shirt_vi = Some(ALL_SHIRT_STYLES.iter().position(|s| *s == shirt).unwrap_or(0));
+        let acc_vi = accessory.and_then(|a| ALL_ACCESSORIES.iter().position(|x| *x == a));
 
-        let (skin_idx, skin_tone) = pick(PortraitColorSlot::Skin, SKIN_TONES[0]);
-        let (_hair_idx, hair_color) = pick(PortraitColorSlot::Hair, [0.3, 0.2, 0.1]);
-        let (_eye_idx, eye_color_fallback) = pick(PortraitColorSlot::Eye, [0.3, 0.5, 0.7]);
-        let (_shirt_idx, shirt_color_from_palette) =
-            pick(PortraitColorSlot::Shirt, derive_shirt_color(primary_color));
+        let mut pick =
+            |slot: PortraitColorSlot, vi: Option<usize>, fallback: [f32; 3]| -> (usize, [f32; 3]) {
+                let allowed = config.allowed_indices_for(slot, vi);
+                if allowed.is_empty() {
+                    return (0, fallback);
+                }
+                let idx = allowed[rng.gen_range(0..allowed.len())];
+                (idx, palette_colors[idx].1)
+            };
+
+        let (skin_idx, skin_tone) = pick(PortraitColorSlot::Skin, face_vi, SKIN_TONES[0]);
+        let (_hair_idx, hair_color) = pick(PortraitColorSlot::Hair, hair_vi, [0.3, 0.2, 0.1]);
+        let (_eye_idx, eye_color_fallback) =
+            pick(PortraitColorSlot::Eye, eye_vi, [0.3, 0.5, 0.7]);
+        let (_shirt_idx, shirt_color_from_palette) = pick(
+            PortraitColorSlot::Shirt,
+            shirt_vi,
+            derive_shirt_color(primary_color),
+        );
         let (acc_idx, acc_color_from_palette) = pick(
             PortraitColorSlot::Accessory,
+            acc_vi,
             derive_accessory_color(primary_color),
         );
 
         // Secondary colors: check complementary map, else fall back to auto-derived
         let skin_highlight = config
-            .get_complementary(PortraitColorSlot::Skin, skin_idx)
+            .get_complementary_for(PortraitColorSlot::Skin, face_vi, skin_idx)
             .map(|i| palette_colors[i].1);
 
         let eye_color = config
-            .get_complementary(PortraitColorSlot::Eye, _hair_idx)
+            .get_complementary_for(PortraitColorSlot::Eye, eye_vi, _eye_idx)
             .map(|i| palette_colors[i].1)
             .unwrap_or(eye_color_fallback);
 
         let acc_shadow = config
-            .get_complementary(PortraitColorSlot::Accessory, acc_idx)
+            .get_complementary_for(PortraitColorSlot::Accessory, acc_vi, acc_idx)
             .map(|i| palette_colors[i].1);
 
         Self {

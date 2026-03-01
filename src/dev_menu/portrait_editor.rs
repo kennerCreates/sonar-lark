@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use bevy::input::mouse::MouseButton;
 use bevy::prelude::*;
@@ -143,6 +143,22 @@ impl PortraitEditorState {
             .is_some_and(|s| s.needs_pairing())
     }
 
+    /// Returns the variant index for the current tab's selected variant.
+    /// None for Mouth (no color slot) and Drone (no variants).
+    fn current_variant_index(&self) -> Option<usize> {
+        match self.active_tab {
+            EditorTab::Face => ALL_FACE_SHAPES.iter().position(|s| *s == self.face_shape),
+            EditorTab::Eyes => ALL_EYE_STYLES.iter().position(|s| *s == self.eye_style),
+            EditorTab::Mouth => None,
+            EditorTab::Hair => ALL_HAIR_STYLES.iter().position(|s| *s == self.hair_style),
+            EditorTab::Shirt => ALL_SHIRT_STYLES.iter().position(|s| *s == self.shirt_style),
+            EditorTab::Accessory => self
+                .accessory
+                .and_then(|a| ALL_ACCESSORIES.iter().position(|x| *x == a)),
+            EditorTab::Drone => None,
+        }
+    }
+
     fn build_descriptor(&self, config: &PortraitPaletteConfig) -> PortraitDescriptor {
         let skin_tone = PALETTE_COLORS[self.primary_colors[&PortraitColorSlot::Skin]].1;
         let hair_color = PALETTE_COLORS[self.primary_colors[&PortraitColorSlot::Hair]].1;
@@ -166,11 +182,15 @@ impl PortraitEditorState {
         let accessory_color = PALETTE_COLORS[acc_idx].1;
 
         let skin_idx = self.primary_colors[&PortraitColorSlot::Skin];
+        let face_vi = ALL_FACE_SHAPES.iter().position(|s| *s == self.face_shape);
         let skin_highlight = config
-            .get_complementary(PortraitColorSlot::Skin, skin_idx)
+            .get_complementary_for(PortraitColorSlot::Skin, face_vi, skin_idx)
             .map(|i| PALETTE_COLORS[i].1);
+        let acc_vi = self
+            .accessory
+            .and_then(|a| ALL_ACCESSORIES.iter().position(|x| *x == a));
         let acc_shadow = config
-            .get_complementary(PortraitColorSlot::Accessory, acc_idx)
+            .get_complementary_for(PortraitColorSlot::Accessory, acc_vi, acc_idx)
             .map(|i| PALETTE_COLORS[i].1);
 
         PortraitDescriptor {
@@ -275,6 +295,12 @@ pub struct ColorNameLabel;
 #[derive(Component)]
 pub struct DroneWarningLabel;
 
+#[derive(Component)]
+pub struct MakeUniqueButton;
+
+#[derive(Component)]
+pub struct UniqueStatusRow;
+
 // ── Setup ───────────────────────────────────────────────────────────────────
 
 pub fn setup_portrait_editor(
@@ -305,7 +331,7 @@ pub fn setup_portrait_editor(
 fn build_ui(
     commands: &mut Commands,
     state: &PortraitEditorState,
-    _config: &PortraitPaletteConfig,
+    config: &PortraitPaletteConfig,
     preview_handle: Option<Handle<Image>>,
 ) {
     commands
@@ -488,8 +514,20 @@ fn build_ui(
                             },
                         ))
                         .with_children(|variant_area| {
-                            spawn_variant_buttons(variant_area, state);
+                            spawn_variant_buttons(variant_area, state, config);
                         });
+
+                    // Unique variant toggle row
+                    right.spawn((
+                        UniqueStatusRow,
+                        Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(8.0),
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        Visibility::Hidden,
+                    ));
 
                     // Color grids row: primary (left) + pairing (right)
                     right
@@ -823,18 +861,25 @@ fn spawn_action_button(parent: &mut ChildSpawnerCommands, label: &str, marker: i
         });
 }
 
-fn spawn_variant_buttons(parent: &mut ChildSpawnerCommands, state: &PortraitEditorState) {
+fn spawn_variant_buttons(
+    parent: &mut ChildSpawnerCommands,
+    state: &PortraitEditorState,
+    config: &PortraitPaletteConfig,
+) {
+    let slot = state.active_tab.color_slot();
     match state.active_tab {
         EditorTab::Face => {
             for (i, shape) in ALL_FACE_SHAPES.iter().enumerate() {
                 let is_active = *shape == state.face_shape;
-                spawn_radio_button(parent, EditorTab::Face, i, &format!("{shape:?}"), is_active);
+                let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
+                spawn_radio_button(parent, EditorTab::Face, i, &format!("{shape:?}"), is_active, is_unique);
             }
         }
         EditorTab::Eyes => {
             for (i, style) in ALL_EYE_STYLES.iter().enumerate() {
                 let is_active = *style == state.eye_style;
-                spawn_radio_button(parent, EditorTab::Eyes, i, &format!("{style:?}"), is_active);
+                let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
+                spawn_radio_button(parent, EditorTab::Eyes, i, &format!("{style:?}"), is_active, is_unique);
             }
         }
         EditorTab::Mouth => {
@@ -846,44 +891,51 @@ fn spawn_variant_buttons(parent: &mut ChildSpawnerCommands, state: &PortraitEdit
                     i,
                     &format!("{style:?}"),
                     is_active,
+                    false,
                 );
             }
         }
         EditorTab::Hair => {
             for (i, style) in ALL_HAIR_STYLES.iter().enumerate() {
                 let is_active = *style == state.hair_style;
-                spawn_radio_button(parent, EditorTab::Hair, i, &format!("{style:?}"), is_active);
+                let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
+                spawn_radio_button(parent, EditorTab::Hair, i, &format!("{style:?}"), is_active, is_unique);
             }
         }
         EditorTab::Shirt => {
             for (i, style) in ALL_SHIRT_STYLES.iter().enumerate() {
                 let is_active = *style == state.shirt_style;
+                let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
                 spawn_radio_button(
                     parent,
                     EditorTab::Shirt,
                     i,
                     &format!("{style:?}"),
                     is_active,
+                    is_unique,
                 );
             }
         }
         EditorTab::Accessory => {
-            // "None" option
+            // "None" option (never unique)
             spawn_radio_button(
                 parent,
                 EditorTab::Accessory,
                 ALL_ACCESSORIES.len(),
                 "None",
                 state.accessory.is_none(),
+                false,
             );
             for (i, acc) in ALL_ACCESSORIES.iter().enumerate() {
                 let is_active = state.accessory == Some(*acc);
+                let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
                 spawn_radio_button(
                     parent,
                     EditorTab::Accessory,
                     i,
                     &format!("{acc:?}"),
                     is_active,
+                    is_unique,
                 );
             }
         }
@@ -906,7 +958,15 @@ fn spawn_radio_button(
     index: usize,
     label: &str,
     active: bool,
+    is_unique: bool,
 ) {
+    let border_color = if active {
+        palette::SKY
+    } else if is_unique {
+        palette::SUNSHINE
+    } else {
+        palette::STEEL
+    };
     parent
         .spawn((
             Button,
@@ -916,15 +976,11 @@ fn spawn_radio_button(
                 padding: UiRect::horizontal(Val::Px(8.0)),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(1.0)),
+                border: UiRect::all(Val::Px(if is_unique { 2.0 } else { 1.0 })),
                 ..default()
             },
             BackgroundColor(if active { RADIO_ACTIVE } else { RADIO_NORMAL }),
-            BorderColor::all(if active {
-                palette::SKY
-            } else {
-                palette::STEEL
-            }),
+            BorderColor::all(border_color),
         ))
         .with_children(|btn| {
             btn.spawn((
@@ -935,6 +991,8 @@ fn spawn_radio_button(
                 },
                 TextColor(if active {
                     palette::VANILLA
+                } else if is_unique {
+                    palette::SUNSHINE
                 } else {
                     palette::SIDEWALK
                 }),
@@ -969,6 +1027,7 @@ pub fn handle_part_tabs(
     for (interaction, tab) in &query {
         if *interaction == Interaction::Pressed && state.active_tab != tab.0 {
             state.active_tab = tab.0;
+            state.selected_pairing_primary = None;
             state.preview_dirty = true;
         }
     }
@@ -1037,6 +1096,7 @@ pub fn handle_primary_color_veto(
     let Some(slot) = state.active_tab.color_slot() else {
         return;
     };
+    let vi = state.current_variant_index();
     for (interaction, cell) in &query {
         if *interaction == Interaction::Hovered || *interaction == Interaction::Pressed {
             // Block vetoing if it would drop drone colors below minimum
@@ -1046,7 +1106,7 @@ pub fn handle_primary_color_veto(
             {
                 return;
             }
-            config.toggle_veto(slot, cell.0);
+            config.toggle_veto_for(slot, vi, cell.0);
         }
     }
 }
@@ -1062,8 +1122,9 @@ pub fn handle_secondary_color_click(
             && let Some(slot) = state.active_tab.color_slot()
         {
             state.secondary_colors.insert(slot, cell.0);
+            let vi = state.current_variant_index();
             if let Some(&primary_idx) = state.primary_colors.get(&slot) {
-                config.set_complementary(slot, primary_idx, cell.0);
+                config.set_complementary_for(slot, vi, primary_idx, cell.0);
             }
             state.preview_dirty = true;
         }
@@ -1080,7 +1141,8 @@ pub fn handle_auto_secondary(
             && let Some(slot) = state.active_tab.color_slot()
             && let Some(&primary_idx) = state.primary_colors.get(&slot)
         {
-            config.clear_complementary(slot, primary_idx);
+            let vi = state.current_variant_index();
+            config.clear_complementary_for(slot, vi, primary_idx);
             state.secondary_colors.remove(&slot);
             state.preview_dirty = true;
         }
@@ -1134,6 +1196,26 @@ pub fn handle_reset_all_button(
     }
 }
 
+pub fn handle_make_unique_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<MakeUniqueButton>)>,
+    mut config: ResMut<PortraitPaletteConfig>,
+    mut state: ResMut<PortraitEditorState>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed
+            && let Some(slot) = state.active_tab.color_slot()
+            && let Some(vi) = state.current_variant_index()
+        {
+            if config.is_variant_unique(slot, vi) {
+                config.revert_variant_to_default(slot, vi);
+            } else {
+                config.make_variant_unique(slot, vi);
+            }
+            state.preview_dirty = true;
+        }
+    }
+}
+
 // ── Pairing interaction handlers ─────────────────────────────────────────────
 
 pub fn handle_pairing_row_click(
@@ -1160,7 +1242,8 @@ pub fn handle_pairing_picker_click(
         if *interaction == Interaction::Pressed
             && let Some(slot) = state.active_tab.color_slot()
         {
-            config.set_complementary(slot, primary_idx, cell.0);
+            let vi = state.current_variant_index();
+            config.set_complementary_for(slot, vi, primary_idx, cell.0);
             state.selected_pairing_primary = None;
             state.preview_dirty = true;
         }
@@ -1177,7 +1260,8 @@ pub fn handle_auto_assign_all(
             && let Some(slot) = state.active_tab.color_slot()
             && slot.needs_pairing()
         {
-            config.auto_assign_all(slot);
+            let vi = state.current_variant_index();
+            config.auto_assign_all_for(slot, vi);
             state.preview_dirty = true;
         }
     }
@@ -1239,17 +1323,86 @@ pub fn update_tab_visuals(
 
 pub fn rebuild_variant_panel(
     state: Res<PortraitEditorState>,
+    config: Res<PortraitPaletteConfig>,
     mut commands: Commands,
     variant_panel: Query<Entity, With<VariantPanel>>,
 ) {
-    if !state.is_changed() {
+    if !state.is_changed() && !config.is_changed() {
         return;
     }
     for entity in &variant_panel {
         commands.entity(entity).despawn_children();
         commands.entity(entity).with_children(|parent| {
-            spawn_variant_buttons(parent, &state);
+            spawn_variant_buttons(parent, &state, &config);
         });
+    }
+}
+
+pub fn rebuild_unique_status_row(
+    state: Res<PortraitEditorState>,
+    config: Res<PortraitPaletteConfig>,
+    mut commands: Commands,
+    row_query: Query<Entity, With<UniqueStatusRow>>,
+) {
+    if !state.is_changed() && !config.is_changed() {
+        return;
+    }
+    let slot = state.active_tab.color_slot();
+    let vi = state.current_variant_index();
+    // Only show for tabs with both a color slot and a variant
+    let show = slot.is_some() && vi.is_some();
+
+    for entity in &row_query {
+        commands.entity(entity).insert(if show {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        });
+        commands.entity(entity).despawn_children();
+        if let (Some(slot), Some(vi)) = (slot, vi) {
+            let is_unique = config.is_variant_unique(slot, vi);
+            commands.entity(entity).with_children(|row| {
+                let (label, bg_color, border_color) = if is_unique {
+                    ("REVERT TO DEFAULT", palette::SAPPHIRE, palette::SUNSHINE)
+                } else {
+                    ("MAKE UNIQUE", palette::INDIGO, palette::STEEL)
+                };
+                row.spawn((
+                    Button,
+                    MakeUniqueButton,
+                    Node {
+                        height: Val::Px(24.0),
+                        padding: UiRect::horizontal(Val::Px(8.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(bg_color),
+                    BorderColor::all(border_color),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new(label),
+                        TextFont {
+                            font_size: 11.0,
+                            ..default()
+                        },
+                        TextColor(palette::VANILLA),
+                    ));
+                });
+                if is_unique {
+                    row.spawn((
+                        Text::new("(variant has its own veto set)"),
+                        TextFont {
+                            font_size: 11.0,
+                            ..default()
+                        },
+                        TextColor(palette::SUNSHINE),
+                    ));
+                }
+            });
+        }
     }
 }
 
@@ -1265,6 +1418,7 @@ pub fn rebuild_primary_grid(
         return;
     }
     let slot = state.active_tab.color_slot();
+    let vi = state.current_variant_index();
     let selected = slot.and_then(|s| state.primary_colors.get(&s).copied());
 
     // Hide entire primary color section when tab has no color slot (e.g. Mouth)
@@ -1276,11 +1430,16 @@ pub fn rebuild_primary_grid(
         });
     }
 
+    // Use variant-aware allowed check
+    let allowed_set: HashSet<usize> = slot
+        .map(|s| config.allowed_indices_for(s, vi).into_iter().collect())
+        .unwrap_or_default();
+
     for entity in &allowed_panel {
         commands.entity(entity).despawn_children();
         commands.entity(entity).with_children(|parent| {
             for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
-                if slot.is_some_and(|s| config.is_vetoed(s, i)) {
+                if !allowed_set.contains(&i) {
                     continue;
                 }
                 spawn_color_cell(parent, i, rgb, selected == Some(i));
@@ -1292,7 +1451,7 @@ pub fn rebuild_primary_grid(
         commands.entity(entity).despawn_children();
         commands.entity(entity).with_children(|parent| {
             for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
-                if !slot.is_some_and(|s| config.is_vetoed(s, i)) {
+                if slot.is_none() || allowed_set.contains(&i) {
                     continue;
                 }
                 spawn_color_cell(parent, i, rgb, selected == Some(i));
@@ -1355,7 +1514,8 @@ pub fn rebuild_pairing_panel(
     }
 
     // Update progress label
-    let (mapped, total) = config.pairing_progress(slot);
+    let vi = state.current_variant_index();
+    let (mapped, total) = config.pairing_progress_for(slot, vi);
     for mut text in &mut progress_query {
         let msg = format!("Color Pairings ({mapped}/{total})");
         if text.0 != msg {
@@ -1364,12 +1524,12 @@ pub fn rebuild_pairing_panel(
     }
 
     // Rebuild pairing list
-    let allowed = config.allowed_indices(slot);
+    let allowed = config.allowed_indices_for(slot, vi);
     for entity in &list_panel {
         commands.entity(entity).despawn_children();
         commands.entity(entity).with_children(|parent| {
             for &idx in &allowed {
-                let secondary_idx = config.get_complementary(slot, idx);
+                let secondary_idx = config.get_complementary_for(slot, vi, idx);
                 let is_selected = state.selected_pairing_primary == Some(idx);
                 spawn_pairing_row(parent, idx, secondary_idx, is_selected);
             }

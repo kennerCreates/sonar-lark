@@ -32,6 +32,7 @@ impl Plugin for DevMenuPlugin {
                 portrait_editor::handle_auto_assign_all,
                 portrait_editor::handle_save_button,
                 portrait_editor::handle_reset_slot_button,
+                portrait_editor::handle_make_unique_button,
             )
                 .run_if(in_state(AppState::DevMenu)),
         )
@@ -42,6 +43,7 @@ impl Plugin for DevMenuPlugin {
                 portrait_editor::update_preview,
                 portrait_editor::update_tab_visuals,
                 portrait_editor::rebuild_variant_panel,
+                portrait_editor::rebuild_unique_status_row,
                 portrait_editor::rebuild_primary_grid,
                 portrait_editor::rebuild_secondary_grid,
                 portrait_editor::rebuild_pairing_panel,
