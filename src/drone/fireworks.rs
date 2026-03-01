@@ -68,7 +68,7 @@ pub struct FireworkMeshes {
 }
 
 #[derive(Resource)]
-pub struct FireworkSounds(#[allow(dead_code)] pub Vec<Handle<bevy::audio::AudioSource>>);
+pub struct FireworkSounds(pub Vec<Handle<bevy::audio::AudioSource>>);
 
 #[derive(Component)]
 pub struct PendingShell {
@@ -451,8 +451,14 @@ pub fn tick_firework_shells(
                 shell.accent_color,
             );
 
-            // TODO: firework sound temporarily disconnected
-            let _ = &firework_sounds;
+            if let Some(ref sounds) = firework_sounds {
+                if let Some(handle) = sounds.0.first() {
+                    commands.spawn((
+                        AudioPlayer::new(handle.clone()),
+                        PlaybackSettings::DESPAWN,
+                    ));
+                }
+            }
 
             commands.entity(entity).despawn();
         }

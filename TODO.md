@@ -24,12 +24,7 @@ Complete. Pilot avatars using hand-drawn Inkscape SVG fragments assembled at run
 
 #### 7. ~~Unify button visual handlers with `ThemedButton` marker~~ ✅
 
-#### 8. Re-enable or remove disconnected firework sounds
-`FireworkSounds` resource is loaded (`fireworks.rs:70`) but playback is disconnected (`fireworks.rs:459`). The `let _ = &firework_sounds;` is a warning suppression hack.
-
-- [ ] Either re-enable the sound playback or remove the resource, its loading system, and the `let _` line.
-
-Files: `drone/fireworks.rs`, `drone/mod.rs`
+#### 8. ~~Re-enable or remove disconnected firework sounds~~ ✅
 
 ### Phase 3 — Modular Drone Models
 - [ ] Model part library in Blender: frames (5-6), arms (4), canopies (3-4), optional extras (prop guards, antennas)
