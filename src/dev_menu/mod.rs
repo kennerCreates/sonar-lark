@@ -27,20 +27,24 @@ impl Plugin for DevMenuPlugin {
                 portrait_editor::handle_primary_color_veto,
                 portrait_editor::handle_secondary_color_click,
                 portrait_editor::handle_auto_secondary,
+                portrait_editor::handle_pairing_row_click,
+                portrait_editor::handle_pairing_picker_click,
+                portrait_editor::handle_auto_assign_all,
                 portrait_editor::handle_save_button,
                 portrait_editor::handle_reset_slot_button,
-                portrait_editor::handle_reset_all_button,
-                portrait_editor::update_preview,
             )
                 .run_if(in_state(AppState::DevMenu)),
         )
         .add_systems(
             Update,
             (
+                portrait_editor::handle_reset_all_button,
+                portrait_editor::update_preview,
                 portrait_editor::update_tab_visuals,
                 portrait_editor::rebuild_variant_panel,
                 portrait_editor::rebuild_primary_grid,
                 portrait_editor::rebuild_secondary_grid,
+                portrait_editor::rebuild_pairing_panel,
                 portrait_editor::update_drone_warning,
                 portrait_editor::update_color_name_on_hover,
                 portrait_editor::handle_button_hover_visuals,

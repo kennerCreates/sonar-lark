@@ -88,13 +88,19 @@ impl PortraitColors {
         Self {
             bg_hex: color_to_hex(bg_color),
             skin_hex: color_to_hex(desc.skin_tone),
-            skin_highlight_hex: color_to_hex(compute_highlight(desc.skin_tone)),
+            skin_highlight_hex: color_to_hex(
+                desc.skin_highlight
+                    .unwrap_or_else(|| compute_highlight(desc.skin_tone)),
+            ),
             hair_hex: color_to_hex(desc.hair_color),
             eye_hex: color_to_hex(desc.eye_color),
             eye_shadow_hex: color_to_hex(compute_shadow(desc.eye_color)),
             shirt_hex: color_to_hex(desc.shirt_color),
             acc_hex: color_to_hex(desc.accessory_color),
-            acc_shadow_hex: color_to_hex(compute_shadow(desc.accessory_color)),
+            acc_shadow_hex: color_to_hex(
+                desc.acc_shadow
+                    .unwrap_or_else(|| compute_shadow(desc.accessory_color)),
+            ),
         }
     }
 }
@@ -398,6 +404,8 @@ mod tests {
             eye_color: [0.2, 0.5, 0.8],
             accessory_color: [0.5, 0.5, 0.5],
             shirt_color: [0.8, 0.8, 0.85],
+            skin_highlight: None,
+            acc_shadow: None,
             generated: true,
         }
     }
@@ -426,7 +434,7 @@ mod tests {
             eye_color: [0.3, 0.3, 0.7],
             accessory_color: [0.7, 0.2, 0.2],
             shirt_color: [0.8, 0.8, 0.8],
-            generated: true,
+            ..test_desc()
         };
         let svg = assemble_svg(&desc, [0.0, 0.0, 0.0], &parts);
         assert!(svg.contains("face-angular"), "missing face content");
@@ -534,7 +542,7 @@ mod tests {
             eye_color: [0.2, 0.6, 0.3],
             accessory_color: [0.7, 0.2, 0.2],
             shirt_color: [0.8, 0.8, 0.85],
-            generated: true,
+            ..test_desc()
         };
         let svg = assemble_svg(&desc, [0.1, 0.1, 0.15], &parts);
 

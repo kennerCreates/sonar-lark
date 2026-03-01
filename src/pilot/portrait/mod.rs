@@ -248,6 +248,10 @@ pub struct PortraitDescriptor {
     #[serde(default)]
     pub shirt_color: [f32; 3],
     #[serde(default)]
+    pub skin_highlight: Option<[f32; 3]>,
+    #[serde(default)]
+    pub acc_shadow: Option<[f32; 3]>,
+    #[serde(default)]
     pub generated: bool,
 }
 
@@ -285,6 +289,8 @@ impl Default for PortraitDescriptor {
             eye_color: [0.0; 3],
             accessory_color: [0.0; 3],
             shirt_color: [0.0; 3],
+            skin_highlight: None,
+            acc_shadow: None,
             generated: false,
         }
     }
@@ -349,6 +355,8 @@ impl PortraitDescriptor {
             eye_color,
             accessory_color,
             shirt_color,
+            skin_highlight: None,
+            acc_shadow: None,
             generated: true,
         }
     }
@@ -397,21 +405,19 @@ impl PortraitDescriptor {
             derive_accessory_color(primary_color),
         );
 
-        // Secondary colors: check complementary map, else use palette pick or auto-derive
-        let _skin_highlight = config
+        // Secondary colors: check complementary map, else fall back to auto-derived
+        let skin_highlight = config
             .get_complementary(PortraitColorSlot::Skin, skin_idx)
             .map(|i| palette_colors[i].1);
-        // Note: skin highlight is auto-computed by the fragment system, not stored on descriptor
 
         let eye_color = config
             .get_complementary(PortraitColorSlot::Eye, _hair_idx)
             .map(|i| palette_colors[i].1)
             .unwrap_or(eye_color_fallback);
 
-        let _acc_shadow = config
+        let acc_shadow = config
             .get_complementary(PortraitColorSlot::Accessory, acc_idx)
             .map(|i| palette_colors[i].1);
-        // Note: acc shadow is auto-computed by the fragment system, not stored on descriptor
 
         Self {
             face_shape,
@@ -425,6 +431,8 @@ impl PortraitDescriptor {
             eye_color,
             accessory_color: acc_color_from_palette,
             shirt_color: shirt_color_from_palette,
+            skin_highlight,
+            acc_shadow,
             generated: true,
         }
     }

@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::palette;
+use crate::pilot::portrait::fragments::{compute_highlight, compute_shadow};
 
 const CONFIG_PATH: &str = "assets/dev/portrait_palette.ron";
 
@@ -23,11 +24,8 @@ pub enum PortraitColorSlot {
 }
 
 impl PortraitColorSlot {
-    pub fn has_secondary(self) -> bool {
-        matches!(
-            self,
-            PortraitColorSlot::Skin | PortraitColorSlot::Eye | PortraitColorSlot::Accessory
-        )
+    pub fn needs_pairing(self) -> bool {
+        matches!(self, PortraitColorSlot::Skin | PortraitColorSlot::Accessory)
     }
 }
 
@@ -98,6 +96,50 @@ impl PortraitPaletteConfig {
         self.vetoed.clear();
         self.complementary.clear();
     }
+
+    /// Returns (mapped_count, total_allowed) for the given slot.
+    pub fn pairing_progress(&self, slot: PortraitColorSlot) -> (usize, usize) {
+        let allowed = self.allowed_indices(slot);
+        let total = allowed.len();
+        let mapped = allowed
+            .iter()
+            .filter(|&&i| self.get_complementary(slot, i).is_some())
+            .count();
+        (mapped, total)
+    }
+
+    /// Auto-assign secondary colors for all unmapped primaries in a slot.
+    /// Skin: nearest palette color to compute_highlight(primary).
+    /// Accessory: nearest palette color to compute_shadow(primary).
+    pub fn auto_assign_all(&mut self, slot: PortraitColorSlot) {
+        let allowed = self.allowed_indices(slot);
+        for &primary_idx in &allowed {
+            if self.get_complementary(slot, primary_idx).is_some() {
+                continue;
+            }
+            let primary_rgb = PALETTE_COLORS[primary_idx].1;
+            let target = match slot {
+                PortraitColorSlot::Skin => compute_highlight(primary_rgb),
+                PortraitColorSlot::Accessory => compute_shadow(primary_rgb),
+                _ => continue,
+            };
+            let nearest = nearest_palette_index(&target);
+            self.set_complementary(slot, primary_idx, nearest);
+        }
+    }
+}
+
+fn nearest_palette_index(target: &[f32; 3]) -> usize {
+    PALETTE_COLORS
+        .iter()
+        .enumerate()
+        .min_by(|(_, (_, a)), (_, (_, b))| {
+            let da: f32 = (0..3).map(|i| (a[i] - target[i]).powi(2)).sum();
+            let db: f32 = (0..3).map(|i| (b[i] - target[i]).powi(2)).sum();
+            da.partial_cmp(&db).unwrap()
+        })
+        .map(|(i, _)| i)
+        .unwrap_or(0)
 }
 
 pub fn load_config() -> PortraitPaletteConfig {

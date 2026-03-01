@@ -67,7 +67,7 @@ pub struct FireworkMeshes {
 }
 
 #[derive(Resource)]
-pub struct FireworkSounds(pub Vec<Handle<bevy::audio::AudioSource>>);
+pub struct FireworkSounds(#[allow(dead_code)] pub Vec<Handle<bevy::audio::AudioSource>>);
 
 #[derive(Component)]
 pub struct PendingShell {
