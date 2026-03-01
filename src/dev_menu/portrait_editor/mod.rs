@@ -1,5 +1,7 @@
 mod build;
-pub mod systems;
+pub mod display;
+pub mod grid;
+pub mod interaction;
 
 use std::collections::HashMap;
 
@@ -306,4 +308,6 @@ pub fn cleanup_portrait_editor(mut commands: Commands) {
 }
 
 // Re-export all public systems so dev_menu/mod.rs doesn't need to change paths.
-pub use systems::*;
+pub use display::*;
+pub use grid::*;
+pub use interaction::*;

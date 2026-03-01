@@ -1,9 +1,13 @@
+pub mod camera_hud;
 pub mod collision;
+pub mod collision_math;
 pub mod gate;
+pub mod leaderboard;
 pub mod lifecycle;
+pub mod overlays;
 pub mod progress;
+pub mod start_button;
 pub mod timing;
-pub mod ui;
 
 use bevy::prelude::*;
 
@@ -16,7 +20,7 @@ impl Plugin for RacePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             OnEnter(AppState::Race),
-            (setup_race, ui::setup_race_ui, ui::setup_leaderboard.after(setup_portrait_cache), ui::setup_camera_hud, lifecycle::load_race_sounds),
+            (setup_race, start_button::setup_race_ui, leaderboard::setup_leaderboard.after(setup_portrait_cache), camera_hud::setup_camera_hud, lifecycle::load_race_sounds),
         )
             // Build GatePlanes resource once gate entities are spawned
             .add_systems(
@@ -56,16 +60,16 @@ impl Plugin for RacePlugin {
             .add_systems(
                 Update,
                 (
-                    ui::handle_start_race_button,
-                    ui::update_start_button_visuals,
-                    ui::update_start_button_text,
-                    ui::show_no_gates_banner,
-                    ui::handle_open_editor_button,
-                    ui::update_open_editor_button_visuals,
-                    ui::manage_countdown_text,
-                    ui::update_race_clock_display,
-                    ui::update_leaderboard,
-                    ui::update_camera_hud,
+                    start_button::handle_start_race_button,
+                    start_button::update_start_button_visuals,
+                    start_button::update_start_button_text,
+                    overlays::show_no_gates_banner,
+                    overlays::handle_open_editor_button,
+                    overlays::update_open_editor_button_visuals,
+                    overlays::manage_countdown_text,
+                    overlays::update_race_clock_display,
+                    leaderboard::update_leaderboard,
+                    camera_hud::update_camera_hud,
                 )
                     .run_if(in_state(AppState::Race)),
             )

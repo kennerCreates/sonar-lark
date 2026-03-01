@@ -57,7 +57,7 @@ The physics model uses a **thrust-through-body** architecture: the drone's orien
 
 ## AI Path Following
 
-Each drone follows a unique cyclic Catmull-Rom spline (3 control points per gate). Per-drone variation: gate pass offset, approach scaling, midleg lateral bias (all deterministic via Fibonacci hashing + `RaceSeed`). `POINTS_PER_GATE = 3.0`. Full lap: all gates + gate 0 again. Curvature-aware speed limiting + gate correction blending + adaptive look-ahead. Requires >= 2 gates.
+Each drone follows a unique cyclic Catmull-Rom spline (3 control points per gate). Per-drone variation: gate pass offset, approach scaling, midleg lateral bias (all deterministic via Fibonacci hashing + `RaceSeed`). `POINTS_PER_GATE = 3.0`. Full lap: all gates + gate 0 again. Curvature-aware speed limiting + gate correction blending + adaptive look-ahead. Requires >= 2 gates. Wandering logic extracted to `wander.rs` (`WanderBounds`, `wander_waypoint()`, `update_wander_targets()`, `transition_to_wandering()`, `build_wander_bounds()`).
 
 ## Aerodynamic Perturbations
 

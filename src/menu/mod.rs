@@ -1,3 +1,4 @@
+mod discover;
 pub mod ui;
 
 use bevy::prelude::*;

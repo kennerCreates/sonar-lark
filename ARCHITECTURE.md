@@ -28,6 +28,9 @@ src/
 │   └── skybox.rs        SkyboxMaterial, procedural TRON night sky
 ├── common/              Environment setup (light, ground, skybox)
 ├── menu/                Menu UI, state navigation
+│   ├── mod.rs           MenuPlugin, system registration
+│   ├── discover.rs      CourseEntry, discover_courses(), discover_courses_in() + tests
+│   └── ui.rs            Menu setup, course selection, button handlers
 ├── obstacle/            Obstacle data layer
 │   ├── definition.rs    ObstacleId, ObstacleDef, TriggerVolumeConfig, CollisionVolumeConfig
 │   ├── library.rs       ObstacleLibrary resource, RON load/save
@@ -37,7 +40,10 @@ src/
 │   └── loader.rs        Load/save/spawn courses from RON
 ├── editor/              Map editor
 │   ├── workshop/        Define new obstacle types from glb scenes
-│   │   ├── mod.rs       WorkshopPlugin, WorkshopState, preview spawning, gizmo
+│   │   ├── mod.rs       WorkshopPlugin, WorkshopState, lifecycle, node list population
+│   │   ├── preview.rs   spawn_preview(), spawn_placeholder_preview()
+│   │   ├── gizmos.rs    draw_trigger_gizmo(), draw_collision_gizmo(), draw_ground_gizmo()
+│   │   ├── widgets.rs   Move/resize widget drawing and handling
 │   │   └── ui/          Workshop UI
 │   │       ├── mod.rs   Re-exports
 │   │       ├── build.rs UI hierarchy construction, marker components, constants
@@ -46,17 +52,30 @@ src/
 │       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, PlacedProp, PlacedCamera, EditorTab, placement/selection
 │       ├── overlays.rs  Visualization gizmos (trigger volumes, gate sequence, spline preview, prop gizmos, camera frustums)
 │       ├── preview.rs   Camera PiP preview (render-to-texture, PreviewCamera, sync system)
-│       ├── transform_gizmos.rs Move/rotate/scale widget systems
+│       ├── transform_gizmos/ Move/rotate/scale widget systems
+│       │   ├── mod.rs       Widget resource types, constants, sample_ring_screen_dist()
+│       │   ├── move_gizmo.rs  draw_move_gizmo(), handle_move_gizmo()
+│       │   ├── rotate_gizmo.rs rotation_axis_from_modifiers(), angle_in_plane(), draw/handle + tests
+│       │   └── scale_gizmo.rs draw_scale_gizmo(), handle_scale_gizmo()
 │       └── ui/          Course editor UI
 │           ├── mod.rs   Re-exports
 │           ├── types.rs Marker components, resources, color constants
-│           ├── build.rs UI hierarchy construction (palette, panels)
-│           ├── file_ops.rs Save/load/delete, navigation, gate ordering
+│           ├── discover.rs discover_existing_courses(), discover_existing_courses_in() + tests
+│           ├── left_panel.rs build_course_editor_ui(), build_left_panel(), tab/prop palette buttons
+│           ├── right_panel.rs build_right_panel(), palette/course/action buttons, dividers
+│           ├── data.rs  build_course_data(), next_gate_order_from_instances() + tests
+│           ├── load.rs  load_course_into_editor(), handle_load_button(), auto_load_pending_course()
+│           ├── save_delete.rs Navigation, save/delete flows, gate ordering
 │           └── systems.rs Interaction handlers, display updates, prop color
 ├── dev_menu/            Development tools (accessible via Dev button on main menu)
 │   ├── mod.rs           DevMenuPlugin, system registration
 │   ├── portrait_config.rs PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS, RON persistence
-│   └── portrait_editor.rs Portrait palette editor UI, live preview, veto/complementary systems
+│   └── portrait_editor/ Portrait palette editor
+│       ├── mod.rs       PortraitEditorState, EditorTab, component markers, setup/cleanup
+│       ├── build.rs     UI hierarchy construction
+│       ├── interaction.rs Button/click handlers (tabs, variants, colors, save, reset, pairing)
+│       ├── grid.rs      Color grid rebuilding, spawn_color_cell, pairing picker
+│       └── display.rs   Preview update, tab visuals, variant panel, warnings
 ├── pilot/               Procedural pilot system
 │   ├── mod.rs           PilotPlugin, Pilot, PilotId, SelectedPilots, PilotConfigs, ColorScheme
 │   ├── personality.rs   PersonalityTrait enum, trait modifiers, catchphrase pools
@@ -64,7 +83,9 @@ src/
 │   ├── gamertag.rs      Combinatorial gamertag generation
 │   ├── roster.rs        PilotRoster resource, RON persistence, initial generation, portrait migration
 │   └── portrait/        Portrait generation from master Inkscape SVG
-│       ├── mod.rs       PortraitDescriptor, slot enums (FaceShape, EyeStyle, MouthStyle, HairStyle, ShirtStyle, Accessory)
+│       ├── mod.rs       Re-exports from slot_enums + descriptor
+│       ├── slot_enums.rs FaceShape, EyeStyle, MouthStyle, HairStyle, ShirtStyle, Accessory + ALL_* arrays
+│       ├── descriptor.rs SecondaryColor, PortraitDescriptor, serde compat, color helpers, generate + tests
 │       ├── loader.rs    PortraitParts resource, master SVG layer parser, hot-reload (F6)
 │       ├── fragments.rs Per-layer hex color replacement, assemble_svg(), PortraitColors, LayerType
 │       ├── rasterize.rs resvg pipeline: SVG → tiny_skia::Pixmap → Bevy Image (48×48)
@@ -72,7 +93,8 @@ src/
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, DroneIdentity, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
-│   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance, update_wander_targets (FixedUpdate, spline-based)
+│   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance (FixedUpdate, spline-based)
+│   ├── wander.rs        WanderBounds, wander_waypoint(), update_wander_targets(), transition_to_wandering()
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
 │   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio
 │   ├── fireworks.rs     Victory fireworks on first finish: placed emitter-based or auto gate 0
@@ -82,9 +104,14 @@ src/
 ├── race/                Race mechanics
 │   ├── gate.rs          GateIndex, GateForward, GatePlanes, plane-crossing gate detection
 │   ├── collision.rs     ObstacleCollisionCache, swept segment vs OBB collision, crash_drone helper
+│   ├── collision_math.rs segment_obb_intersection(), point_in_gate_opening() — pure geometry
 │   ├── progress.rs      RaceProgress, per-drone state tracking
 │   ├── timing.rs        RaceClock
-│   └── lifecycle.rs     Countdown, finish detection
+│   ├── lifecycle.rs     Countdown, finish detection
+│   ├── start_button.rs  StartRaceButton, setup_race_ui(), countdown text
+│   ├── overlays.rs      Race clock display, no-gates banner, open-editor button
+│   ├── leaderboard.rs   Leaderboard panel (12 rows), fmt_time()
+│   └── camera_hud.rs    Camera mode HUD overlay
 ├── camera/              Camera modes
 │   ├── chase.rs         Broadcast-style pack-follow camera (Chase mode, default in Race)
 │   ├── fpv.rs           Stabilized close-follow camera on target drone (FPV mode)
@@ -181,7 +208,7 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 |--------|-------|----------------|
 | `obstacle::library` | 8 | Insert/get, overwrite, save/load roundtrip, error cases, existing RON format |
 | `course::loader` | 11 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course, camera roundtrip, backward compat (no cameras field) |
-| `menu::ui` | 5 | Course discovery, filtering, sorting, path storage, missing directory |
+| `menu::discover` | 8 | Course discovery, filtering, sorting, path storage, gate counting, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
 | `drone::paths` | 25 | Race path/spline generation, per-drone path generation, start positions, return path generation |
 | `drone::spawning` | 2 | Config randomization bounds, PID variation application |
@@ -194,7 +221,8 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 | `pilot::skill` | 4 | Config within bounds, high skill tighter ranges, traits modify config |
 | `pilot::roster` | 10 | Save/load roundtrip, roster size, unique IDs, backward compat, migration |
 | `pilot::mod` | 1 | ColorScheme roundtrip |
-| `pilot::portrait` | 16 | Generation bounds, HSL roundtrip, serde compat, enum reachability |
+| `pilot::portrait::descriptor` | 10 | Generation bounds, HSL roundtrip, serde compat |
+| `pilot::portrait::slot_enums` | 6 | Enum reachability (all variants covered by ALL_* arrays) |
 | `pilot::portrait::loader` | 9 | Master SVG layer parsing, PortraitParts get/get_by_label |
 | `pilot::portrait::fragments` | 18 | Color helpers, SVG assembly, per-layer color replacement |
 | `pilot::portrait::rasterize` | 7 | Solid color images, unpremultiply alpha, rasterization output |
