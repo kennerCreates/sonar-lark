@@ -146,10 +146,11 @@ pub fn setup_menu(mut commands: Commands) {
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "Editor", EditorButton);
+                    ui_theme::spawn_menu_button(row, "Editor", EditorButton, 200.0);
 
                     row.spawn((
                         Button,
+                        ui_theme::ThemedButton,
                         RaceButton,
                         Node {
                             width: Val::Px(200.0),
@@ -174,7 +175,7 @@ pub fn setup_menu(mut commands: Commands) {
                         ));
                     });
 
-                    ui_theme::spawn_menu_button(row, "Dev", DevButton);
+                    ui_theme::spawn_menu_button(row, "Dev", DevButton, 200.0);
                 });
 
             parent.spawn((
@@ -330,20 +331,6 @@ pub fn handle_dev_button(
         if *interaction == Interaction::Pressed {
             next_state.set(AppState::DevMenu);
         }
-    }
-}
-
-pub fn handle_button_visuals(
-    mut query: Query<
-        (&Interaction, &mut BackgroundColor, &mut BorderColor),
-        (
-            Changed<Interaction>,
-            Or<(With<EditorButton>, With<RaceButton>, With<DevButton>)>,
-        ),
-    >,
-) {
-    for (interaction, mut bg, mut border) in &mut query {
-        ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
     }
 }
 

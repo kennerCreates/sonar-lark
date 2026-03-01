@@ -38,6 +38,7 @@ fn main() {
         .add_sub_state::<states::EditorMode>()
         .add_plugins((
             rendering::RenderingPlugin,
+            ui_theme::UiThemePlugin,
             common::CommonPlugin,
             menu::MenuPlugin,
             obstacle::ObstaclePlugin,

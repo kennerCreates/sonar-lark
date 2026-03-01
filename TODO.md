@@ -20,24 +20,9 @@ Complete. Pilot avatars using hand-drawn Inkscape SVG fragments assembled at run
 
 #### 5. ~~Extract drone name/color resolution helper~~ ✅
 
-#### 6. Promote `fmt_time()` to shared utility
-The time format `"{:01}:{:05.2}"` is duplicated in `race/leaderboard.rs:255`, `race/overlays.rs:97`, `results/ui.rs:175`.
+#### 6. ~~Promote `fmt_time()` to shared utility~~ ✅
 
-- [ ] Move `fmt_time(seconds: f32) -> String` to `ui_theme.rs` (or a new `common/formatting.rs`).
-- [ ] Replace all 3 inline format sites.
-
-Files: `ui_theme.rs`, `race/leaderboard.rs`, `race/overlays.rs`, `results/ui.rs`
-
-#### 7. Unify button visual handlers with `ThemedButton` marker
-Three identical `handle_*_button_visuals()` systems exist in `menu/ui.rs:336`, `results/ui.rs:248`, `race/overlays.rs:235` — each iterating `Changed<Interaction>` and calling `apply_button_visual`.
-
-- [ ] Add a `#[derive(Component)] pub struct ThemedButton;` marker to `ui_theme.rs`.
-- [ ] Add a single global system `pub fn update_themed_button_visuals(query: Query<(&Interaction, &mut BackgroundColor, &mut BorderColor), (Changed<Interaction>, With<ThemedButton>)>)` in `ui_theme.rs`.
-- [ ] Attach `ThemedButton` to all standard buttons (spawned via `spawn_menu_button` and the inline copies in `start_button.rs`, `overlays.rs`).
-- [ ] Parameterize `spawn_menu_button` to accept optional `width: f32` (default 200.0) to eliminate the inline button copies in `start_button.rs:40-64` and `overlays.rs:190-213`.
-- [ ] Delete the 3 per-screen visual handler systems and their registrations.
-
-Files: `ui_theme.rs`, `menu/ui.rs`, `menu/mod.rs`, `results/ui.rs`, `results/mod.rs`, `race/overlays.rs`, `race/start_button.rs`, `race/mod.rs`
+#### 7. ~~Unify button visual handlers with `ThemedButton` marker~~ ✅
 
 #### 8. Re-enable or remove disconnected firework sounds
 `FireworkSounds` resource is loaded (`fireworks.rs:70`) but playback is disconnected (`fireworks.rs:459`). The `let _ = &firework_sounds;` is a warning suppression hack.

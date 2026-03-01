@@ -6,6 +6,7 @@ use crate::palette;
 use crate::pilot::SelectedPilots;
 use crate::pilot::portrait::cache::PortraitCache;
 use crate::states::AppState;
+use crate::ui_theme;
 
 use super::lifecycle::RacePhase;
 use super::progress::RaceProgress;
@@ -219,21 +220,15 @@ pub fn update_leaderboard(
         if pos < 12 && row_data[pos].1 {
             let (_, _, finished, crashed, finish_time) = row_data[pos];
             if finished {
-                text.0 = fmt_time(finish_time);
+                text.0 = ui_theme::fmt_time(finish_time);
                 *tc = TextColor(palette::SEA_FOAM);
             } else if crashed {
                 text.0 = "DNF".into();
                 *tc = TextColor(palette::NEON_RED);
             } else {
-                text.0 = fmt_time(elapsed);
+                text.0 = ui_theme::fmt_time(elapsed);
                 *tc = TextColor(palette::SIDEWALK);
             }
         }
     }
-}
-
-fn fmt_time(t: f32) -> String {
-    let mins = (t / 60.0) as u32;
-    let secs = t % 60.0;
-    format!("{:01}:{:05.2}", mins, secs)
 }

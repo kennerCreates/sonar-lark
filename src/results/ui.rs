@@ -164,9 +164,7 @@ pub fn setup_results_ui(
                                 // Time / DNF
                                 let (time_text, time_color) = if entry.finished {
                                     let t = entry.finish_time.unwrap_or(0.0);
-                                    let m = (t / 60.0) as u32;
-                                    let s = t % 60.0;
-                                    (format!("{:01}:{:05.2}", m, s), palette::SEA_FOAM)
+                                    (ui_theme::fmt_time(t), palette::SEA_FOAM)
                                 } else if entry.crashed {
                                     ("DNF".to_string(), palette::NEON_RED)
                                 } else {
@@ -210,8 +208,8 @@ pub fn setup_results_ui(
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "RACE AGAIN", RaceAgainButton);
-                    ui_theme::spawn_menu_button(row, "MAIN MENU", MainMenuButton);
+                    ui_theme::spawn_menu_button(row, "RACE AGAIN", RaceAgainButton, 200.0);
+                    ui_theme::spawn_menu_button(row, "MAIN MENU", MainMenuButton, 200.0);
                 });
         });
 }
@@ -239,16 +237,3 @@ pub fn handle_main_menu_button(
     }
 }
 
-pub fn handle_results_button_visuals(
-    mut query: Query<
-        (&Interaction, &mut BackgroundColor, &mut BorderColor),
-        (
-            Changed<Interaction>,
-            Or<(With<RaceAgainButton>, With<MainMenuButton>)>,
-        ),
-    >,
-) {
-    for (interaction, mut bg, mut border) in &mut query {
-        ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
-    }
-}

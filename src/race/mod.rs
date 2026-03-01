@@ -65,7 +65,6 @@ impl Plugin for RacePlugin {
                     start_button::update_start_button_text,
                     overlays::show_no_gates_banner,
                     overlays::handle_open_editor_button,
-                    overlays::update_open_editor_button_visuals,
                     overlays::manage_countdown_text,
                     overlays::update_race_clock_display,
                     leaderboard::update_leaderboard,

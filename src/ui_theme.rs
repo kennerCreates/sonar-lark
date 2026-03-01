@@ -22,6 +22,36 @@ pub const PANEL_BG: Color = palette::SMOKY_BLACK;
 pub const TOGGLE_ON: Color = palette::FROG;
 pub const TOGGLE_OFF: Color = palette::BURGUNDY;
 
+/// Marker for buttons whose visuals are managed by the global themed handler.
+#[derive(Component)]
+pub struct ThemedButton;
+
+pub struct UiThemePlugin;
+
+impl Plugin for UiThemePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Update, update_themed_button_visuals);
+    }
+}
+
+pub fn update_themed_button_visuals(
+    mut query: Query<
+        (&Interaction, &mut BackgroundColor, &mut BorderColor),
+        (Changed<Interaction>, With<ThemedButton>),
+    >,
+) {
+    for (interaction, mut bg, mut border) in &mut query {
+        apply_button_visual(interaction, &mut bg, &mut border);
+    }
+}
+
+/// Format a time in seconds as `M:SS.cc` (e.g. `1:03.50`).
+pub fn fmt_time(t: f32) -> String {
+    let mins = (t / 60.0) as u32;
+    let secs = t % 60.0;
+    format!("{:01}:{:05.2}", mins, secs)
+}
+
 /// Apply standard button visuals (background + border) based on interaction state.
 pub fn apply_button_visual(
     interaction: &Interaction,
@@ -122,17 +152,20 @@ pub fn spawn_action_button(
 }
 
 /// Spawn a large button used in menu/results screens.
+/// Automatically includes `ThemedButton` for global visual handling.
 pub fn spawn_menu_button(
     parent: &mut ChildSpawnerCommands,
     label: &str,
     marker: impl Component,
+    width: f32,
 ) {
     parent
         .spawn((
             Button,
+            ThemedButton,
             marker,
             Node {
-                width: Val::Px(200.0),
+                width: Val::Px(width),
                 height: Val::Px(60.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,

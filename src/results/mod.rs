@@ -15,7 +15,6 @@ impl Plugin for ResultsPlugin {
                 (
                     ui::handle_race_again_button,
                     ui::handle_main_menu_button,
-                    ui::handle_results_button_visuals,
                 )
                     .run_if(in_state(AppState::Results)),
             )

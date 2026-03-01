@@ -92,9 +92,7 @@ pub fn update_race_clock_display(
 
     if show_clock {
         let elapsed = clock.map(|c| c.elapsed).unwrap_or(0.0);
-        let mins = (elapsed / 60.0) as u32;
-        let secs = elapsed % 60.0;
-        let display = format!("{:01}:{:05.2}", mins, secs);
+        let display = ui_theme::fmt_time(elapsed);
 
         if let Ok(mut text) = inner_query.single_mut() {
             text.0 = display;
@@ -186,31 +184,7 @@ pub fn show_no_gates_banner(
                 });
 
             // "OPEN EDITOR" button
-            parent
-                .spawn((
-                    Button,
-                    OpenEditorButton,
-                    Node {
-                        width: Val::Px(220.0),
-                        height: Val::Px(60.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        border: UiRect::all(Val::Px(3.0)),
-                        ..default()
-                    },
-                    BackgroundColor(ui_theme::BUTTON_NORMAL),
-                    BorderColor::all(ui_theme::BORDER_NORMAL),
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new("OPEN EDITOR"),
-                        TextFont {
-                            font_size: 24.0,
-                            ..default()
-                        },
-                        TextColor(palette::VANILLA),
-                    ));
-                });
+            ui_theme::spawn_menu_button(parent, "OPEN EDITOR", OpenEditorButton, 220.0);
         });
 }
 
@@ -232,13 +206,3 @@ pub fn handle_open_editor_button(
     }
 }
 
-pub fn update_open_editor_button_visuals(
-    mut query: Query<
-        (&Interaction, &mut BackgroundColor, &mut BorderColor),
-        (Changed<Interaction>, With<OpenEditorButton>),
-    >,
-) {
-    for (interaction, mut bg, mut border) in &mut query {
-        ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
-    }
-}
