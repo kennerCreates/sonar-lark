@@ -1,5 +1,6 @@
 pub mod portrait_config;
 pub mod portrait_editor;
+pub mod portrait_palette_data;
 
 use bevy::prelude::*;
 

@@ -4,13 +4,8 @@ use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
 use crate::states::EditorMode;
+use crate::ui_theme;
 
-pub(super) const PANEL_BG: Color = palette::SMOKY_BLACK;
-pub(super) const BUTTON_NORMAL: Color = palette::INDIGO;
-pub(super) const BUTTON_HOVERED: Color = palette::SAPPHIRE;
-pub(super) const BUTTON_PRESSED: Color = palette::GREEN;
-pub(super) const TOGGLE_ON: Color = palette::FROG;
-pub(super) const TOGGLE_OFF: Color = palette::BURGUNDY;
 pub(super) const RADIO_ACTIVE: Color = palette::TEAL;
 pub(super) const RADIO_INACTIVE: Color = palette::INDIGO;
 
@@ -99,7 +94,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 overflow: Overflow::scroll_y(),
                 ..default()
             },
-            BackgroundColor(PANEL_BG),
+            BackgroundColor(ui_theme::PANEL_BG),
         ))
         .with_children(|panel| {
             panel.spawn((
@@ -145,16 +140,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     ));
                 });
 
-            // Divider
-            panel.spawn((
-                Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Px(1.0),
-                    margin: UiRect::vertical(Val::Px(8.0)),
-                    ..default()
-                },
-                BackgroundColor(palette::STEEL),
-            ));
+            ui_theme::spawn_divider(panel);
 
             panel.spawn((
                 Text::new("Obstacle Library"),
@@ -198,8 +184,8 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 ..default()
             });
 
-            spawn_small_button(panel, "Back to Menu", BackButton);
-            spawn_small_button(panel, "Course Editor", SwitchToCourseEditorButton);
+            ui_theme::spawn_panel_button(panel, "Back to Menu", BackButton);
+            ui_theme::spawn_panel_button(panel, "Course Editor", SwitchToCourseEditorButton);
         });
 }
 
@@ -215,7 +201,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                 overflow: Overflow::scroll_y(),
                 ..default()
             },
-            BackgroundColor(PANEL_BG),
+            BackgroundColor(ui_theme::PANEL_BG),
         ))
         .with_children(|panel| {
             // Obstacle Name
@@ -255,12 +241,12 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                     ));
                 });
 
-            spawn_divider(panel);
+            ui_theme::spawn_divider(panel);
 
             // Edit target toggle
             spawn_edit_target_row(panel);
 
-            spawn_divider(panel);
+            ui_theme::spawn_divider(panel);
 
             spawn_toggle_row(panel, "Trigger Volume", HasTriggerToggle, HasTriggerText, true);
             spawn_toggle_row(panel, "Collision Volume", HasCollisionToggle, HasCollisionText, false);
@@ -270,10 +256,10 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                 ..default()
             });
 
-            spawn_divider(panel);
-            spawn_action_button(panel, "Save Obstacle", SaveButton, palette::JUNGLE);
-            spawn_action_button(panel, "New / Clear", NewButton, BUTTON_NORMAL);
-            spawn_action_button(panel, "Delete", DeleteButton, palette::MAROON);
+            ui_theme::spawn_divider(panel);
+            ui_theme::spawn_action_button(panel, "Save Obstacle", SaveButton, palette::JUNGLE);
+            ui_theme::spawn_action_button(panel, "New / Clear", NewButton, ui_theme::BUTTON_NORMAL);
+            ui_theme::spawn_action_button(panel, "Delete", DeleteButton, palette::MAROON);
         });
 }
 
@@ -290,7 +276,7 @@ pub fn spawn_node_button(parent: &mut ChildSpawnerCommands, name: &str) {
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(BUTTON_NORMAL),
+            BackgroundColor(ui_theme::BUTTON_NORMAL),
             BorderColor::all(palette::SAPPHIRE),
         ))
         .with_children(|btn| {
@@ -318,7 +304,7 @@ pub(super) fn spawn_library_button(parent: &mut ChildSpawnerCommands, id: &str) 
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(BUTTON_NORMAL),
+            BackgroundColor(ui_theme::BUTTON_NORMAL),
             BorderColor::all(palette::SAPPHIRE),
         ))
         .with_children(|btn| {
@@ -329,34 +315,6 @@ pub(super) fn spawn_library_button(parent: &mut ChildSpawnerCommands, id: &str) 
                     ..default()
                 },
                 TextColor(palette::SEA_FOAM),
-            ));
-        });
-}
-
-fn spawn_small_button(parent: &mut ChildSpawnerCommands, label: &str, marker: impl Component) {
-    parent
-        .spawn((
-            Button,
-            marker,
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(32.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(BUTTON_NORMAL),
-            BorderColor::all(palette::STEEL),
-        ))
-        .with_children(|btn| {
-            btn.spawn((
-                Text::new(label),
-                TextFont {
-                    font_size: 14.0,
-                    ..default()
-                },
-                TextColor(palette::SAND),
             ));
         });
 }
@@ -387,7 +345,7 @@ fn spawn_toggle_row(
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
-                BackgroundColor(if initial { TOGGLE_ON } else { TOGGLE_OFF }),
+                BackgroundColor(if initial { ui_theme::TOGGLE_ON } else { ui_theme::TOGGLE_OFF }),
                 BorderColor::all(palette::STEEL),
             ))
             .with_children(|btn| {
@@ -462,48 +420,3 @@ fn spawn_radio_option(
         });
 }
 
-fn spawn_action_button(
-    parent: &mut ChildSpawnerCommands,
-    label: &str,
-    marker: impl Component,
-    bg: Color,
-) {
-    parent
-        .spawn((
-            Button,
-            marker,
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(36.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                margin: UiRect::vertical(Val::Px(2.0)),
-                ..default()
-            },
-            BackgroundColor(bg),
-            BorderColor::all(palette::STEEL),
-        ))
-        .with_children(|btn| {
-            btn.spawn((
-                Text::new(label),
-                TextFont {
-                    font_size: 15.0,
-                    ..default()
-                },
-                TextColor(palette::VANILLA),
-            ));
-        });
-}
-
-fn spawn_divider(parent: &mut ChildSpawnerCommands) {
-    parent.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Px(1.0),
-            margin: UiRect::vertical(Val::Px(4.0)),
-            ..default()
-        },
-        BackgroundColor(palette::STEEL),
-    ));
-}

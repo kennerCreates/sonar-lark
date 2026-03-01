@@ -6,10 +6,7 @@ use crate::pilot::SelectedPilots;
 use crate::pilot::portrait::cache::PortraitCache;
 use crate::race::progress::RaceResults;
 use crate::states::AppState;
-
-const NORMAL_BUTTON: Color = palette::INDIGO;
-const HOVERED_BUTTON: Color = palette::SAPPHIRE;
-const PRESSED_BUTTON: Color = palette::GREEN;
+use crate::ui_theme;
 
 #[derive(Component)]
 pub(crate) struct RaceAgainButton;
@@ -221,43 +218,12 @@ pub fn setup_results_ui(
                     ..default()
                 })
                 .with_children(|row| {
-                    spawn_results_button(row, "RACE AGAIN", RaceAgainButton);
-                    spawn_results_button(row, "MAIN MENU", MainMenuButton);
+                    ui_theme::spawn_menu_button(row, "RACE AGAIN", RaceAgainButton);
+                    ui_theme::spawn_menu_button(row, "MAIN MENU", MainMenuButton);
                 });
         });
 }
 
-fn spawn_results_button(
-    parent: &mut ChildSpawnerCommands,
-    label: &str,
-    marker: impl Component,
-) {
-    parent
-        .spawn((
-            Button,
-            marker,
-            Node {
-                width: Val::Px(200.0),
-                height: Val::Px(50.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(3.0)),
-                ..default()
-            },
-            BackgroundColor(NORMAL_BUTTON),
-            BorderColor::all(palette::STEEL),
-        ))
-        .with_children(|btn: &mut ChildSpawnerCommands| {
-            btn.spawn((
-                Text::new(label),
-                TextFont {
-                    font_size: 22.0,
-                    ..default()
-                },
-                TextColor(palette::VANILLA),
-            ));
-        });
-}
 
 pub fn handle_race_again_button(
     query: Query<&Interaction, (Changed<Interaction>, With<RaceAgainButton>)>,
@@ -291,19 +257,6 @@ pub fn handle_results_button_visuals(
     >,
 ) {
     for (interaction, mut bg, mut border) in &mut query {
-        match *interaction {
-            Interaction::Pressed => {
-                *bg = BackgroundColor(PRESSED_BUTTON);
-                *border = BorderColor::all(palette::VANILLA);
-            }
-            Interaction::Hovered => {
-                *bg = BackgroundColor(HOVERED_BUTTON);
-                *border = BorderColor::all(palette::SIDEWALK);
-            }
-            Interaction::None => {
-                *bg = BackgroundColor(NORMAL_BUTTON);
-                *border = BorderColor::all(palette::STEEL);
-            }
-        }
+        ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
     }
 }

@@ -5,6 +5,7 @@ use crate::obstacle::definition::{CollisionVolumeConfig, ObstacleDef, ObstacleId
 use crate::obstacle::library::{save_obstacle_library, ObstacleLibrary};
 use crate::palette;
 use crate::states::{AppState, EditorMode};
+use crate::ui_theme;
 
 use super::build::*;
 use crate::editor::workshop::{EditTarget, PreviewObstacle, WorkshopState};
@@ -358,10 +359,10 @@ pub fn update_display_values(
     }
 
     if let Ok(mut bg) = bgs.p0().single_mut() {
-        *bg = BackgroundColor(if state.has_trigger { TOGGLE_ON } else { TOGGLE_OFF });
+        *bg = BackgroundColor(if state.has_trigger { ui_theme::TOGGLE_ON } else { ui_theme::TOGGLE_OFF });
     }
     if let Ok(mut bg) = bgs.p1().single_mut() {
-        *bg = BackgroundColor(if state.has_collision { TOGGLE_ON } else { TOGGLE_OFF });
+        *bg = BackgroundColor(if state.has_collision { ui_theme::TOGGLE_ON } else { ui_theme::TOGGLE_OFF });
     }
 
     if let Ok(mut bg) = bgs.p2().single_mut() {
@@ -390,11 +391,7 @@ pub fn handle_button_hover(
     >,
 ) {
     for (interaction, mut bg) in &mut query {
-        match *interaction {
-            Interaction::Pressed => *bg = BackgroundColor(BUTTON_PRESSED),
-            Interaction::Hovered => *bg = BackgroundColor(BUTTON_HOVERED),
-            Interaction::None => *bg = BackgroundColor(BUTTON_NORMAL),
-        }
+        ui_theme::apply_button_bg(interaction, &mut bg);
     }
 }
 

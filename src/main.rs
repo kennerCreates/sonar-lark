@@ -14,6 +14,7 @@ mod race;
 mod rendering;
 mod results;
 mod states;
+pub mod ui_theme;
 
 use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;

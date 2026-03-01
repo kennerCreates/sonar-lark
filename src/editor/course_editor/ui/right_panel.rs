@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::editor::course_editor::TransformMode;
 use crate::obstacle::definition::ObstacleId;
 use crate::palette;
+use crate::ui_theme;
 
 use super::types::*;
 
@@ -18,7 +19,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[
                 overflow: Overflow::scroll_y(),
                 ..default()
             },
-            BackgroundColor(PANEL_BG),
+            BackgroundColor(ui_theme::PANEL_BG),
         ))
         .with_children(|panel| {
             panel.spawn((
@@ -57,15 +58,15 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[
                     ));
                 });
 
-            spawn_small_button(panel, "New Course", NewCourseButton);
-            spawn_action_button(
+            ui_theme::spawn_panel_button(panel, "New Course", NewCourseButton);
+            ui_theme::spawn_action_button(
                 panel,
                 "Save Course",
                 SaveCourseButton,
                 palette::JUNGLE,
             );
 
-            spawn_divider(panel);
+            ui_theme::spawn_divider(panel);
 
             panel.spawn((
                 Text::new("Load Existing"),
@@ -101,14 +102,14 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[
                         for course in existing_courses {
                             spawn_existing_course_button(
                                 container,
-                                &course.display_name,
+                                &course.name,
                                 &course.path,
                             );
                         }
                     }
                 });
 
-            spawn_divider(panel);
+            ui_theme::spawn_divider(panel);
 
             panel.spawn((
                 Text::new("Gate Ordering"),
@@ -141,7 +142,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[
                         border: UiRect::all(Val::Px(1.0)),
                         ..default()
                     },
-                    BackgroundColor(TOGGLE_OFF),
+                    BackgroundColor(ui_theme::TOGGLE_OFF),
                     BorderColor::all(palette::STEEL),
                 ))
                 .with_children(|btn| {
@@ -156,9 +157,9 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[
                     ));
                 });
 
-            spawn_small_button(panel, "Clear Gate Orders", ClearGateOrdersButton);
+            ui_theme::spawn_panel_button(panel, "Clear Gate Orders", ClearGateOrdersButton);
 
-            spawn_divider(panel);
+            ui_theme::spawn_divider(panel);
 
             panel.spawn((
                 Text::new("Transform Mode"),
@@ -182,7 +183,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[
                     spawn_transform_mode_button(row, "Scale (3)", TransformMode::Scale);
                 });
 
-            spawn_divider(panel);
+            ui_theme::spawn_divider(panel);
 
             panel.spawn((
                 Text::new("Del  →  delete selected"),
@@ -262,7 +263,7 @@ pub fn spawn_palette_button(parent: &mut ChildSpawnerCommands, id: &ObstacleId) 
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(BUTTON_NORMAL),
+            BackgroundColor(ui_theme::BUTTON_NORMAL),
             BorderColor::all(palette::SAPPHIRE),
         ))
         .with_children(|btn| {
@@ -302,7 +303,7 @@ pub fn spawn_existing_course_button(
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
-                BackgroundColor(BUTTON_NORMAL),
+                BackgroundColor(ui_theme::BUTTON_NORMAL),
                 BorderColor::all(palette::SAPPHIRE),
             ))
             .with_children(|btn| {
@@ -344,80 +345,6 @@ pub fn spawn_existing_course_button(
         });
 }
 
-pub fn spawn_small_button(parent: &mut ChildSpawnerCommands, label: &str, marker: impl Component) {
-    parent
-        .spawn((
-            Button,
-            marker,
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(30.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(BUTTON_NORMAL),
-            BorderColor::all(palette::STEEL),
-        ))
-        .with_children(|btn| {
-            btn.spawn((
-                Text::new(label),
-                TextFont {
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette::SAND),
-            ));
-        });
-}
-
-fn spawn_action_button(
-    parent: &mut ChildSpawnerCommands,
-    label: &str,
-    marker: impl Component,
-    bg: Color,
-) {
-    parent
-        .spawn((
-            Button,
-            marker,
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(36.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                margin: UiRect::vertical(Val::Px(2.0)),
-                ..default()
-            },
-            BackgroundColor(bg),
-            BorderColor::all(palette::STEEL),
-        ))
-        .with_children(|btn| {
-            btn.spawn((
-                Text::new(label),
-                TextFont {
-                    font_size: 15.0,
-                    ..default()
-                },
-                TextColor(palette::VANILLA),
-            ));
-        });
-}
-
-pub fn spawn_divider(parent: &mut ChildSpawnerCommands) {
-    parent.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Px(1.0),
-            margin: UiRect::vertical(Val::Px(4.0)),
-            ..default()
-        },
-        BackgroundColor(palette::STEEL),
-    ));
-}
-
 fn spawn_transform_mode_button(
     parent: &mut ChildSpawnerCommands,
     label: &str,
@@ -435,7 +362,7 @@ fn spawn_transform_mode_button(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(BUTTON_NORMAL),
+            BackgroundColor(ui_theme::BUTTON_NORMAL),
             BorderColor::all(palette::STEEL),
         ))
         .with_children(|btn| {

@@ -4,10 +4,9 @@ use crate::course::data::PropKind;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
 use crate::states::EditorMode;
+use crate::ui_theme;
 
-use super::right_panel::{
-    build_right_panel, spawn_divider, spawn_palette_button, spawn_small_button,
-};
+use super::right_panel::{build_right_panel, spawn_palette_button};
 use super::types::*;
 
 pub fn build_course_editor_ui(
@@ -44,7 +43,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 overflow: Overflow::scroll_y(),
                 ..default()
             },
-            BackgroundColor(PANEL_BG),
+            BackgroundColor(ui_theme::PANEL_BG),
         ))
         .with_children(|panel| {
             panel.spawn((
@@ -132,7 +131,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                         PropKind::ShellBurstEmitter,
                     );
 
-                    spawn_divider(content);
+                    ui_theme::spawn_divider(content);
 
                     content.spawn((
                         Text::new("Color: Auto"),
@@ -156,7 +155,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 border: UiRect::all(Val::Px(1.0)),
                                 ..default()
                             },
-                            BackgroundColor(BUTTON_NORMAL),
+                            BackgroundColor(ui_theme::BUTTON_NORMAL),
                             BorderColor::all(palette::STEEL),
                         ))
                         .with_children(|btn| {
@@ -195,7 +194,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 border: UiRect::all(Val::Px(1.0)),
                                 ..default()
                             },
-                            BackgroundColor(BUTTON_NORMAL),
+                            BackgroundColor(ui_theme::BUTTON_NORMAL),
                             BorderColor::all(palette::SAPPHIRE),
                         ))
                         .with_children(|btn| {
@@ -209,7 +208,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                             ));
                         });
 
-                    spawn_divider(content);
+                    ui_theme::spawn_divider(content);
 
                     content.spawn((
                         Text::new("Primary: (select a camera)"),
@@ -233,7 +232,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 border: UiRect::all(Val::Px(1.0)),
                                 ..default()
                             },
-                            BackgroundColor(BUTTON_NORMAL),
+                            BackgroundColor(ui_theme::BUTTON_NORMAL),
                             BorderColor::all(palette::STEEL),
                         ))
                         .with_children(|btn| {
@@ -247,7 +246,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                             ));
                         });
 
-                    spawn_divider(content);
+                    ui_theme::spawn_divider(content);
 
                     content.spawn((
                         Text::new("Use Move/Rotate to aim"),
@@ -264,9 +263,9 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 ..default()
             });
 
-            spawn_divider(panel);
-            spawn_small_button(panel, "Obstacle Workshop", BackToWorkshopButton);
-            spawn_small_button(panel, "Back to Menu", BackToMenuButton);
+            ui_theme::spawn_divider(panel);
+            ui_theme::spawn_panel_button(panel, "Obstacle Workshop", BackToWorkshopButton);
+            ui_theme::spawn_panel_button(panel, "Back to Menu", BackToMenuButton);
         });
 }
 
@@ -288,7 +287,7 @@ fn spawn_tab_button(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(if active { BUTTON_SELECTED } else { BUTTON_NORMAL }),
+            BackgroundColor(if active { ui_theme::BUTTON_SELECTED } else { ui_theme::BUTTON_NORMAL }),
             BorderColor::all(palette::STEEL),
         ))
         .with_children(|btn| {
@@ -324,7 +323,7 @@ fn spawn_prop_palette_button(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(BUTTON_NORMAL),
+            BackgroundColor(ui_theme::BUTTON_NORMAL),
             BorderColor::all(palette::SAPPHIRE),
         ))
         .with_children(|btn| {

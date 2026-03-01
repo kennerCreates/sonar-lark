@@ -5,12 +5,10 @@ use crate::drone::spawning::NoGatesCourse;
 use crate::editor::course_editor::PendingEditorCourse;
 use crate::palette;
 use crate::states::AppState;
+use crate::ui_theme;
 
 use super::lifecycle::{CountdownTimer, RacePhase};
-use super::start_button::{
-    CountdownText, CountdownTextContent, StartRaceButton,
-    HOVERED_BUTTON, NORMAL_BUTTON, PRESSED_BUTTON,
-};
+use super::start_button::{CountdownText, CountdownTextContent, StartRaceButton};
 use super::timing::RaceClock;
 
 #[derive(Component)]
@@ -201,8 +199,8 @@ pub fn show_no_gates_banner(
                         border: UiRect::all(Val::Px(3.0)),
                         ..default()
                     },
-                    BackgroundColor(NORMAL_BUTTON),
-                    BorderColor::all(palette::STEEL),
+                    BackgroundColor(ui_theme::BUTTON_NORMAL),
+                    BorderColor::all(ui_theme::BORDER_NORMAL),
                 ))
                 .with_children(|btn| {
                     btn.spawn((
@@ -242,19 +240,6 @@ pub fn update_open_editor_button_visuals(
     >,
 ) {
     for (interaction, mut bg, mut border) in &mut query {
-        match *interaction {
-            Interaction::Pressed => {
-                *bg = BackgroundColor(PRESSED_BUTTON);
-                *border = BorderColor::all(palette::VANILLA);
-            }
-            Interaction::Hovered => {
-                *bg = BackgroundColor(HOVERED_BUTTON);
-                *border = BorderColor::all(palette::SIDEWALK);
-            }
-            Interaction::None => {
-                *bg = BackgroundColor(NORMAL_BUTTON);
-                *border = BorderColor::all(palette::STEEL);
-            }
-        }
+        ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
     }
 }

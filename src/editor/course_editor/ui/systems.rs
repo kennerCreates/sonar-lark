@@ -10,6 +10,7 @@ use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
 use crate::states::AppState;
 use crate::rendering::{cel_material_from_color, CelLightDir, CelMaterial};
+use crate::ui_theme;
 
 use super::types::*;
 
@@ -198,18 +199,18 @@ pub fn update_display_values(
 
     if let Ok(mut bg) = gate_mode_bg.single_mut() {
         *bg = BackgroundColor(if state.gate_order_mode {
-            TOGGLE_ON
+            ui_theme::TOGGLE_ON
         } else {
-            TOGGLE_OFF
+            ui_theme::TOGGLE_OFF
         });
     }
 
     for (btn, mut bg) in &mut palette_bgs {
         *bg = BackgroundColor(
             if state.selected_palette_id.as_ref() == Some(&btn.0) {
-                BUTTON_SELECTED
+                ui_theme::BUTTON_SELECTED
             } else {
-                BUTTON_NORMAL
+                ui_theme::BUTTON_NORMAL
             },
         );
     }
@@ -234,11 +235,7 @@ pub fn handle_button_hover(
     >,
 ) {
     for (interaction, mut bg) in &mut query {
-        match *interaction {
-            Interaction::Pressed => *bg = BackgroundColor(BUTTON_PRESSED),
-            Interaction::Hovered => *bg = BackgroundColor(BUTTON_HOVERED),
-            Interaction::None => *bg = BackgroundColor(BUTTON_NORMAL),
-        }
+        ui_theme::apply_button_bg(interaction, &mut bg);
     }
 }
 
@@ -262,9 +259,9 @@ pub fn update_transform_mode_ui(
     }
     for (btn, mut bg) in &mut buttons {
         *bg = BackgroundColor(if btn.0 == state.transform_mode {
-            BUTTON_SELECTED
+            ui_theme::BUTTON_SELECTED
         } else {
-            BUTTON_NORMAL
+            ui_theme::BUTTON_NORMAL
         });
     }
 }
@@ -381,9 +378,9 @@ pub fn handle_tab_switch(
     }
 
     let (obs_bg, prop_bg, cam_bg) = match tab {
-        EditorTab::Obstacles => (BUTTON_SELECTED, BUTTON_NORMAL, BUTTON_NORMAL),
-        EditorTab::Props => (BUTTON_NORMAL, BUTTON_SELECTED, BUTTON_NORMAL),
-        EditorTab::Cameras => (BUTTON_NORMAL, BUTTON_NORMAL, BUTTON_SELECTED),
+        EditorTab::Obstacles => (ui_theme::BUTTON_SELECTED, ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_NORMAL),
+        EditorTab::Props => (ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_SELECTED, ui_theme::BUTTON_NORMAL),
+        EditorTab::Cameras => (ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_SELECTED),
     };
     if let Ok(mut bg) = obstacle_tab_bg.single_mut() {
         *bg = BackgroundColor(obs_bg);

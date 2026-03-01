@@ -1,3 +1,5 @@
+pub mod drone_identity;
+
 use bevy::picking::Pickable;
 use bevy::prelude::*;
 

@@ -3,15 +3,11 @@ use bevy::prelude::*;
 use crate::drone::components::Drone;
 use crate::palette;
 use crate::states::AppState;
+use crate::ui_theme;
 
 use super::lifecycle::{CountdownTimer, RacePhase, RaceStartSound, ResultsTransitionTimer};
 use super::progress::RaceProgress;
 use super::timing::RaceClock;
-
-pub(super) const NORMAL_BUTTON: Color = palette::INDIGO;
-pub(super) const HOVERED_BUTTON: Color = palette::SAPPHIRE;
-pub(super) const PRESSED_BUTTON: Color = palette::GREEN;
-pub(super) const DISABLED_BUTTON: Color = palette::SMOKY_BLACK;
 
 #[derive(Component)]
 pub(crate) struct StartRaceButton;
@@ -52,8 +48,8 @@ pub fn setup_race_ui(mut commands: Commands) {
                         border: UiRect::all(Val::Px(3.0)),
                         ..default()
                     },
-                    BackgroundColor(NORMAL_BUTTON),
-                    BorderColor::all(palette::STEEL),
+                    BackgroundColor(ui_theme::BUTTON_NORMAL),
+                    BorderColor::all(ui_theme::BORDER_NORMAL),
                 ))
                 .with_children(|btn| {
                     btn.spawn((
@@ -124,23 +120,12 @@ pub fn update_start_button_visuals(
     for (interaction, mut bg, mut border) in &mut button_query {
         match *phase {
             RacePhase::Countdown | RacePhase::Racing => {
-                *bg = BackgroundColor(DISABLED_BUTTON);
-                *border = BorderColor::all(palette::INDIGO);
+                *bg = BackgroundColor(ui_theme::BUTTON_DISABLED);
+                *border = BorderColor::all(ui_theme::BORDER_DISABLED);
             }
-            RacePhase::WaitingToStart | RacePhase::Finished => match *interaction {
-                Interaction::Pressed => {
-                    *bg = BackgroundColor(PRESSED_BUTTON);
-                    *border = BorderColor::all(palette::VANILLA);
-                }
-                Interaction::Hovered => {
-                    *bg = BackgroundColor(HOVERED_BUTTON);
-                    *border = BorderColor::all(palette::SIDEWALK);
-                }
-                Interaction::None => {
-                    *bg = BackgroundColor(NORMAL_BUTTON);
-                    *border = BorderColor::all(palette::STEEL);
-                }
-            },
+            RacePhase::WaitingToStart | RacePhase::Finished => {
+                ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
+            }
         }
     }
 }

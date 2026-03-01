@@ -3,16 +3,7 @@ use bevy::prelude::*;
 use crate::course::data::PropKind;
 use crate::editor::course_editor::TransformMode;
 use crate::obstacle::definition::ObstacleId;
-use crate::palette;
 use crate::rendering::CelMaterial;
-
-pub const PANEL_BG: Color = palette::SMOKY_BLACK;
-pub const BUTTON_NORMAL: Color = palette::INDIGO;
-pub const BUTTON_HOVERED: Color = palette::SAPPHIRE;
-pub const BUTTON_PRESSED: Color = palette::GREEN;
-pub const BUTTON_SELECTED: Color = palette::TEAL;
-pub const TOGGLE_ON: Color = palette::FROG;
-pub const TOGGLE_OFF: Color = palette::BURGUNDY;
 
 // --- Marker components ---
 
@@ -137,7 +128,4 @@ pub const COLOR_CYCLE: &[(&str, Option<[f32; 4]>)] = &[
     ("White", Some([0.949, 0.949, 0.855, 1.0])),
 ];
 
-pub struct CourseEntry {
-    pub display_name: String,
-    pub path: String,
-}
+pub use crate::course::discovery::CourseEntry;

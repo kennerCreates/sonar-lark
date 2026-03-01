@@ -7,6 +7,7 @@ use crate::editor::course_editor::{
 };
 use crate::palette;
 use crate::states::{AppState, EditorMode};
+use crate::ui_theme;
 
 use super::discover::discover_existing_courses;
 use super::right_panel::spawn_existing_course_button;
@@ -80,7 +81,7 @@ fn rebuild_courses_list(commands: &mut Commands, container: Entity) {
             ));
         } else {
             for course in &courses {
-                spawn_existing_course_button(parent, &course.display_name, &course.path);
+                spawn_existing_course_button(parent, &course.name, &course.path);
             }
         }
     });
@@ -141,7 +142,7 @@ fn spawn_delete_confirmation(commands: &mut Commands, container: Entity, display
                         border: UiRect::all(Val::Px(1.0)),
                         ..default()
                     },
-                    BackgroundColor(BUTTON_NORMAL),
+                    BackgroundColor(ui_theme::BUTTON_NORMAL),
                     BorderColor::all(palette::STEEL),
                 ))
                 .with_children(|btn| {

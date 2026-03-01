@@ -1,4 +1,5 @@
 pub mod data;
+pub mod discovery;
 pub mod loader;
 
 use bevy::prelude::*;

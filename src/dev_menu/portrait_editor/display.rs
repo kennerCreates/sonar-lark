@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::palette;
+use crate::ui_theme;
 use crate::pilot::portrait::loader::PortraitParts;
 use crate::pilot::portrait::rasterize::rasterize_portrait;
 
@@ -248,19 +249,6 @@ pub fn handle_button_hover_visuals(
     >,
 ) {
     for (interaction, mut bg, mut border) in &mut query {
-        match *interaction {
-            Interaction::Pressed => {
-                *bg = BackgroundColor(palette::GREEN);
-                *border = BorderColor::all(palette::VANILLA);
-            }
-            Interaction::Hovered => {
-                *bg = BackgroundColor(palette::SAPPHIRE);
-                *border = BorderColor::all(palette::SIDEWALK);
-            }
-            Interaction::None => {
-                *bg = BackgroundColor(palette::INDIGO);
-                *border = BorderColor::all(palette::STEEL);
-            }
-        }
+        ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
     }
 }

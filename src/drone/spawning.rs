@@ -2,9 +2,12 @@ use bevy::prelude::*;
 use rand::Rng;
 use rand::seq::SliceRandom;
 
+// Re-export for backward compatibility with existing imports.
+pub use crate::common::drone_identity::{DRONE_COLORS, DRONE_NAMES};
+
+use crate::common::drone_identity::DRONE_COUNT;
 use crate::course::data::CourseData;
 use crate::obstacle::library::ObstacleLibrary;
-use crate::palette;
 use crate::pilot::{PilotConfigs, SelectedPilots};
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 use crate::states::AppState;
@@ -12,34 +15,7 @@ use super::components::*;
 use super::interpolation::{PhysicsRotation, PhysicsTranslation, PreviousRotation, PreviousTranslation};
 use super::paths::{RacePath, generate_race_path, generate_drone_race_path, compute_start_positions};
 
-const DRONE_COUNT: u8 = 12;
 const GRAVITY: f32 = 9.81;
-
-/// Per-drone colors — 12 palette colors chosen for maximum hue spread.
-pub const DRONE_COLORS: [Color; 12] = [
-    palette::NEON_RED,
-    palette::SUNFLOWER,
-    palette::LIMON,
-    palette::GRASS,
-    palette::FROG,
-    palette::JADE,
-    palette::SKY,
-    palette::HOMEWORLD,
-    palette::PERIWINKLE,
-    palette::AMETHYST,
-    palette::PINK,
-    palette::VANILLA,
-];
-
-/// Callsigns for each of the 12 drones, matching `DRONE_COLORS` indices.
-pub const DRONE_NAMES: [&str; 12] = [
-    "FALCON", "VIPER", "HAWK", "PHANTOM",
-    "SPARK", "BLITZ", "NOVA", "DRIFT",
-    "SURGE", "BOLT", "ECHO", "FURY",
-];
-
-const _: () = assert!(DRONE_COLORS.len() == DRONE_COUNT as usize);
-const _: () = assert!(DRONE_NAMES.len() == DRONE_COUNT as usize);
 
 /// Marker resource inserted when `spawn_drones` detects the course has no gates.
 /// Prevents the warning from repeating every frame and signals the UI to show a banner.
