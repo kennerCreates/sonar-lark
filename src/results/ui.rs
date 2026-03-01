@@ -73,128 +73,142 @@ pub fn setup_results_ui(
                 TextColor(palette::STONE),
             ));
 
-            // Standings container
+            // Standings — two columns
+            let half = (results.standings.len() + 1) / 2;
             parent
                 .spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(2.0),
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(24.0),
                     margin: UiRect::vertical(Val::Px(12.0)),
                     padding: UiRect::all(Val::Px(8.0)),
                     ..default()
                 })
-                .with_children(|container| {
-                    for (pos, entry) in results.standings.iter().enumerate() {
-                        let drone_idx = entry.drone_index;
-                        let identity = drones.iter()
-                            .find(|(d, _)| d.index as usize == drone_idx)
-                            .map(|(_, id)| id);
-                        let name = resolve_drone_name(selected.as_deref(), drone_idx, identity);
-                        let color = resolve_drone_color(selected.as_deref(), drone_idx, identity);
-
-                        let is_winner = pos == 0 && entry.finished;
-
-                        container
+                .with_children(|columns| {
+                    for col in 0..2 {
+                        let start = col * half;
+                        let end = (start + half).min(results.standings.len());
+                        columns
                             .spawn(Node {
-                                height: Val::Px(128.0),
-                                flex_direction: FlexDirection::Row,
-                                align_items: AlignItems::Center,
-                                column_gap: Val::Px(6.0),
-                                padding: UiRect::axes(Val::Px(4.0), Val::Px(2.0)),
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Px(2.0),
                                 ..default()
                             })
-                            .with_children(|row| {
-                                // Color bar
-                                row.spawn((
-                                    Node {
-                                        width: Val::Px(4.0),
-                                        height: Val::Percent(100.0),
-                                        ..default()
-                                    },
-                                    BackgroundColor(color),
-                                ));
+                            .with_children(|container| {
+                                for pos in start..end {
+                                    let entry = &results.standings[pos];
+                                    let drone_idx = entry.drone_index;
+                                    let identity = drones.iter()
+                                        .find(|(d, _)| d.index as usize == drone_idx)
+                                        .map(|(_, id)| id);
+                                    let name = resolve_drone_name(selected.as_deref(), drone_idx, identity);
+                                    let color = resolve_drone_color(selected.as_deref(), drone_idx, identity);
 
-                                // Portrait thumbnail
-                                let portrait_handle = selected.as_ref()
-                                    .and_then(|s| s.pilots.get(drone_idx))
-                                    .and_then(|sel| {
-                                        portrait_cache.as_ref()
-                                            .and_then(|cache| cache.get(sel.pilot_id))
-                                    });
-                                if let Some(handle) = portrait_handle {
-                                    row.spawn((
-                                        ImageNode::new(handle),
-                                        Node {
-                                            width: Val::Px(128.0),
-                                            height: Val::Px(128.0),
+                                    let is_winner = pos == 0 && entry.finished;
+
+                                    container
+                                        .spawn(Node {
+                                            height: Val::Px(64.0),
+                                            flex_direction: FlexDirection::Row,
+                                            align_items: AlignItems::Center,
+                                            column_gap: Val::Px(6.0),
+                                            padding: UiRect::axes(Val::Px(4.0), Val::Px(2.0)),
                                             ..default()
-                                        },
-                                    ));
-                                } else {
-                                    row.spawn((
-                                        Node {
-                                            width: Val::Px(128.0),
-                                            height: Val::Px(128.0),
-                                            ..default()
-                                        },
-                                        BackgroundColor(color),
-                                    ));
+                                        })
+                                        .with_children(|row| {
+                                            // Color bar
+                                            row.spawn((
+                                                Node {
+                                                    width: Val::Px(4.0),
+                                                    height: Val::Percent(100.0),
+                                                    ..default()
+                                                },
+                                                BackgroundColor(color),
+                                            ));
+
+                                            // Portrait thumbnail
+                                            let portrait_handle = selected.as_ref()
+                                                .and_then(|s| s.pilots.get(drone_idx))
+                                                .and_then(|sel| {
+                                                    portrait_cache.as_ref()
+                                                        .and_then(|cache| cache.get(sel.pilot_id))
+                                                });
+                                            if let Some(handle) = portrait_handle {
+                                                row.spawn((
+                                                    ImageNode::new(handle),
+                                                    Node {
+                                                        width: Val::Px(64.0),
+                                                        height: Val::Px(64.0),
+                                                        ..default()
+                                                    },
+                                                ));
+                                            } else {
+                                                row.spawn((
+                                                    Node {
+                                                        width: Val::Px(64.0),
+                                                        height: Val::Px(64.0),
+                                                        ..default()
+                                                    },
+                                                    BackgroundColor(color),
+                                                ));
+                                            }
+
+                                            // Position + name
+                                            let name_color = if is_winner {
+                                                palette::LIMON
+                                            } else if entry.crashed {
+                                                palette::STONE
+                                            } else {
+                                                palette::VANILLA
+                                            };
+                                            row.spawn((
+                                                Text::new(format!("{:>2}  {}", pos + 1, name)),
+                                                TextFont {
+                                                    font_size: 15.0,
+                                                    ..default()
+                                                },
+                                                TextColor(name_color),
+                                                Node {
+                                                    width: Val::Px(140.0),
+                                                    ..default()
+                                                },
+                                            ));
+
+                                            // Time / DNF
+                                            let (time_text, time_color) = if entry.finished {
+                                                let t = entry.finish_time.unwrap_or(0.0);
+                                                (ui_theme::fmt_time(t), palette::SEA_FOAM)
+                                            } else if entry.crashed {
+                                                ("DNF".to_string(), palette::NEON_RED)
+                                            } else {
+                                                ("---".to_string(), palette::SIDEWALK)
+                                            };
+                                            row.spawn((
+                                                Text::new(time_text),
+                                                TextFont {
+                                                    font_size: 15.0,
+                                                    ..default()
+                                                },
+                                                TextColor(time_color),
+                                                Node {
+                                                    width: Val::Px(72.0),
+                                                    ..default()
+                                                },
+                                            ));
+
+                                            // Gates passed
+                                            row.spawn((
+                                                Text::new(format!(
+                                                    "{}/{}",
+                                                    entry.gates_passed, results.total_gates
+                                                )),
+                                                TextFont {
+                                                    font_size: 15.0,
+                                                    ..default()
+                                                },
+                                                TextColor(palette::STONE),
+                                            ));
+                                        });
                                 }
-
-                                // Position + name
-                                let name_color = if is_winner {
-                                    palette::LIMON
-                                } else if entry.crashed {
-                                    palette::STONE
-                                } else {
-                                    palette::VANILLA
-                                };
-                                row.spawn((
-                                    Text::new(format!("{:>2}  {}", pos + 1, name)),
-                                    TextFont {
-                                        font_size: 15.0,
-                                        ..default()
-                                    },
-                                    TextColor(name_color),
-                                    Node {
-                                        width: Val::Px(140.0),
-                                        ..default()
-                                    },
-                                ));
-
-                                // Time / DNF
-                                let (time_text, time_color) = if entry.finished {
-                                    let t = entry.finish_time.unwrap_or(0.0);
-                                    (ui_theme::fmt_time(t), palette::SEA_FOAM)
-                                } else if entry.crashed {
-                                    ("DNF".to_string(), palette::NEON_RED)
-                                } else {
-                                    ("---".to_string(), palette::SIDEWALK)
-                                };
-                                row.spawn((
-                                    Text::new(time_text),
-                                    TextFont {
-                                        font_size: 15.0,
-                                        ..default()
-                                    },
-                                    TextColor(time_color),
-                                    Node {
-                                        width: Val::Px(72.0),
-                                        ..default()
-                                    },
-                                ));
-
-                                // Gates passed
-                                row.spawn((
-                                    Text::new(format!(
-                                        "{}/{}",
-                                        entry.gates_passed, results.total_gates
-                                    )),
-                                    TextFont {
-                                        font_size: 15.0,
-                                        ..default()
-                                    },
-                                    TextColor(palette::STONE),
-                                ));
                             });
                     }
                 });

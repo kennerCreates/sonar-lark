@@ -1,48 +1,41 @@
 use rand::Rng;
 use std::collections::HashSet;
 
-const PREFIXES: &[&str] = &[
-    "x", "xx", "X", "Shadow", "Dark", "N1tro", "Neo", "Cyber", "Dr", "El", "Lil", "Hyper",
-    "Ultra", "Turbo", "Razor", "xX", "Xx", "Mega", "Zero", "Ace",
-];
-
 const ROOTS: &[&str] = &[
     "Vortex", "Pulse", "Glitch", "Phantom", "Blitz", "Nova", "Spark", "Drift", "Surge", "Bolt",
-    "Echo", "Fury", "Hawk", "Falcon", "Viper", "Raven", "Storm", "Flash", "Vertex", "Pixel",
+    "Echo", "Fury", "Hawk", "Falcon", "Viper", "Raven", "Storm", "Flash", "Shadow",
     "Cipher", "Neon", "Orbit", "Flux", "Apex", "Zenith", "Wraith", "Specter", "Torque", "Vector",
     "Blade", "Ghost", "Comet", "Fang", "Pyro", "Strafe", "Throttle", "Nitro", "Havoc", "Onyx",
-];
-
-const SUFFIXES: &[&str] = &[
-    "_", "xx", "X", "z", "0", "1", "99", "420", "007", "_TTV", "FPV", "HD", "Pro", "YT", "GG",
-    "XD", "_v2", "Jr", "II", "69",
+    "Aegis", "Rift", "Crux", "Shard", "Jinx", "Hex", "Brink", "Prism", "Haze", "Warp",
+    "Flare", "Raid", "Siege", "Claw", "Dash", "Jolt", "Turbo", "Magnet", "Fuse",
+    "Dynamo", "Ripple", "Quake", "Ember", "Razor", "Chrome", "Stealth", "Chaos", "Impact", "Omega",
+    "Titan", "Rumble", "Snare", "Sonic", "Cobalt", "Neutron", "Diesel", "Trigger", "Volts",
+    "Luna", "Siren", "Astra", "Lyra", "Valkyrie", "Seraph", "Celeste", "Athena", "Ivy", "Aria",
+    "Nyx", "Soleil", "Vega", "Tempest", "Zara", "Rune", "Freya", "Karma", "Halo", "Aurora",
+    "Cleo", "Jade", "Mira", "Stella", "Kira", "Elektra", "Selene", "Sable", "Echo", "Phaedra",
+    "Vesper", "Artemis", "Nova", "Iris", "Wren", "Crimson", "Banshee", "Soraya", "Lux", "Rogue",
+    "Pandora", "Medusa", "Calypso", "Persephone", "Juno", "Hera", "Demeter", "Circe",
+    "Minerva", "Diana", "Brigid", "Amara", "Theia", "Rhea", "Gaia", "Eris", "Nemesis",
+    "Pixie", "Nova", "Zephyr", "Diva", "Bliss", "Shimmer", "Velvet", "Mirage", "Starling", "Whisper",
+    "Opal", "Pearl", "Sapphire", "Garnet", "Amethyst", "Topaz", "Ruby", "Scarlet", "Ivory", "Silver",
+    "Venom", "Hex", "Spite", "Dagger", "Thorn", "Scythe", "Shade", "Phantom", "Prowl", "Sting",
+    "Riot", "Rebel", "Fury", "Blaze", "Striker", "Mystic", "Spectra", "Glimmer", "Nova", "Zenith",
+    "Solstice", "Eclipse", "Nebula", "Cascade", "Blossom", "Dahlia", "Lotus", "Willow", "Sage", "Fern",
+    "Coral", "Marina", "Dove", "Lark", "Sparrow", "Petal", "Briar", "Roslyn", "Meadow", "Clover",
 ];
 
 /// Gamertag formatting styles.
 #[derive(Clone, Copy)]
 enum Style {
-    /// "ShadowVortex"
-    PrefixRoot,
-    /// "VortexPro"
-    RootSuffix,
-    /// "xShadowVortex_"
-    PrefixRootSuffix,
     /// "Sh4d0wV0rt3x"
     LeetRoot,
     /// "VortexPulse"
     DoubleRoot,
-    /// "Vortex"
+    /// "Vortex42"
     BareRoot,
 }
 
-const ALL_STYLES: [Style; 6] = [
-    Style::PrefixRoot,
-    Style::RootSuffix,
-    Style::PrefixRootSuffix,
-    Style::LeetRoot,
-    Style::DoubleRoot,
-    Style::BareRoot,
-];
+const ALL_STYLES: [Style; 3] = [Style::LeetRoot, Style::DoubleRoot, Style::BareRoot];
 
 /// Generate a unique gamertag. `existing` prevents collisions with already-used tags.
 pub fn generate_gamertag(rng: &mut impl Rng, existing: &HashSet<String>) -> String {
@@ -64,22 +57,6 @@ pub fn generate_gamertag(rng: &mut impl Rng, existing: &HashSet<String>) -> Stri
 fn generate_one(rng: &mut impl Rng) -> String {
     let style = ALL_STYLES[rng.gen_range(0..ALL_STYLES.len())];
     match style {
-        Style::PrefixRoot => {
-            let prefix = PREFIXES[rng.gen_range(0..PREFIXES.len())];
-            let root = ROOTS[rng.gen_range(0..ROOTS.len())];
-            format!("{prefix}{root}")
-        }
-        Style::RootSuffix => {
-            let root = ROOTS[rng.gen_range(0..ROOTS.len())];
-            let suffix = SUFFIXES[rng.gen_range(0..SUFFIXES.len())];
-            format!("{root}{suffix}")
-        }
-        Style::PrefixRootSuffix => {
-            let prefix = PREFIXES[rng.gen_range(0..PREFIXES.len())];
-            let root = ROOTS[rng.gen_range(0..ROOTS.len())];
-            let suffix = SUFFIXES[rng.gen_range(0..SUFFIXES.len())];
-            format!("{prefix}{root}{suffix}")
-        }
         Style::LeetRoot => {
             let root = ROOTS[rng.gen_range(0..ROOTS.len())];
             leetspeak(root, rng)
@@ -99,21 +76,24 @@ fn generate_one(rng: &mut impl Rng) -> String {
 }
 
 fn leetspeak(s: &str, rng: &mut impl Rng) -> String {
+    const LEET_MAPS: [(char, char, char); 6] = [
+        ('a', 'A', '4'),
+        ('e', 'E', '3'),
+        ('i', 'I', '1'),
+        ('o', 'O', '0'),
+        ('s', 'S', '5'),
+        ('t', 'T', '7'),
+    ];
+    // Randomly enable each letter mapping (all-or-nothing per letter)
+    let active: [bool; 6] = std::array::from_fn(|_| rng.gen_bool(0.4));
     s.chars()
         .map(|c| {
-            if rng.gen_bool(0.4) {
-                match c {
-                    'a' | 'A' => '4',
-                    'e' | 'E' => '3',
-                    'i' | 'I' => '1',
-                    'o' | 'O' => '0',
-                    's' | 'S' => '5',
-                    't' | 'T' => '7',
-                    _ => c,
+            for (i, &(lo, hi, repl)) in LEET_MAPS.iter().enumerate() {
+                if active[i] && (c == lo || c == hi) {
+                    return repl;
                 }
-            } else {
-                c
             }
+            c
         })
         .collect()
 }
