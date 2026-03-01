@@ -22,7 +22,7 @@ Blender ──► drone.glb ──► DroneGltfHandle (OnEnter(Race) load)
                           DroneAssets (run_if drone_gltf_ready)
                                 │
 CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve (editor preview)
-        (paths.rs)  │
+  (paths/generation.rs)  │
                     └──► generate_drone_race_path() ──► per-drone unique CubicCurve (12x)
                          (midleg lateral shift + gate 2D offset + approach scaling)
                                                                    │

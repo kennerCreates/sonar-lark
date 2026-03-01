@@ -26,7 +26,7 @@ All obstacle models come from a single `assets/models/obstacles.glb`. Individual
 
 ## Course Editor UI Files
 
-`ui/` directory: `discover.rs` (course file discovery + tests), `left_panel.rs` + `right_panel.rs` (UI construction), `data.rs` (build_course_data + tests), `load.rs` (load into editor), `save_delete.rs` (save/delete/navigation/gate ordering), `systems.rs` (interaction handlers, display updates), `types.rs` (marker components).
+`ui/` directory: `discover.rs` (re-exports from `course::discovery`), `left_panel.rs` + `right_panel.rs` (UI construction), `data.rs` (build_course_data + tests), `load.rs` (load into editor), `save_delete.rs` (save/delete/navigation/gate ordering), `systems.rs` (interaction handlers, display updates), `types.rs` (marker components, re-exports `CourseEntry`). Button styling uses shared `ui_theme` module.
 
 ## Course Delete Pattern
 

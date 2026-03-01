@@ -26,10 +26,13 @@ src/
 │   ├── mod.rs           RenderingPlugin, CelLightDir resource
 │   ├── cel_material.rs  CelMaterial (cel-shading with halftone + hue shifting)
 │   └── skybox.rs        SkyboxMaterial, procedural TRON night sky
+├── ui_theme.rs          Shared button styling constants, interaction helpers, spawn helpers
 ├── common/              Environment setup (light, ground, skybox)
+│   ├── mod.rs           CommonPlugin, drone_identity re-export
+│   └── drone_identity.rs DRONE_COLORS, DRONE_NAMES, DRONE_COUNT (shared across modules)
 ├── menu/                Menu UI, state navigation
 │   ├── mod.rs           MenuPlugin, system registration
-│   ├── discover.rs      CourseEntry, discover_courses(), discover_courses_in() + tests
+│   ├── discover.rs      Re-exports from course::discovery
 │   └── ui.rs            Menu setup, course selection, button handlers
 ├── obstacle/            Obstacle data layer
 │   ├── definition.rs    ObstacleId, ObstacleDef, TriggerVolumeConfig, CollisionVolumeConfig
@@ -37,6 +40,7 @@ src/
 │   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume/ObstacleCollisionVolume components
 ├── course/              Course data layer
 │   ├── data.rs          CourseData, ObstacleInstance, PropKind, PropInstance, CameraInstance
+│   ├── discovery.rs     CourseEntry, discover_courses(), discover_courses_in() + tests
 │   └── loader.rs        Load/save/spawn courses from RON
 ├── editor/              Map editor
 │   ├── workshop/        Define new obstacle types from glb scenes
@@ -59,8 +63,8 @@ src/
 │       │   └── scale_gizmo.rs draw_scale_gizmo(), handle_scale_gizmo()
 │       └── ui/          Course editor UI
 │           ├── mod.rs   Re-exports
-│           ├── types.rs Marker components, resources, color constants
-│           ├── discover.rs discover_existing_courses(), discover_existing_courses_in() + tests
+│           ├── types.rs Marker components, resources, re-exports CourseEntry
+│           ├── discover.rs Re-exports from course::discovery
 │           ├── left_panel.rs build_course_editor_ui(), build_left_panel(), tab/prop palette buttons
 │           ├── right_panel.rs build_right_panel(), palette/course/action buttons, dividers
 │           ├── data.rs  build_course_data(), next_gate_order_from_instances() + tests
@@ -69,7 +73,8 @@ src/
 │           └── systems.rs Interaction handlers, display updates, prop color
 ├── dev_menu/            Development tools (accessible via Dev button on main menu)
 │   ├── mod.rs           DevMenuPlugin, system registration
-│   ├── portrait_config.rs PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS, RON persistence
+│   ├── portrait_config.rs PortraitColorSlot, PortraitPaletteConfig, RON persistence
+│   ├── color_picker_data.rs PALETTE_COLORS (64 named sRGB colors from palette)
 │   └── portrait_editor/ Portrait palette editor
 │       ├── mod.rs       PortraitEditorState, EditorTab, component markers, setup/cleanup
 │       ├── build.rs     UI hierarchy construction
@@ -93,13 +98,19 @@ src/
 ├── drone/               Drone simulation
 │   ├── components.rs    Drone, DroneIdentity, PositionPid, AttitudePd, DesiredAttitude, DroneDynamics, DroneConfig, AIController, DesiredPosition
 │   ├── physics.rs       hover_target, position_pid, attitude_controller, motor_lag, apply_forces, integrate_motion, clamp_transform (FixedUpdate)
-│   ├── ai.rs            update_ai_targets, compute_racing_line, proximity_avoidance (FixedUpdate, spline-based)
+│   ├── ai/              AI targeting and racing line (FixedUpdate, spline-based)
+│   │   ├── mod.rs       update_ai_targets, spline math helpers, curvature/speed functions
+│   │   ├── racing_line.rs compute_racing_line (desired position from spline + gate correction)
+│   │   └── proximity.rs proximity_avoidance (lateral dodge when drones are nearby)
 │   ├── wander.rs        WanderBounds, wander_waypoint(), update_wander_targets(), transition_to_wandering()
 │   ├── dev_dashboard.rs Toggleable UI panel (F4) for live-tuning AiTuningParams during races
 │   ├── explosion.rs     Crash effects: debris + two-layer smoke (hot/dark) + audio
 │   ├── fireworks.rs     Victory fireworks on first finish: placed emitter-based or auto gate 0
 │   ├── interpolation.rs Visual transform interpolation (FixedFirst restore, FixedPostUpdate save, PostUpdate interpolate)
-│   ├── paths.rs         RacePath, spline generation (race/drone/return), compute_start_positions
+│   ├── paths/           Race path spline generation
+│   │   ├── mod.rs       RacePath struct, extract_sorted_gates(), re-exports
+│   │   ├── generation.rs generate_race_path(), generate_drone_race_path(), adaptive_approach_offset()
+│   │   └── start_positions.rs compute_start_positions()
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems
 ├── race/                Race mechanics
 │   ├── gate.rs          GateIndex, GateForward, GatePlanes, plane-crossing gate detection
@@ -208,11 +219,12 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 |--------|-------|----------------|
 | `obstacle::library` | 8 | Insert/get, overwrite, save/load roundtrip, error cases, existing RON format |
 | `course::loader` | 11 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course, camera roundtrip, backward compat (no cameras field) |
-| `menu::discover` | 8 | Course discovery, filtering, sorting, path storage, gate counting, missing directory |
+| `course::discovery` | 8 | Course discovery, filtering, sorting, path storage, gate counting, missing directory |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
-| `drone::paths` | 25 | Race path/spline generation, per-drone path generation, start positions, return path generation |
+| `drone::paths` | 23 | Race path/spline generation, per-drone path generation, start positions (split: generation.rs + start_positions.rs) |
 | `drone::spawning` | 2 | Config randomization bounds, PID variation application |
-| `drone::ai` | 8 | safe_speed_for_curvature, cyclic_curvature |
+| `drone::ai` | 9 | safe_speed_for_curvature, cyclic_curvature (split: mod.rs + racing_line.rs + proximity.rs) |
+| `dev_menu::color_picker_data` | 2 | PALETTE_COLORS count and value range |
 | `race::progress` | 15 | Gate pass advancement, crash/finish recording, idempotency, standings sorting |
 | `race::gate` | 16 | Point-in-trigger-volume AABB, plane-crossing detection |
 | `race::collision` | 15 | segment_obb_intersection, point_in_gate_opening, integration tests |
@@ -231,6 +243,6 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`.
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
 - `load_course_from_file` / `save_course` / `delete_course` — pure file I/O, no Bevy systems
-- `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability
-- `generate_race_path(course)` / `generate_drone_race_path(course, config, index)` / `compute_start_positions(...)` / `generate_return_path(...)` — pure geometry, no ECS (in `drone::paths`)
+- `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability (in `course::discovery`)
+- `generate_race_path(course)` / `generate_drone_race_path(course, config, index)` / `compute_start_positions(...)` — pure geometry, no ECS (in `drone::paths`)
 - `cyclic_curvature(spline, t, cycle_t)` / `safe_speed_for_curvature(κ, tuning)` — pure math (in `drone::ai`)

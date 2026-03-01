@@ -273,7 +273,7 @@ fn save_config_to(config: &PortraitPaletteConfig, path: &Path) {
     }
 }
 
-pub use super::portrait_palette_data::PALETTE_COLORS;
+pub use super::color_picker_data::PALETTE_COLORS;
 
 #[cfg(test)]
 mod tests {
