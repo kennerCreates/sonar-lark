@@ -2,10 +2,11 @@ use bevy::prelude::*;
 
 use super::super::components::*;
 use super::{
-    FINISH_EXTENSION, FINISH_EPSILON, VELOCITY_LOOK_AHEAD_T,
+    FINISH_EPSILON, VELOCITY_LOOK_AHEAD_T,
     cyclic_curvature, cyclic_pos, cyclic_vel, max_curvature_ahead,
     safe_speed_for_curvature_with,
 };
+use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
 
 /// How far ahead (in spline parameter units) gate correction begins.
 /// 2.0 = starts from the previous gate's midleg waypoint.

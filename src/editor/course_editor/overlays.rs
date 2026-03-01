@@ -2,7 +2,8 @@ use bevy::prelude::*;
 
 use crate::course::data::{CourseData, ObstacleInstance, PropKind};
 use crate::drone::ai::{cyclic_curvature, safe_speed_for_curvature};
-use crate::drone::components::{AiTuningParams, POINTS_PER_GATE};
+use crate::common::POINTS_PER_GATE;
+use crate::drone::components::AiTuningParams;
 use crate::drone::paths::generate_race_path;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::TriggerVolume;

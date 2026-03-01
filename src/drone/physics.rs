@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use crate::race::timing::RaceClock;
 use super::components::*;
 
-const GRAVITY: f32 = 9.81;
 /// Approximate full-pack race duration for battery sag curve (seconds).
 const RACE_DURATION_ESTIMATE: f32 = 90.0;
 const GROUND_HEIGHT: f32 = 0.3;

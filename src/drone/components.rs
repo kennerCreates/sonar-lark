@@ -1,10 +1,7 @@
 use bevy::math::cubic_splines::CubicCurve;
 use bevy::prelude::*;
 
-/// Spline control points per gate: approach, departure, midleg-to-next.
-/// The midleg waypoint between consecutive gates spreads the turn across
-/// two segments, reducing peak curvature for higher cornering speed.
-pub const POINTS_PER_GATE: f32 = 3.0;
+pub const GRAVITY: f32 = 9.81;
 
 #[derive(Component)]
 pub struct Drone {

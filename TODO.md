@@ -14,22 +14,9 @@ Complete. Pilot avatars using hand-drawn Inkscape SVG fragments assembled at run
 
 #### 2. ~~Split `spawn_drones` into sub-functions~~ ✅
 
-#### 3. Shared `GRAVITY` constant
-`GRAVITY: f32 = 9.81` is defined independently in `drone/spawning.rs:17` and `drone/explosion.rs:35`.
+#### 3. ~~Shared `GRAVITY` constant~~ ✅
 
-- [ ] Move to `drone/components.rs` as `pub const GRAVITY: f32 = 9.81;` (or `common/` if non-drone modules ever need it).
-- [ ] Update both import sites.
-
-Files: `drone/components.rs`, `drone/spawning.rs`, `drone/explosion.rs`
-
-#### 4. Move `POINTS_PER_GATE` and `FINISH_EXTENSION` to `common/`
-These are course topology constants consumed by the race module (`race/gate.rs`), but currently defined in `drone/components.rs` and `drone/ai/mod.rs`. This creates a race→drone dependency for what are really shared race/path constants.
-
-- [ ] Create `common/course_topology.rs` with `pub const POINTS_PER_GATE`, `pub const FINISH_EXTENSION`.
-- [ ] Re-export from `common/mod.rs`.
-- [ ] Update imports in `race/gate.rs`, `drone/ai/mod.rs`, `drone/paths/generation.rs`, and any other consumers.
-
-Files: `common/course_topology.rs` (new), `common/mod.rs`, `race/gate.rs`, `drone/ai/mod.rs`, `drone/components.rs`, `drone/paths/generation.rs`
+#### 4. ~~Move `POINTS_PER_GATE` and `FINISH_EXTENSION` to `common/`~~ ✅
 
 #### 5. Extract drone name/color resolution helper
 The pattern of looking up drone display name and color via `SelectedPilots` with fallback to `DroneIdentity` is copy-pasted across 4+ systems (leaderboard, results, camera HUD, overlays).

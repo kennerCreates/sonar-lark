@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-use crate::drone::ai::FINISH_EXTENSION;
-use crate::drone::components::{AIController, Drone, DroneDynamics, DroneIdentity, DronePhase, POINTS_PER_GATE};
+use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
+use crate::drone::components::{AIController, Drone, DroneDynamics, DroneIdentity, DronePhase};
 use crate::drone::explosion::{CrashSounds, ExplosionMeshes};
 use crate::drone::interpolation::PreviousTranslation;
 use crate::obstacle::spawning::TriggerVolume;

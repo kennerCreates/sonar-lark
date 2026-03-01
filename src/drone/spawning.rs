@@ -14,7 +14,6 @@ use super::components::*;
 use super::interpolation::{PhysicsRotation, PhysicsTranslation, PreviousRotation, PreviousTranslation};
 use super::paths::{RacePath, generate_race_path, generate_drone_race_path, compute_start_positions};
 
-const GRAVITY: f32 = 9.81;
 
 /// Marker resource inserted when `spawn_drones` detects the course has no gates.
 /// Prevents the warning from repeating every frame and signals the UI to show a banner.

@@ -14,10 +14,7 @@ const WAYPOINT_REACH_DISTANCE: f32 = 5.0;
 pub(super) const VELOCITY_LOOK_AHEAD_T: f32 = 0.5;
 const MAX_ADVANCE_PER_TICK: f32 = 0.15;
 
-/// How far past a full cycle the race extends. Drones must fly through
-/// the start/finish gate again (completing a full lap) before transitioning.
-/// 1.5 puts the finish well past gate 0's departure (at cycle + 1.0).
-pub const FINISH_EXTENSION: f32 = 1.5;
+use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
 
 /// Small epsilon added to finish_t guards so that spline_t can advance slightly
 /// past the finish, allowing miss_detection's strict `>` check to fire on drones

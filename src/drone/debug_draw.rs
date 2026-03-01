@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use super::components::*;
 use super::paths::adaptive_approach_offset;
+use crate::common::POINTS_PER_GATE;
 use crate::race::gate::GatePlanes;
 
 /// Toggle resource for flight debug visualization. Press F3 during race to toggle.

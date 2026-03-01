@@ -1,5 +1,8 @@
+pub mod course_topology;
 pub mod drone_identity;
 pub mod race_participant;
+
+pub use course_topology::{FINISH_EXTENSION, POINTS_PER_GATE};
 
 pub use race_participant::RaceParticipant;
 

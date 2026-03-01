@@ -3,6 +3,7 @@ use rand::Rng;
 
 use crate::palette;
 use crate::states::AppState;
+use super::components::GRAVITY;
 
 // --- Debris ---
 const DEBRIS_COUNT: usize = 55;
@@ -32,7 +33,6 @@ const DARK_SMOKE_SPREAD_SPEED: f32 = 1.0;
 const DARK_SMOKE_DRAG: f32 = 1.5;
 const DARK_SMOKE_GROW_PEAK: f32 = 0.2;
 
-const GRAVITY: f32 = 9.81;
 const CRASH_SOUND_COUNT: usize = 6;
 
 #[derive(Clone, Copy)]

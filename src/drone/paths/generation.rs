@@ -156,6 +156,7 @@ pub fn generate_drone_race_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::POINTS_PER_GATE;
     use crate::course::data::ObstacleInstance;
     use crate::obstacle::definition::{ObstacleId, ObstacleDef, TriggerVolumeConfig};
     use crate::obstacle::library::ObstacleLibrary;

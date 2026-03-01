@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use bevy::time::Fixed;
 
-use crate::drone::components::{AIController, Drone, DroneDynamics, DronePhase, POINTS_PER_GATE};
+use crate::common::POINTS_PER_GATE;
+use crate::drone::components::{AIController, Drone, DroneDynamics, DronePhase};
 use crate::drone::interpolation::PreviousTranslation;
 use crate::race::progress::RaceProgress;
 
