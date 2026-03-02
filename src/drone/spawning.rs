@@ -328,7 +328,6 @@ fn randomize_drone_config(rng: &mut impl Rng) -> DroneConfig {
         // Fraction of gate opening used for pass-through offset (0.3–0.6).
         // Aggressive drones use wider offsets (bolder lines through gates).
         gate_pass_offset: rng.gen_range(0.2..=0.4) + (cornering_aggression - 0.8) * 0.5,
-        maneuver_threshold_mult: rng.gen_range(0.85..=1.15),
     }
 }
 
@@ -361,7 +360,6 @@ mod tests {
             racing_line_bias: 0.0,
             approach_offset_scale: 1.0,
             gate_pass_offset: 0.0,
-            maneuver_threshold_mult: 1.0,
         }
     }
 
@@ -394,10 +392,6 @@ mod tests {
             assert!(
                 (0.19..=0.61).contains(&config.gate_pass_offset),
                 "gate_pass_offset {} out of range", config.gate_pass_offset
-            );
-            assert!(
-                (0.84..=1.16).contains(&config.maneuver_threshold_mult),
-                "maneuver_threshold_mult {} out of range", config.maneuver_threshold_mult
             );
         }
     }

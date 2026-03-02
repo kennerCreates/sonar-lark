@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
 use super::components::*;
-use super::maneuver::{ManeuverKind, ManeuverTrajectory, TiltOverride};
 use super::paths::adaptive_approach_offset;
 use crate::common::POINTS_PER_GATE;
 use crate::race::gate::GatePlanes;
@@ -268,83 +267,5 @@ pub fn draw_progress_indicators(
             1.5,
             color,
         );
-    }
-}
-
-/// Draw maneuver state for drones with a trajectory or tilt override.
-/// - Trajectory curve as a polyline (20 samples)
-/// - Colored ring: red = Split-S, blue = Power Loop, yellow = Aggressive Bank
-/// - Line from drone to exit point on spline
-pub fn draw_maneuver_state(
-    mut gizmos: Gizmos,
-    debug: Option<Res<FlightDebugDraw>>,
-    traj_query: Query<(
-        &Transform,
-        &ManeuverTrajectory,
-        &AIController,
-    )>,
-    tilt_query: Query<(&Transform, &AIController, &TiltOverride)>,
-) {
-    let Some(debug) = debug else { return };
-    if !debug.enabled {
-        return;
-    }
-
-    // Drones with maneuver trajectory (Split-S / Power Loop)
-    for (transform, traj, ai) in &traj_query {
-        let pos = transform.translation;
-        let color = maneuver_color(traj.kind);
-        let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
-
-        // Draw the trajectory curve as a polyline
-        let samples = 20;
-        for i in 0..samples {
-            let t0 = (i as f32 / samples as f32) * traj.curve_len;
-            let t1 = ((i + 1) as f32 / samples as f32) * traj.curve_len;
-            let p0 = traj.curve.position(t0);
-            let p1 = traj.curve.position(t1);
-            gizmos.line(p0, p1, color);
-        }
-
-        // Colored ring around the drone
-        gizmos.circle(
-            Isometry3d::new(pos, Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
-            2.0,
-            color,
-        );
-
-        // Line from drone to exit point on spline
-        let exit_t = traj.exit_spline_t.rem_euclid(cycle_t);
-        let exit_pos = ai.spline.position(exit_t);
-        gizmos.line(pos, exit_pos, Color::srgba(1.0, 1.0, 1.0, 0.3));
-        gizmos.sphere(Isometry3d::from_translation(exit_pos), 0.3, color);
-    }
-
-    // Drones with tilt override (Aggressive Bank)
-    for (transform, ai, tilt) in &tilt_query {
-        let pos = transform.translation;
-        let color = maneuver_color(ManeuverKind::AggressiveBank);
-        let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
-
-        // Yellow ring
-        gizmos.circle(
-            Isometry3d::new(pos, Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
-            2.0,
-            color,
-        );
-
-        // Line to exit point
-        let exit_t = tilt.exit_spline_t.rem_euclid(cycle_t);
-        let exit_pos = ai.spline.position(exit_t);
-        gizmos.line(pos, exit_pos, Color::srgba(1.0, 1.0, 0.0, 0.3));
-        gizmos.sphere(Isometry3d::from_translation(exit_pos), 0.3, color);
-    }
-}
-
-fn maneuver_color(kind: ManeuverKind) -> Color {
-    match kind {
-        ManeuverKind::SplitS => Color::srgb(1.0, 0.2, 0.2),       // red
-        ManeuverKind::PowerLoop => Color::srgb(0.2, 0.4, 1.0),    // blue
-        ManeuverKind::AggressiveBank => Color::srgb(1.0, 1.0, 0.2), // yellow
     }
 }

@@ -41,9 +41,6 @@ pub struct TraitModifiers {
     pub approach_offset_scale: f32,
     /// Multiplier on PID variation magnitude
     pub pid_variation_scale: f32,
-    /// Additive adjustment to maneuver_threshold_mult.
-    /// Negative = flips earlier (more acrobatic). Positive = prefers banking.
-    pub maneuver_threshold: f32,
 }
 
 impl PersonalityTrait {
@@ -58,7 +55,6 @@ impl PersonalityTrait {
                 gate_pass_offset: 0.05,
                 approach_offset_scale: -0.04,
                 pid_variation_scale: 1.0,
-                maneuver_threshold: -0.08,
             },
             Cautious => TraitModifiers {
                 cornering_aggression: -0.10,
@@ -68,7 +64,6 @@ impl PersonalityTrait {
                 gate_pass_offset: -0.05,
                 approach_offset_scale: 0.05,
                 pid_variation_scale: 0.8,
-                maneuver_threshold: 0.10,
             },
             Flashy => TraitModifiers {
                 cornering_aggression: 0.05,
@@ -78,7 +73,6 @@ impl PersonalityTrait {
                 gate_pass_offset: 0.08,
                 approach_offset_scale: -0.02,
                 pid_variation_scale: 1.1,
-                maneuver_threshold: -0.15,
             },
             Methodical => TraitModifiers {
                 cornering_aggression: -0.05,
@@ -88,7 +82,6 @@ impl PersonalityTrait {
                 gate_pass_offset: -0.03,
                 approach_offset_scale: 0.03,
                 pid_variation_scale: 0.7,
-                maneuver_threshold: 0.05,
             },
             Reckless => TraitModifiers {
                 cornering_aggression: 0.15,
@@ -98,7 +91,6 @@ impl PersonalityTrait {
                 gate_pass_offset: 0.10,
                 approach_offset_scale: -0.06,
                 pid_variation_scale: 1.2,
-                maneuver_threshold: -0.12,
             },
             Smooth => TraitModifiers {
                 cornering_aggression: 0.0,
@@ -108,7 +100,6 @@ impl PersonalityTrait {
                 gate_pass_offset: 0.0,
                 approach_offset_scale: 0.02,
                 pid_variation_scale: 0.6,
-                maneuver_threshold: 0.03,
             },
             Technical => TraitModifiers {
                 cornering_aggression: 0.03,
@@ -118,7 +109,6 @@ impl PersonalityTrait {
                 gate_pass_offset: -0.02,
                 approach_offset_scale: 0.04,
                 pid_variation_scale: 0.8,
-                maneuver_threshold: -0.03,
             },
             Hotdog => TraitModifiers {
                 cornering_aggression: 0.08,
@@ -128,7 +118,6 @@ impl PersonalityTrait {
                 gate_pass_offset: 0.12,
                 approach_offset_scale: -0.05,
                 pid_variation_scale: 1.3,
-                maneuver_threshold: -0.20,
             },
         }
     }
@@ -244,7 +233,6 @@ mod tests {
             assert!(m.gate_pass_offset.abs() <= 0.15);
             assert!(m.approach_offset_scale.abs() <= 0.1);
             assert!((0.5..=1.5).contains(&m.pid_variation_scale));
-            assert!(m.maneuver_threshold.abs() <= 0.25);
         }
     }
 

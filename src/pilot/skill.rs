@@ -80,10 +80,6 @@ pub fn generate_drone_config(
     let gate_base = 0.2 + rng.gen_range(0.0..=0.2 * range_factor(s_corner));
     let gate_pass_offset = gate_base + (cornering_aggression - 0.8) * 0.5;
 
-    // Maneuver threshold mult: optimal = 1.0, range 0.85..1.15, governed by cornering
-    let maneuver_range = 0.15 * range_factor(s_corner);
-    let maneuver_threshold_mult = 1.0 + rng.gen_range(-maneuver_range..=maneuver_range);
-
     // Hover noise: optimal = low, governed by consistency
     let hover_factor = range_factor(s_consist);
     let hover_noise_amp = Vec3::new(
@@ -105,7 +101,6 @@ pub fn generate_drone_config(
     let mut total_approach_adj = 0.0f32;
     let mut line_bias_scale = 1.0f32;
     let mut pid_scale = 1.0f32;
-    let mut total_maneuver_adj = 0.0f32;
 
     for trait_ in traits {
         let m = trait_.modifiers();
@@ -116,7 +111,6 @@ pub fn generate_drone_config(
         total_approach_adj += m.approach_offset_scale;
         line_bias_scale *= m.racing_line_bias_scale;
         pid_scale *= m.pid_variation_scale;
-        total_maneuver_adj += m.maneuver_threshold;
     }
 
     // --- Clamp to the same bounds as randomize_drone_config() ---
@@ -140,7 +134,6 @@ pub fn generate_drone_config(
         racing_line_bias: (racing_line_bias * line_bias_scale).clamp(-4.4, 4.4),
         approach_offset_scale: (approach_offset_scale + total_approach_adj).clamp(0.89, 1.11),
         gate_pass_offset: (gate_pass_offset + total_gate_adj).clamp(0.19, 0.61),
-        maneuver_threshold_mult: (maneuver_threshold_mult + total_maneuver_adj).clamp(0.7, 1.3),
     }
 }
 
@@ -189,11 +182,6 @@ mod tests {
                 (0.18..=0.62).contains(&config.gate_pass_offset),
                 "gate_pass_offset {} out of range",
                 config.gate_pass_offset
-            );
-            assert!(
-                (0.69..=1.31).contains(&config.maneuver_threshold_mult),
-                "maneuver_threshold_mult {} out of range",
-                config.maneuver_threshold_mult
             );
         }
     }

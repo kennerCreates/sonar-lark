@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
 use super::super::components::*;
-use super::super::maneuver::ManeuverTrajectory;
 use super::{
     FINISH_EPSILON, VELOCITY_LOOK_AHEAD_T,
     cyclic_curvature, cyclic_pos, cyclic_vel, max_curvature_ahead,
@@ -26,25 +25,11 @@ pub fn compute_racing_line(
         &DroneConfig,
         &DronePhase,
         &mut DesiredPosition,
-        Option<&ManeuverTrajectory>,
     )>,
 ) {
     let elapsed = time.elapsed_secs();
 
-    for (transform, ai, config, phase, mut desired, maneuver_traj) in &mut query {
-        // When a maneuver trajectory is active, sample from it instead of the racing spline
-        if let Some(traj) = maneuver_traj {
-            let progress = ((elapsed - traj.start_time) / traj.duration).clamp(0.0, 1.0);
-            let curve_t = progress * traj.curve_len;
-
-            // Small look-ahead for smoother tracking
-            let look_ahead_t = ((progress + 0.05) * traj.curve_len).min(traj.curve_len);
-            desired.position = traj.curve.position(look_ahead_t);
-            desired.velocity_hint = traj.curve.velocity(curve_t).normalize_or(Vec3::NEG_Z);
-            desired.max_speed = traj.entry_speed;
-            continue;
-        }
-
+    for (transform, ai, config, phase, mut desired) in &mut query {
         match *phase {
             DronePhase::Idle | DronePhase::Crashed | DronePhase::Wandering => continue,
             DronePhase::Racing => {

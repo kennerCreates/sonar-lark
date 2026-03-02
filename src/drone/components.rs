@@ -126,10 +126,6 @@ pub struct DroneConfig {
     /// Each gate gets a deterministic 2D offset (width + height) within ±(fraction × half_extent),
     /// so drones spread across the gate opening instead of all flying through center.
     pub gate_pass_offset: f32,
-    /// Multiplier on maneuver trigger threshold.
-    /// <1.0 = triggers maneuvers at lower turn angles (more acrobatic).
-    /// >1.0 = prefers banking over flipping (conservative).
-    pub maneuver_threshold_mult: f32,
 }
 
 #[derive(Component)]
@@ -246,7 +242,4 @@ tuning_params! {
     avoidance_radius,           "Avoid Radius",     1.0,  2.0,   15.0,  8.0;
     avoidance_strength,         "Avoid Strength",   1.0,  0.0,   30.0,  0.0;
     feedforward_blend,          "FF Blend",         0.05, 0.0,   1.0,   0.85;
-    maneuver_turn_threshold,    "Maneuver Thresh",  5.0,  30.0,  150.0, 90.0;
-    maneuver_altitude_min,      "Maneuver Alt",     0.5,  1.0,   20.0,  8.0;
-    maneuver_enabled,           "Maneuvers On",     1.0,  0.0,   1.0,   1.0;
 }

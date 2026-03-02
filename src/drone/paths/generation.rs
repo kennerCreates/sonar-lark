@@ -177,7 +177,6 @@ mod tests {
             racing_line_bias: 0.0,
             approach_offset_scale: 1.0,
             gate_pass_offset: 0.0,
-            maneuver_threshold_mult: 1.0,
         }
     }
 
