@@ -8,6 +8,7 @@ use super::{
 };
 use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
 use crate::drone::components::*;
+use crate::race::progress::RaceProgress;
 
 /// Raised tilt limit for Aggressive Bank (~103 degrees in radians).
 const AGGRESSIVE_BANK_TILT: f32 = 1.80;
@@ -97,6 +98,7 @@ pub fn activate_pending_maneuvers(
     mut commands: Commands,
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
+    progress: Option<Res<RaceProgress>>,
     query: Query<(
         Entity,
         &Transform,
@@ -104,11 +106,12 @@ pub fn activate_pending_maneuvers(
         &DroneDynamics,
         &DronePhase,
         &PendingManeuver,
+        &Drone,
     )>,
 ) {
     let now = time.elapsed_secs();
 
-    for (entity, transform, ai, dynamics, phase, pending) in &query {
+    for (entity, transform, ai, dynamics, phase, pending, drone) in &query {
         if *phase == DronePhase::Crashed {
             commands.entity(entity).remove::<PendingManeuver>();
             continue;
@@ -116,6 +119,21 @@ pub fn activate_pending_maneuvers(
 
         if ai.spline_t < pending.trigger_t {
             continue;
+        }
+
+        // For flip maneuvers (SplitS/PowerLoop), defer activation if an uncrossed
+        // gate sits between the drone and the maneuver exit. The drone must cross
+        // the gate physically before position_pid is bypassed.
+        if matches!(pending.kind, ManeuverKind::SplitS | ManeuverKind::PowerLoop)
+            && let Some(ref progress) = progress
+        {
+            let drone_idx = drone.index as usize;
+            if let Some(state) = progress.drone_states.get(drone_idx) {
+                let next_gate_t = state.next_gate as f32 * POINTS_PER_GATE;
+                if next_gate_t < pending.exit_t {
+                    continue; // Wait for gate crossing
+                }
+            }
         }
 
         commands.entity(entity).remove::<PendingManeuver>();
