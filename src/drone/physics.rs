@@ -11,6 +11,9 @@ const INTEGRAL_CLAMP: f32 = 10.0;
 /// during PID bypass (maneuvers) and limits windup from tilt-clamp saturation.
 /// At 1.5/s: integral decays to 22% after 1s bypass, <5% after 2s.
 const INTEGRAL_DECAY_RATE: f32 = 1.5;
+/// Rate-tracking proportional bandwidth (1/s) for body-rate control mode.
+/// First-order convergence: time constant = 1/30 ≈ 0.033s, settles in ~6 frames at 64Hz.
+const RATE_TRACKING_BANDWIDTH: f32 = 30.0;
 
 /// Noise-driven hover target. Layered sine waves produce organic 1–3 cm drift.
 pub fn hover_target(
@@ -166,38 +169,48 @@ pub fn acceleration_to_attitude(
 /// and integrates angular velocity and orientation.
 pub fn attitude_controller(
     time: Res<Time>,
-    mut query: Query<(&mut Transform, &mut DroneDynamics, &DesiredAttitude, &AttitudePd, &DronePhase)>,
+    mut query: Query<(
+        &mut Transform,
+        &mut DroneDynamics,
+        &DesiredAttitude,
+        &AttitudePd,
+        &DronePhase,
+        Option<&DesiredBodyRates>,
+    )>,
 ) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    for (mut transform, mut dynamics, attitude, pd, phase) in &mut query {
+    for (mut transform, mut dynamics, attitude, pd, phase, body_rates) in &mut query {
         if *phase == DronePhase::Crashed {
             continue;
         }
-        // Orientation error: rotation from current to desired
-        let error_quat = attitude.orientation * transform.rotation.inverse();
 
-        // Convert to axis-angle, taking the short path
-        let (axis, mut angle) = error_quat.to_axis_angle();
-        if angle > std::f32::consts::PI {
-            angle = -(2.0 * std::f32::consts::PI - angle);
-        }
-
-        let error_vec = if angle.abs() > 0.001 {
-            axis * angle
+        let torque = if let Some(body_rates) = body_rates {
+            // Rate-tracking mode: P controller on angular velocity error.
+            // angular_accel = rate_error * bandwidth (axis-independent via MOI scaling)
+            let rate_error = body_rates.angular_velocity - dynamics.angular_velocity;
+            rate_error * RATE_TRACKING_BANDWIDTH * dynamics.moment_of_inertia
         } else {
-            Vec3::ZERO
+            // Orientation-tracking mode (normal flight)
+            let error_quat = attitude.orientation * transform.rotation.inverse();
+            let (axis, mut angle) = error_quat.to_axis_angle();
+            if angle > std::f32::consts::PI {
+                angle = -(2.0 * std::f32::consts::PI - angle);
+            }
+            let error_vec = if angle.abs() > 0.001 {
+                axis * angle
+            } else {
+                Vec3::ZERO
+            };
+            Vec3::new(
+                error_vec.x * pd.kp_roll_pitch - dynamics.angular_velocity.x * pd.kd_roll_pitch,
+                error_vec.y * pd.kp_yaw - dynamics.angular_velocity.y * pd.kd_yaw,
+                error_vec.z * pd.kp_roll_pitch - dynamics.angular_velocity.z * pd.kd_roll_pitch,
+            )
         };
-
-        // PD torque: split roll/pitch (x,z) from yaw (y)
-        let torque = Vec3::new(
-            error_vec.x * pd.kp_roll_pitch - dynamics.angular_velocity.x * pd.kd_roll_pitch,
-            error_vec.y * pd.kp_yaw - dynamics.angular_velocity.y * pd.kd_yaw,
-            error_vec.z * pd.kp_roll_pitch - dynamics.angular_velocity.z * pd.kd_roll_pitch,
-        );
 
         let angular_accel = torque / dynamics.moment_of_inertia;
         dynamics.angular_velocity += angular_accel * dt;
@@ -303,17 +316,21 @@ pub fn dirty_air_perturbation(
 }
 
 /// First-order low-pass filter on thrust, simulating motor spool-up lag.
-pub fn motor_lag(time: Res<Time>, mut query: Query<(&mut DroneDynamics, &DesiredAttitude, &DronePhase)>) {
+pub fn motor_lag(
+    time: Res<Time>,
+    mut query: Query<(&mut DroneDynamics, &DesiredAttitude, &DronePhase, Option<&DesiredBodyRates>)>,
+) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    for (mut dynamics, attitude, phase) in &mut query {
+    for (mut dynamics, attitude, phase, body_rates) in &mut query {
         if *phase == DronePhase::Crashed {
             continue;
         }
-        dynamics.commanded_thrust = attitude.thrust_magnitude;
+        let commanded = body_rates.map(|br| br.thrust).unwrap_or(attitude.thrust_magnitude);
+        dynamics.commanded_thrust = commanded;
         let alpha = (dt / dynamics.motor_time_constant).min(1.0);
         dynamics.thrust += (dynamics.commanded_thrust - dynamics.thrust) * alpha;
         dynamics.thrust = dynamics.thrust.clamp(0.0, dynamics.max_thrust);

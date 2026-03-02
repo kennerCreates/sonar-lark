@@ -85,6 +85,18 @@ pub struct DesiredAttitude {
     pub thrust_magnitude: f32,
 }
 
+/// Body-rate control override for acrobatic maneuvers.
+/// When present, `attitude_controller` switches from orientation tracking to rate
+/// tracking, and `motor_lag` reads thrust from here instead of `DesiredAttitude`.
+/// Inserted by maneuver systems (Phase 6), removed when maneuver completes.
+#[derive(Component)]
+pub struct DesiredBodyRates {
+    /// Target angular velocity in world frame (rad/s).
+    pub angular_velocity: Vec3,
+    /// Target thrust magnitude (N).
+    pub thrust: f32,
+}
+
 #[derive(Component)]
 pub struct DroneDynamics {
     pub velocity: Vec3,
