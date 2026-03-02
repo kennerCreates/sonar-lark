@@ -10,17 +10,13 @@ pub enum FaceShape {
     Round,
     Square,
     Angular,
-    Long,
-    Diamond,
 }
 
-pub const ALL_FACE_SHAPES: [FaceShape; 6] = [
+pub const ALL_FACE_SHAPES: [FaceShape; 4] = [
     FaceShape::Oval,
     FaceShape::Round,
     FaceShape::Square,
     FaceShape::Angular,
-    FaceShape::Long,
-    FaceShape::Diamond,
 ];
 
 impl FaceShape {
@@ -34,10 +30,10 @@ impl FaceShape {
 
     pub fn group_id(&self) -> &'static str {
         match self {
-            FaceShape::Oval | FaceShape::Long => "oval",
+            FaceShape::Oval => "oval",
             FaceShape::Round => "round",
             FaceShape::Square => "square",
-            FaceShape::Angular | FaceShape::Diamond => "angular",
+            FaceShape::Angular => "angular",
         }
     }
 }
@@ -51,17 +47,13 @@ pub enum EyeStyle {
     Narrow,
     Wide,
     Visor,
-    Goggles,
-    Winking,
 }
 
-pub const ALL_EYE_STYLES: [EyeStyle; 6] = [
+pub const ALL_EYE_STYLES: [EyeStyle; 4] = [
     EyeStyle::Normal,
     EyeStyle::Narrow,
     EyeStyle::Wide,
     EyeStyle::Visor,
-    EyeStyle::Goggles,
-    EyeStyle::Winking,
 ];
 
 impl EyeStyle {
@@ -75,9 +67,9 @@ impl EyeStyle {
 
     pub fn group_id(&self) -> &'static str {
         match self {
-            EyeStyle::Normal | EyeStyle::Winking => "normal",
+            EyeStyle::Normal => "normal",
             EyeStyle::Narrow => "narrow",
-            EyeStyle::Wide | EyeStyle::Goggles => "wide",
+            EyeStyle::Wide => "wide",
             EyeStyle::Visor => "visor",
         }
     }
@@ -91,15 +83,13 @@ pub enum MouthStyle {
     Neutral,
     Smile,
     Smirk,
-    Gritted,
     Frown,
 }
 
-pub const ALL_MOUTH_STYLES: [MouthStyle; 5] = [
+pub const ALL_MOUTH_STYLES: [MouthStyle; 4] = [
     MouthStyle::Neutral,
     MouthStyle::Smile,
     MouthStyle::Smirk,
-    MouthStyle::Gritted,
     MouthStyle::Frown,
 ];
 
@@ -118,7 +108,7 @@ impl MouthStyle {
             MouthStyle::Neutral => "neutral",
             MouthStyle::Smile => "smile",
             MouthStyle::Smirk => "smirk",
-            MouthStyle::Gritted | MouthStyle::Frown => "frown",
+            MouthStyle::Frown => "frown",
         }
     }
 }
@@ -134,17 +124,15 @@ pub enum HairStyle {
     Helmet,
     Beanie,
     Bald,
-    Ponytail,
 }
 
-pub const ALL_HAIR_STYLES: [HairStyle; 7] = [
+pub const ALL_HAIR_STYLES: [HairStyle; 6] = [
     HairStyle::ShortCrop,
     HairStyle::Mohawk,
     HairStyle::LongSwept,
     HairStyle::Helmet,
     HairStyle::Beanie,
     HairStyle::Bald,
-    HairStyle::Ponytail,
 ];
 
 impl HairStyle {
@@ -156,12 +144,17 @@ impl HairStyle {
         ALL_HAIR_STYLES.iter().position(|s| s == self).unwrap()
     }
 
+    pub fn is_bald(&self) -> bool {
+        matches!(self, HairStyle::Bald)
+    }
+
     pub fn group_id(&self) -> &'static str {
         match self {
-            HairStyle::ShortCrop | HairStyle::Bald => "short_crop",
+            HairStyle::ShortCrop => "short_crop",
             HairStyle::Mohawk => "mohawk",
-            HairStyle::LongSwept | HairStyle::Ponytail => "long_sweep",
+            HairStyle::LongSwept => "long_sweep",
             HairStyle::Helmet | HairStyle::Beanie => "beanie",
+            HairStyle::Bald => "bald",
         }
     }
 }
@@ -169,22 +162,28 @@ impl HairStyle {
 // ── Accessory ───────────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum EarringKind {
+    Round,
+    Ring,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub enum NecklaceKind {
+    Chain,
+    Pendant,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Accessory {
-    #[serde(alias = "Earring", alias = "GogglesUp", alias = "Antenna")]
-    EarringRound,
-    #[serde(alias = "SpikedCollar", alias = "FacePaint")]
-    EarringRing,
-    #[serde(alias = "Piercings", alias = "Earpiece")]
-    NecklaceChain,
-    #[serde(alias = "Necklace", alias = "Scar")]
-    NecklacePendant,
+    Earring(EarringKind),
+    Necklace(NecklaceKind),
 }
 
 pub const ALL_ACCESSORIES: [Accessory; 4] = [
-    Accessory::EarringRound,
-    Accessory::EarringRing,
-    Accessory::NecklaceChain,
-    Accessory::NecklacePendant,
+    Accessory::Earring(EarringKind::Round),
+    Accessory::Earring(EarringKind::Ring),
+    Accessory::Necklace(NecklaceKind::Chain),
+    Accessory::Necklace(NecklaceKind::Pendant),
 ];
 
 impl Accessory {
@@ -198,16 +197,16 @@ impl Accessory {
 
     pub fn group_id(&self) -> &'static str {
         match self {
-            Accessory::EarringRound => "earring_round",
-            Accessory::EarringRing => "earring_ring",
-            Accessory::NecklaceChain => "necklace_chain",
-            Accessory::NecklacePendant => "necklace_pendant",
+            Accessory::Earring(EarringKind::Round) => "earring_round",
+            Accessory::Earring(EarringKind::Ring) => "earring_ring",
+            Accessory::Necklace(NecklaceKind::Chain) => "necklace_chain",
+            Accessory::Necklace(NecklaceKind::Pendant) => "necklace_pendant",
         }
     }
 
     /// Whether this accessory uses a secondary (shadow) color in its SVG.
     pub fn has_shadow(&self) -> bool {
-        matches!(self, Accessory::NecklacePendant)
+        matches!(self, Accessory::Necklace(NecklaceKind::Pendant))
     }
 }
 
@@ -312,16 +311,4 @@ mod tests {
         assert_eq!(seen.len(), ALL_SHIRT_STYLES.len());
     }
 
-    #[test]
-    fn accessory_alias_backward_compat() {
-        let old_names = [
-            "Necklace", "Scar", "SpikedCollar", "FacePaint",
-            "Piercings", "Earpiece", "Earring", "GogglesUp", "Antenna",
-        ];
-        for name in old_names {
-            let ron_str = format!("{name}");
-            let result: Result<Accessory, _> = ron::from_str(&ron_str);
-            assert!(result.is_ok(), "Failed to deserialize alias '{name}': {result:?}");
-        }
-    }
 }

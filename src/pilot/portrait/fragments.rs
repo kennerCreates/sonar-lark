@@ -204,7 +204,7 @@ pub fn assemble_svg(
     parts: &PortraitParts,
 ) -> String {
     let colors = PortraitColors::from_descriptor(descriptor, bg_color);
-    let hair_id = descriptor.hair.group_id();
+    let bald = descriptor.hair.is_bald();
 
     let mut svg = String::with_capacity(16384);
     svg.push_str(r#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" viewBox="0 0 20 20">"#);
@@ -214,9 +214,12 @@ pub fn assemble_svg(
         svg.push_str(&replace_layer_colors(bg, LayerType::Background, &colors));
     }
 
-    // Hair back
-    if let Some(hb) = parts.get("hair_back", hair_id) {
-        svg.push_str(&replace_layer_colors(hb, LayerType::Hair, &colors));
+    // Hair back (skip for bald)
+    if !bald {
+        let hair_id = descriptor.hair.group_id();
+        if let Some(hb) = parts.get("hair_back", hair_id) {
+            svg.push_str(&replace_layer_colors(hb, LayerType::Hair, &colors));
+        }
     }
 
     // Face
@@ -248,10 +251,13 @@ pub fn assemble_svg(
         svg.push_str(&replace_layer_colors(mouth, LayerType::Mouth, &colors));
     }
 
-    // Hair front
-    let hair_front = get_or_warn(parts, "hair_front", hair_id);
-    if !hair_front.is_empty() {
-        svg.push_str(&replace_layer_colors(hair_front, LayerType::Hair, &colors));
+    // Hair front (skip for bald)
+    if !bald {
+        let hair_id = descriptor.hair.group_id();
+        let hair_front = get_or_warn(parts, "hair_front", hair_id);
+        if !hair_front.is_empty() {
+            svg.push_str(&replace_layer_colors(hair_front, LayerType::Hair, &colors));
+        }
     }
 
     // Accessory (optional)
@@ -401,7 +407,7 @@ mod tests {
             mouth: MouthStyle::Smile,
             hair: HairStyle::ShortCrop,
             shirt: ShirtStyle::Round,
-            accessory: Some(Accessory::NecklacePendant),
+            accessory: Some(Accessory::Necklace(NecklaceKind::Pendant)),
             skin_tone: [0.8, 0.6, 0.4],
             hair_color: [0.1, 0.1, 0.1],
             eye_color: [0.3, 0.3, 0.7],
@@ -509,7 +515,7 @@ mod tests {
             mouth: MouthStyle::Smile,
             hair: HairStyle::LongSwept,
             shirt: ShirtStyle::Crew,
-            accessory: Some(Accessory::NecklacePendant),
+            accessory: Some(Accessory::Necklace(NecklaceKind::Pendant)),
             skin_tone: [0.8, 0.6, 0.45],
             hair_color: [0.3, 0.15, 0.05],
             eye_color: [0.2, 0.6, 0.3],

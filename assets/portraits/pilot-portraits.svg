@@ -33,7 +33,7 @@
      inkscape:window-x="-11"
      inkscape:window-y="-11"
      inkscape:window-maximized="1"
-     inkscape:current-layer="layer13"
+     inkscape:current-layer="layer11"
      showguides="true"><sodipodi:guide
        position="59.597394,285.62292"
        orientation="0,-1"
@@ -96,7 +96,7 @@
      inkscape:groupmode="layer"
      id="layer18"
      inkscape:label="face_round"
-     style="display:none"><path
+     style="display:inline"><path
        style="display:inline;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
        d="m 22.774891,29.033794 c -0.568485,-1.395373 -2.499721,-1.921176 -1.432696,-4.379599 0.116655,-0.072 0.303047,-0.184695 0.415611,-0.274551 0.225129,-0.179711 0.445658,-0.384346 0.671864,-0.610552 0.68335,-0.68335 1.169637,-1.563439 1.366841,-2.548165 1.236062,0.683857 2.057564,-3.986066 0.132809,-2.77089 0.0044,-1.08268 -0.220344,-2.119327 -0.540019,-2.856674 -0.494618,-1.140864 -2.70741,-1.900659 -4.088122,-1.900659 -1.380712,0 -3.265642,0.670615 -4.029729,1.697054 -0.490783,0.659295 -0.553233,1.717708 -0.518831,2.760039 -1.596912,-0.746676 -0.929856,3.169805 0.173633,2.938321 0.178768,1.038426 0.677685,1.967013 1.391646,2.680974 0.226206,0.226206 0.528491,0.478081 0.721752,0.634182 1.042839,2.439788 -0.774819,3.272603 -1.343304,4.667976"
        id="path2-1-0-82"
@@ -444,7 +444,7 @@
      inkscape:groupmode="layer"
      id="layer12"
      inkscape:label="eyes_visor"
-     style="display:inline"><path
+     style="display:none"><path
        style="display:inline;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
        d="m 23.883601,18.944106 c -0.333937,0.555245 -1.674542,1.420589 -2.366632,1.460123 -0.748274,0.04274 -1.595644,-0.333381 -2.064214,-0.327302 -0.609839,0.0079 -1.291627,0.468298 -1.992747,0.342694 -0.701121,-0.125606 -2.159062,-0.803655 -2.662729,-1.718475 l 0.03326,-1.085491 c 1.089847,0.380199 2.283731,0.04843 3.002147,0.196575 0.718416,0.148146 1.230422,0.718707 1.722055,0.737462 0.492465,0.01879 0.875667,-0.668296 1.712315,-0.743537 0.772417,-0.06946 1.985712,0.09981 2.563669,-0.06031 z"
        id="path38-8"
@@ -535,9 +535,9 @@
      inkscape:groupmode="layer"
      id="layer11"
      inkscape:label="hair_front_beanie"
-     style="display:none"><path
+     style="display:inline"><path
        style="display:inline;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:1.15654;stroke-opacity:1;paint-order:markers fill stroke"
-       d="m 14.821604,17.6044 c -0.340964,-5.230794 8.90828,-5.606837 9.004102,0.14056 -3.730155,0.824342 -4.675513,0.798491 -9.004102,-0.14056 z"
+       d="m 14.639703,17.571327 c -0.374037,-5.379622 9.553202,-5.706056 9.301758,0.173633 -3.730155,0.824342 -4.973169,0.765418 -9.301758,-0.173633 z"
        id="path40"
        sodipodi:nodetypes="ccc"
        inkscape:label="hair_front_ beanie"

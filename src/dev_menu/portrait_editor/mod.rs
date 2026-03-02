@@ -11,8 +11,8 @@ use crate::palette;
 use crate::pilot::portrait::loader::PortraitParts;
 use crate::pilot::portrait::rasterize::rasterize_portrait;
 use crate::pilot::portrait::{
-    Accessory, EyeStyle, FaceShape, HairStyle, MouthStyle, PortraitDescriptor, SecondaryColor,
-    ShirtStyle,
+    Accessory, EarringKind, EyeStyle, FaceShape, HairStyle, MouthStyle, PortraitDescriptor,
+    SecondaryColor, ShirtStyle,
 };
 use super::portrait_config::{
     DRONE_COLOR_INDEX, PALETTE_COLORS, PortraitColorSlot, PortraitPaletteConfig,
@@ -113,7 +113,7 @@ impl Default for PortraitEditorState {
             mouth_style: MouthStyle::Neutral,
             hair_style: HairStyle::ShortCrop,
             shirt_style: ShirtStyle::Crew,
-            accessory: Some(Accessory::EarringRound),
+            accessory: Some(Accessory::Earring(EarringKind::Round)),
             primary_colors,
             selected_pairing_primary: None,
             preview_dirty: true,
