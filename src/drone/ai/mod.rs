@@ -9,6 +9,7 @@ use bevy::prelude::*;
 use crate::race::progress::RaceProgress;
 
 use super::components::*;
+use super::maneuver::ActiveManeuver;
 
 const WAYPOINT_REACH_DISTANCE: f32 = 5.0;
 pub(super) const VELOCITY_LOOK_AHEAD_T: f32 = 0.5;
@@ -92,7 +93,7 @@ pub fn update_ai_targets(
         &mut DronePhase,
         &DroneDynamics,
         &Drone,
-    )>,
+    ), Without<ActiveManeuver>>,
 ) {
     let dt = time.delta_secs();
 
