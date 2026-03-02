@@ -99,10 +99,21 @@ impl Plugin for DronePlugin {
                     .after(physics::apply_forces)
                     .run_if(in_race_or_results),
             )
-            // Tilt override cleanup (independent, after maneuver cleanup)
+            // Activate pending maneuvers when drone reaches trigger point
             .add_systems(
                 FixedUpdate,
-                maneuver::cleanup::cleanup_tilt_overrides
+                maneuver::trigger::activate_pending_maneuvers
+                    .after(maneuver::trigger::trigger_maneuvers)
+                    .before(maneuver::execution::execute_maneuvers)
+                    .run_if(in_race_or_results),
+            )
+            // Tilt override + pending maneuver cleanup (independent, after maneuver cleanup)
+            .add_systems(
+                FixedUpdate,
+                (
+                    maneuver::cleanup::cleanup_tilt_overrides,
+                    maneuver::cleanup::cleanup_pending_maneuvers,
+                )
                     .after(maneuver::cleanup::cleanup_completed_maneuvers)
                     .run_if(in_race_or_results),
             )

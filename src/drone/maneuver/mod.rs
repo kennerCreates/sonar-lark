@@ -44,6 +44,16 @@ pub struct TiltOverride {
     pub exit_spline_t: f32,
 }
 
+/// Deferred maneuver: detected a turn ahead, waiting until the drone reaches
+/// `trigger_t` before converting to `ActiveManeuver` or `TiltOverride`.
+#[derive(Component)]
+pub struct PendingManeuver {
+    pub kind: ManeuverKind,
+    /// Spline parameter at which the maneuver should activate.
+    pub trigger_t: f32,
+    pub exit_t: f32,
+}
+
 /// Tracks the exit spline_t of the most recently completed maneuver for cooldown.
 /// Prevents immediate re-triggering after a maneuver finishes.
 #[derive(Component)]

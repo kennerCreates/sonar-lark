@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::{ActiveManeuver, ManeuverCooldown, ManeuverPhaseTag, TiltOverride};
+use super::{ActiveManeuver, ManeuverCooldown, ManeuverPhaseTag, PendingManeuver, TiltOverride};
 use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
 use crate::drone::components::*;
 use crate::race::progress::RaceProgress;
@@ -72,6 +72,20 @@ pub fn cleanup_tilt_overrides(
             commands
                 .entity(entity)
                 .insert(ManeuverCooldown { exit_t: tilt.exit_spline_t });
+        }
+    }
+}
+
+/// Removes `PendingManeuver` from crashed drones and from drones whose spline_t
+/// has overshot the trigger point by a wide margin (stale pending).
+pub fn cleanup_pending_maneuvers(
+    mut commands: Commands,
+    query: Query<(Entity, &AIController, &DronePhase, &PendingManeuver)>,
+) {
+    for (entity, ai, phase, pending) in &query {
+        let stale = *phase == DronePhase::Crashed || ai.spline_t > pending.exit_t;
+        if stale {
+            commands.entity(entity).remove::<PendingManeuver>();
         }
     }
 }

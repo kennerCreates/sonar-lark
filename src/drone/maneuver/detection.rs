@@ -26,8 +26,17 @@ const FLIP_ANGLE_THRESHOLD: f32 = 120.0;
 /// Per-sample angle threshold (degrees) for determining where the turn ends.
 const TANGENT_STABLE_DEG: f32 = 5.0;
 
+/// Per-sample angle threshold (degrees) for determining where the turn begins.
+const TANGENT_ENTRY_DEG: f32 = 8.0;
+
+/// Spline parameter distance before the turn entry point at which the maneuver
+/// should activate. Gives the drone a short lead-in before the turn.
+const TRIGGER_LEAD_IN: f32 = 0.3;
+
 pub struct ManeuverTrigger {
     pub kind: ManeuverKind,
+    /// Spline parameter where the drone should start executing the maneuver.
+    pub trigger_t: f32,
     pub exit_t: f32,
     #[allow(dead_code)] // Read in Phase 5 (debug visualization)
     pub turn_angle: f32,
@@ -87,10 +96,12 @@ pub fn detect_maneuver(
         }
     }
 
-    // Scan ahead: accumulate total XZ-plane turn angle and find where the turn ends.
+    // Scan ahead: accumulate total XZ-plane turn angle and find where the turn
+    // starts (first significant deviation) and ends (last significant deviation).
     let scan_range = SCAN_RANGE_GATES * POINTS_PER_GATE;
     let mut total_angle = 0.0f32;
     let mut prev_flat = flat_dir(sample_tangent(spline, spline_t, cycle_t));
+    let mut first_turning_idx: Option<usize> = None;
     let mut last_turning_idx = 0usize;
 
     for i in 1..=TANGENT_SAMPLES {
@@ -101,6 +112,9 @@ pub fn detect_maneuver(
         if delta > TANGENT_STABLE_DEG {
             last_turning_idx = i;
         }
+        if delta > TANGENT_ENTRY_DEG && first_turning_idx.is_none() {
+            first_turning_idx = Some(i);
+        }
         prev_flat = cur_flat;
     }
 
@@ -108,6 +122,11 @@ pub fn detect_maneuver(
     if total_angle < effective_threshold {
         return None;
     }
+
+    // trigger_t: just before where the turn starts (with a small lead-in).
+    let entry_idx = first_turning_idx.unwrap_or(1);
+    let entry_t = spline_t + (entry_idx as f32 / TANGENT_SAMPLES as f32) * scan_range;
+    let trigger_t = (entry_t - TRIGGER_LEAD_IN).max(spline_t);
 
     // exit_t: one sample past where the turn ends, capped at scan_range.
     let exit_idx = (last_turning_idx + 1).min(TANGENT_SAMPLES);
@@ -131,6 +150,7 @@ pub fn detect_maneuver(
 
     Some(ManeuverTrigger {
         kind,
+        trigger_t,
         exit_t,
         turn_angle: total_angle,
     })

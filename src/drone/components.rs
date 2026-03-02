@@ -247,6 +247,6 @@ tuning_params! {
     avoidance_strength,         "Avoid Strength",   1.0,  0.0,   30.0,  0.0;
     feedforward_blend,          "FF Blend",         0.05, 0.0,   1.0,   0.85;
     maneuver_turn_threshold,    "Maneuver Thresh",  5.0,  30.0,  150.0, 90.0;
-    maneuver_altitude_min,      "Maneuver Alt",     0.5,  1.0,   10.0,  3.0;
+    maneuver_altitude_min,      "Maneuver Alt",     0.5,  1.0,   20.0,  8.0;
     maneuver_enabled,           "Maneuvers On",     1.0,  0.0,   1.0,   1.0;
 }
