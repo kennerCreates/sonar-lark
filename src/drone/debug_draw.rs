@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use super::components::*;
-use super::maneuver::{ActiveManeuver, ManeuverKind, TiltOverride};
+use super::maneuver::{ManeuverKind, ManeuverTrajectory, TiltOverride};
 use super::paths::adaptive_approach_offset;
 use crate::common::POINTS_PER_GATE;
 use crate::race::gate::GatePlanes;
@@ -271,18 +271,17 @@ pub fn draw_progress_indicators(
     }
 }
 
-/// Draw maneuver state for drones with an active maneuver or tilt override.
+/// Draw maneuver state for drones with a trajectory or tilt override.
+/// - Trajectory curve as a polyline (20 samples)
 /// - Colored ring: red = Split-S, blue = Power Loop, yellow = Aggressive Bank
-/// - Arrow showing target orientation (body-up direction)
 /// - Line from drone to exit point on spline
 pub fn draw_maneuver_state(
     mut gizmos: Gizmos,
     debug: Option<Res<FlightDebugDraw>>,
-    active_query: Query<(
+    traj_query: Query<(
         &Transform,
-        &ActiveManeuver,
+        &ManeuverTrajectory,
         &AIController,
-        &DesiredAttitude,
     )>,
     tilt_query: Query<(&Transform, &AIController, &TiltOverride)>,
 ) {
@@ -291,11 +290,21 @@ pub fn draw_maneuver_state(
         return;
     }
 
-    // Drones with full maneuver override (Split-S / Power Loop)
-    for (transform, maneuver, ai, attitude) in &active_query {
+    // Drones with maneuver trajectory (Split-S / Power Loop)
+    for (transform, traj, ai) in &traj_query {
         let pos = transform.translation;
-        let color = maneuver_color(maneuver.kind);
+        let color = maneuver_color(traj.kind);
         let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
+
+        // Draw the trajectory curve as a polyline
+        let samples = 20;
+        for i in 0..samples {
+            let t0 = (i as f32 / samples as f32) * traj.curve_len;
+            let t1 = ((i + 1) as f32 / samples as f32) * traj.curve_len;
+            let p0 = traj.curve.position(t0);
+            let p1 = traj.curve.position(t1);
+            gizmos.line(p0, p1, color);
+        }
 
         // Colored ring around the drone
         gizmos.circle(
@@ -304,12 +313,8 @@ pub fn draw_maneuver_state(
             color,
         );
 
-        // Arrow showing target body-up direction
-        let target_up = attitude.orientation.mul_vec3(Vec3::Y);
-        gizmos.arrow(pos, pos + target_up * 3.0, color);
-
         // Line from drone to exit point on spline
-        let exit_t = maneuver.exit_spline_t.rem_euclid(cycle_t);
+        let exit_t = traj.exit_spline_t.rem_euclid(cycle_t);
         let exit_pos = ai.spline.position(exit_t);
         gizmos.line(pos, exit_pos, Color::srgba(1.0, 1.0, 1.0, 0.3));
         gizmos.sphere(Isometry3d::from_translation(exit_pos), 0.3, color);

@@ -1,40 +1,36 @@
 pub mod cleanup;
 pub mod detection;
-pub mod execution;
-pub mod profiles;
+pub mod trajectory;
 pub mod trigger;
 
+use bevy::math::cubic_splines::CubicCurve;
 use bevy::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ManeuverKind {
     SplitS,
+    #[allow(dead_code)] // Not yet produced by detect_maneuver; reserved for future courses
     PowerLoop,
     AggressiveBank,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ManeuverPhaseTag {
-    Entry,
-    Ballistic,
-    Recovery,
-}
-
+/// Active maneuver trajectory: the PID samples from this curve instead of the
+/// racing spline. Replaces the old `ActiveManeuver` open-loop override.
 #[derive(Component)]
-#[allow(dead_code)] // entry_position / entry_altitude read in Phase 5 (debug)
-pub struct ActiveManeuver {
+pub struct ManeuverTrajectory {
     pub kind: ManeuverKind,
-    pub phase: ManeuverPhaseTag,
-    /// 0.0 → 1.0 within current phase
-    pub phase_progress: f32,
-    pub phase_start_time: f32,
-    pub phase_duration: f32,
-    pub entry_velocity: Vec3,
-    pub entry_position: Vec3,
-    /// Where to resume normal flight on the spline
+    /// 3D path through space (CubicHermite curve).
+    pub curve: CubicCurve<Vec3>,
+    /// Number of segments in the curve (for parameterization: t ∈ [0, curve_len]).
+    pub curve_len: f32,
+    /// `elapsed_secs` at activation.
+    pub start_time: f32,
+    /// Total duration in seconds.
+    pub duration: f32,
+    /// Where to resume on the racing spline after maneuver completes.
     pub exit_spline_t: f32,
-    pub entry_yaw_dir: Vec3,
-    pub entry_altitude: f32,
+    /// Speed to maintain during maneuver (entry speed at activation).
+    pub entry_speed: f32,
 }
 
 /// Lighter alternative for aggressive banking: PID still active, just with a raised tilt limit.
@@ -45,7 +41,7 @@ pub struct TiltOverride {
 }
 
 /// Deferred maneuver: detected a turn ahead, waiting until the drone reaches
-/// `trigger_t` before converting to `ActiveManeuver` or `TiltOverride`.
+/// `trigger_t` before converting to `ManeuverTrajectory` or `TiltOverride`.
 #[derive(Component)]
 pub struct PendingManeuver {
     pub kind: ManeuverKind,

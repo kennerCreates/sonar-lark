@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::race::timing::RaceClock;
 use super::components::*;
-use super::maneuver::{ActiveManeuver, TiltOverride};
+use super::maneuver::{ManeuverTrajectory, TiltOverride};
 
 /// Approximate full-pack race duration for battery sag curve (seconds).
 const RACE_DURATION_ESTIMATE: f32 = 90.0;
@@ -60,17 +60,20 @@ pub fn position_pid(
         &mut DesiredAttitude,
         &DronePhase,
         Option<&TiltOverride>,
-    ), Without<ActiveManeuver>>,
+        Option<&ManeuverTrajectory>,
+    )>,
 ) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    for (transform, desired, mut pid, dynamics, mut attitude, phase, tilt_override) in &mut query {
+    for (transform, desired, mut pid, dynamics, mut attitude, phase, tilt_override, maneuver_traj) in &mut query {
         if *phase == DronePhase::Crashed {
             continue;
         }
+        let in_maneuver = maneuver_traj.is_some();
+
         let error = desired.position - transform.translation;
 
         pid.integral = (pid.integral + error * dt).clamp(
@@ -78,23 +81,22 @@ pub fn position_pid(
             Vec3::splat(INTEGRAL_CLAMP),
         );
 
-        // Blended derivative: mix absolute damping with velocity feedforward.
-        // At ff_blend=0: pure damping (-velocity), for position hold.
-        // At ff_blend=1: velocity-error damping (desired_vel - velocity),
-        // which stops fighting motion when the drone is at target speed.
         let desired_velocity = desired.velocity_hint * desired.max_speed;
         let derivative = -dynamics.velocity + desired_velocity * tuning.feedforward_blend;
 
         let pid_output = pid.kp * error + pid.ki * pid.integral + pid.kd * derivative;
 
-        // Desired acceleration = PID + gravity compensation
         let desired_accel = pid_output + Vec3::Y * GRAVITY;
 
-        // Desired body-up direction: aligned with desired acceleration
         let desired_up = desired_accel.normalize_or(Vec3::Y);
 
-        // Clamp tilt angle (override from TiltOverride if present, else tuning resource)
-        let max_tilt = tilt_override.map(|o| o.max_tilt).unwrap_or(tuning.max_tilt_angle);
+        // During maneuver: allow full inversion (PI). Otherwise: normal tilt clamp.
+        let max_tilt = if in_maneuver {
+            std::f32::consts::PI
+        } else {
+            tilt_override.map(|o| o.max_tilt).unwrap_or(tuning.max_tilt_angle)
+        };
+
         let tilt_angle = desired_up.angle_between(Vec3::Y);
         let clamped_up = if tilt_angle > max_tilt {
             let tilt_axis = Vec3::Y.cross(desired_up).normalize_or(Vec3::X);
@@ -103,14 +105,20 @@ pub fn position_pid(
             desired_up
         };
 
-        // Thrust magnitude: sized so the vertical component matches desired_accel.y.
-        // This prevents excess vertical force when tilt is clamped.
-        // (When unclamped this reduces to |desired_accel| * mass.)
-        let cos_tilt = clamped_up.y.max(0.05);
-        attitude.thrust_magnitude =
-            (desired_accel.y * dynamics.mass / cos_tilt).clamp(0.0, dynamics.max_thrust);
+        // Thrust formula:
+        // - During maneuver: generalized dot-product form that works at any orientation
+        //   including inverted (body_up · desired_accel * mass)
+        // - Normal flight: cos-division form (more stable at moderate tilt)
+        if in_maneuver {
+            let body_up = transform.rotation * Vec3::Y;
+            attitude.thrust_magnitude =
+                (desired_accel.dot(body_up) * dynamics.mass).clamp(0.0, dynamics.max_thrust);
+        } else {
+            let cos_tilt = clamped_up.y.max(0.05);
+            attitude.thrust_magnitude =
+                (desired_accel.y * dynamics.mass / cos_tilt).clamp(0.0, dynamics.max_thrust);
+        }
 
-        // Yaw: face movement direction from velocity_hint, or keep current heading
         let yaw_dir = if desired.velocity_hint.length_squared() > 0.01 {
             let flat = Vec3::new(desired.velocity_hint.x, 0.0, desired.velocity_hint.z);
             flat.normalize_or(Vec3::NEG_Z)
@@ -119,7 +127,6 @@ pub fn position_pid(
             Vec3::new(fwd.x, 0.0, fwd.z).normalize_or(Vec3::NEG_Z)
         };
 
-        // Build orientation: combine tilt (body-up direction) with yaw (heading)
         let right = yaw_dir.cross(clamped_up).normalize_or(Vec3::X);
         let corrected_fwd = clamped_up.cross(right).normalize();
         attitude.orientation =

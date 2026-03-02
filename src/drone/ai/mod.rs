@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use crate::race::progress::RaceProgress;
 
 use super::components::*;
-use super::maneuver::ActiveManeuver;
+use super::maneuver::ManeuverTrajectory;
 
 const WAYPOINT_REACH_DISTANCE: f32 = 5.0;
 pub(super) const VELOCITY_LOOK_AHEAD_T: f32 = 0.5;
@@ -26,12 +26,12 @@ pub(super) const FINISH_EPSILON: f32 = 0.01;
 const SPEED_CURVATURE_SAMPLES: usize = 5;
 
 /// Sample position from the cyclic race spline, wrapping t into [0, cycle_t).
-pub(super) fn cyclic_pos(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> Vec3 {
+pub fn cyclic_pos(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> Vec3 {
     spline.position(t.rem_euclid(cycle_t))
 }
 
 /// Sample velocity/tangent from the cyclic race spline, wrapping t into [0, cycle_t).
-pub(super) fn cyclic_vel(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> Vec3 {
+pub fn cyclic_vel(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> Vec3 {
     spline.velocity(t.rem_euclid(cycle_t))
 }
 
@@ -93,11 +93,17 @@ pub fn update_ai_targets(
         &mut DronePhase,
         &DroneDynamics,
         &Drone,
-    ), Without<ActiveManeuver>>,
+        Option<&ManeuverTrajectory>,
+    )>,
 ) {
     let dt = time.delta_secs();
 
-    for (transform, mut ai, mut phase, dynamics, drone) in &mut query {
+    for (transform, mut ai, mut phase, dynamics, drone, maneuver_traj) in &mut query {
+        // Freeze spline_t during maneuver trajectory — prevents miss_detection from firing
+        if maneuver_traj.is_some() {
+            continue;
+        }
+
         match *phase {
             DronePhase::Idle | DronePhase::Crashed | DronePhase::Wandering => continue,
             DronePhase::Racing => {

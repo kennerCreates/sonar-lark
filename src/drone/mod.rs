@@ -67,7 +67,7 @@ impl Plugin for DronePlugin {
                     .run_if(resource_exists::<CourseData>),
             )
             // Physics chain in FixedUpdate — split into two groups (12-system limit per run_if tuple).
-            // Group 1: AI + maneuver + physics core
+            // Group 1: AI + maneuver activation + physics core
             .add_systems(
                 FixedUpdate,
                 (
@@ -77,7 +77,7 @@ impl Plugin for DronePlugin {
                     wander::update_wander_targets.run_if(drones_are_active),
                     physics::hover_target.run_if(not(drones_are_active)),
                     maneuver::trigger::trigger_maneuvers.run_if(drones_are_active),
-                    maneuver::execution::execute_maneuvers,
+                    maneuver::trigger::activate_pending_maneuvers.run_if(drones_are_active),
                     physics::position_pid,
                     physics::attitude_controller,
                     physics::dirty_air_perturbation,
@@ -93,28 +93,20 @@ impl Plugin for DronePlugin {
                 (
                     physics::integrate_motion,
                     physics::clamp_transform,
-                    maneuver::cleanup::cleanup_completed_maneuvers,
+                    maneuver::cleanup::cleanup_maneuver_trajectories,
                 )
                     .chain()
                     .after(physics::apply_forces)
                     .run_if(in_race_or_results),
             )
-            // Activate pending maneuvers when drone reaches trigger point
-            .add_systems(
-                FixedUpdate,
-                maneuver::trigger::activate_pending_maneuvers
-                    .after(maneuver::trigger::trigger_maneuvers)
-                    .before(maneuver::execution::execute_maneuvers)
-                    .run_if(in_race_or_results),
-            )
-            // Tilt override + pending maneuver cleanup (independent, after maneuver cleanup)
+            // Tilt override + pending maneuver cleanup (independent, after trajectory cleanup)
             .add_systems(
                 FixedUpdate,
                 (
                     maneuver::cleanup::cleanup_tilt_overrides,
                     maneuver::cleanup::cleanup_pending_maneuvers,
                 )
-                    .after(maneuver::cleanup::cleanup_completed_maneuvers)
+                    .after(maneuver::cleanup::cleanup_maneuver_trajectories)
                     .run_if(in_race_or_results),
             )
             // Save authoritative physics state after the physics chain

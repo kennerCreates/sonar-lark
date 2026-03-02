@@ -1,37 +1,39 @@
 use bevy::prelude::*;
 
-use super::{ActiveManeuver, ManeuverCooldown, ManeuverPhaseTag, PendingManeuver, TiltOverride};
+use super::{ManeuverCooldown, ManeuverTrajectory, PendingManeuver, TiltOverride};
 use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
 use crate::drone::components::*;
 use crate::race::progress::RaceProgress;
 
-/// Removes `ActiveManeuver` when Recovery phase completes (progress >= 1.0).
+/// Removes `ManeuverTrajectory` when its duration expires or the drone crashes.
 /// Resets PID integral to prevent windup kick on re-engagement,
 /// jumps `spline_t` to the maneuver's exit point (capped to not exceed the
 /// next gate's miss threshold), and inserts a `ManeuverCooldown` to prevent
 /// immediate re-triggering.
-/// Also removes `ActiveManeuver` from crashed drones (no cooldown needed).
-pub fn cleanup_completed_maneuvers(
+pub fn cleanup_maneuver_trajectories(
+    time: Res<Time>,
     mut commands: Commands,
     race_progress: Option<Res<RaceProgress>>,
     mut query: Query<(
         Entity,
-        &ActiveManeuver,
+        &ManeuverTrajectory,
         &Drone,
         &DronePhase,
         &mut PositionPid,
         &mut AIController,
     )>,
 ) {
-    for (entity, maneuver, drone, phase, mut pid, mut ai) in &mut query {
-        let should_remove = *phase == DronePhase::Crashed
-            || (maneuver.phase == ManeuverPhaseTag::Recovery && maneuver.phase_progress >= 1.0);
+    let now = time.elapsed_secs();
+
+    for (entity, traj, drone, phase, mut pid, mut ai) in &mut query {
+        let progress = (now - traj.start_time) / traj.duration;
+        let should_remove = *phase == DronePhase::Crashed || progress >= 1.0;
 
         if should_remove {
-            commands.entity(entity).remove::<ActiveManeuver>();
+            commands.entity(entity).remove::<ManeuverTrajectory>();
             pid.integral = Vec3::ZERO;
             if *phase != DronePhase::Crashed {
-                let mut exit_t = maneuver.exit_spline_t;
+                let mut exit_t = traj.exit_spline_t;
 
                 // Cap exit_t so the spline_t jump can't exceed the next gate's
                 // miss threshold. During a flip the drone may not physically
@@ -46,7 +48,6 @@ pub fn cleanup_completed_maneuvers(
                         } else {
                             cycle_t + FINISH_EXTENSION
                         };
-                        // Small margin so spline_t lands safely below the threshold.
                         exit_t = exit_t.min(miss_threshold - 0.1);
                     }
                 }
