@@ -188,6 +188,7 @@ mod tests {
             scale: Vec3::ONE,
             gate_order: Some(order),
             gate_forward_flipped: false,
+            camera: None,
         }
     }
 
@@ -199,6 +200,7 @@ mod tests {
             scale: Vec3::ONE,
             gate_order: None,
             gate_forward_flipped: false,
+            camera: None,
         }
     }
 

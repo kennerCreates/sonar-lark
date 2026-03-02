@@ -163,6 +163,7 @@ mod tests {
                     scale: Vec3::ONE,
                     gate_order: Some(0),
                     gate_forward_flipped: false,
+                    camera: None,
                 },
                 ObstacleInstance {
                     obstacle_id: ObstacleId("gate_air".to_string()),
@@ -171,6 +172,7 @@ mod tests {
                     scale: Vec3::splat(1.5),
                     gate_order: Some(1),
                     gate_forward_flipped: false,
+                    camera: None,
                 },
                 ObstacleInstance {
                     obstacle_id: ObstacleId("wall_short".to_string()),
@@ -179,6 +181,7 @@ mod tests {
                     scale: Vec3::ONE,
                     gate_order: None,
                     gate_forward_flipped: false,
+                    camera: None,
                 },
             ],
             props: vec![],
@@ -275,6 +278,7 @@ mod tests {
                 scale: Vec3::new(0.5, 1.0, 2.0),
                 gate_order: Some(7),
                 gate_forward_flipped: false,
+                camera: None,
             }],
             props: vec![],
             cameras: vec![],

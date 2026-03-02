@@ -199,12 +199,38 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                         ))
                         .with_children(|btn| {
                             btn.spawn((
-                                Text::new("Place Camera"),
+                                Text::new("Add Camera to Gate"),
                                 TextFont {
                                     font_size: 13.0,
                                     ..default()
                                 },
                                 TextColor(palette::SKY),
+                            ));
+                        });
+
+                    content
+                        .spawn((
+                            Button,
+                            RemoveCameraButton,
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(28.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                border: UiRect::all(Val::Px(1.0)),
+                                ..default()
+                            },
+                            BackgroundColor(ui_theme::BUTTON_NORMAL),
+                            BorderColor::all(palette::STEEL),
+                        ))
+                        .with_children(|btn| {
+                            btn.spawn((
+                                Text::new("Remove Camera"),
+                                TextFont {
+                                    font_size: 12.0,
+                                    ..default()
+                                },
+                                TextColor(palette::PEACH),
                             ));
                         });
 
@@ -249,7 +275,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     ui_theme::spawn_divider(content);
 
                     content.spawn((
-                        Text::new("Use Move/Rotate to aim"),
+                        Text::new("Select a gate, then add a camera.\nUse Move/Rotate to aim."),
                         TextFont {
                             font_size: 12.0,
                             ..default()

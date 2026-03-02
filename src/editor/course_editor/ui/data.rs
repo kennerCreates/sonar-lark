@@ -1,25 +1,33 @@
 use bevy::prelude::*;
 
-use crate::course::data::{CameraInstance, CourseData, ObstacleInstance, PropInstance};
+use crate::course::data::{CourseData, GateCamera, ObstacleInstance, PropInstance};
 use crate::editor::course_editor::{PlacedCamera, PlacedObstacle, PlacedProp};
 
 /// Build a `CourseData` from placed obstacle and prop data.
+/// Each obstacle may optionally have a camera child (local Transform + PlacedCamera).
 /// Pure function — no ECS dependencies.
 pub fn build_course_data<'a>(
     name: String,
-    obstacles: impl IntoIterator<Item = (&'a PlacedObstacle, &'a Transform)>,
+    obstacles: impl IntoIterator<
+        Item = (&'a PlacedObstacle, &'a Transform, Option<(&'a PlacedCamera, &'a Transform)>),
+    >,
     props: impl IntoIterator<Item = (&'a PlacedProp, &'a Transform)>,
-    cameras: impl IntoIterator<Item = (&'a PlacedCamera, &'a Transform)>,
 ) -> CourseData {
     let instances = obstacles
         .into_iter()
-        .map(|(placed, transform)| ObstacleInstance {
+        .map(|(placed, transform, camera)| ObstacleInstance {
             obstacle_id: placed.obstacle_id.clone(),
             translation: transform.translation,
             rotation: transform.rotation,
             scale: transform.scale,
             gate_order: placed.gate_order,
             gate_forward_flipped: placed.gate_forward_flipped,
+            camera: camera.map(|(cam, cam_tf)| GateCamera {
+                offset: cam_tf.translation,
+                rotation: cam_tf.rotation,
+                is_primary: cam.is_primary,
+                label: cam.label.clone(),
+            }),
         })
         .collect();
 
@@ -33,21 +41,11 @@ pub fn build_course_data<'a>(
         })
         .collect();
 
-    let cameras = cameras
-        .into_iter()
-        .map(|(cam, transform)| CameraInstance {
-            translation: transform.translation,
-            rotation: transform.rotation,
-            is_primary: cam.is_primary,
-            label: cam.label.clone(),
-        })
-        .collect();
-
     CourseData {
         name,
         instances,
         props,
-        cameras,
+        cameras: vec![],
     }
 }
 
@@ -75,9 +73,8 @@ mod tests {
     fn build_course_data_empty() {
         let course = build_course_data(
             "empty".to_string(),
-            Vec::<(&PlacedObstacle, &Transform)>::new(),
+            Vec::<(&PlacedObstacle, &Transform, Option<(&PlacedCamera, &Transform)>)>::new(),
             Vec::<(&PlacedProp, &Transform)>::new(),
-            Vec::<(&PlacedCamera, &Transform)>::new(),
         );
         assert_eq!(course.name, "empty");
         assert!(course.instances.is_empty());
@@ -99,9 +96,8 @@ mod tests {
 
         let course = build_course_data(
             "test".to_string(),
-            vec![(&placed, &transform)],
+            vec![(&placed, &transform, None)],
             Vec::<(&PlacedProp, &Transform)>::new(),
-            Vec::<(&PlacedCamera, &Transform)>::new(),
         );
 
         assert_eq!(course.instances.len(), 1);
@@ -111,6 +107,7 @@ mod tests {
         assert_eq!(inst.scale, Vec3::new(0.5, 1.0, 1.5));
         assert_eq!(inst.gate_order, Some(2));
         assert!(inst.gate_forward_flipped);
+        assert!(inst.camera.is_none());
     }
 
     #[test]
@@ -123,9 +120,8 @@ mod tests {
 
         let course = build_course_data(
             "props_test".to_string(),
-            Vec::<(&PlacedObstacle, &Transform)>::new(),
+            Vec::<(&PlacedObstacle, &Transform, Option<(&PlacedCamera, &Transform)>)>::new(),
             vec![(&prop, &transform)],
-            Vec::<(&PlacedCamera, &Transform)>::new(),
         );
 
         assert_eq!(course.props.len(), 1);
@@ -158,9 +154,8 @@ mod tests {
 
         let course = build_course_data(
             "mixed".to_string(),
-            vec![(&obs1, &t1), (&obs2, &t2)],
+            vec![(&obs1, &t1, None), (&obs2, &t2, None)],
             vec![(&prop, &tp)],
-            Vec::<(&PlacedCamera, &Transform)>::new(),
         );
 
         assert_eq!(course.instances.len(), 2);
@@ -169,6 +164,33 @@ mod tests {
         assert_eq!(course.instances[1].obstacle_id.0, "wall");
         assert_eq!(course.props[0].kind, PropKind::ShellBurstEmitter);
         assert!(course.props[0].color_override.is_none());
+    }
+
+    #[test]
+    fn build_course_data_with_gate_camera() {
+        let placed = PlacedObstacle {
+            obstacle_id: ObstacleId("gate_loop".to_string()),
+            gate_order: Some(0),
+            gate_forward_flipped: false,
+        };
+        let transform = Transform::from_translation(Vec3::new(10.0, 0.0, 0.0));
+        let cam = PlacedCamera {
+            is_primary: true,
+            label: None,
+        };
+        let cam_tf = Transform::from_translation(Vec3::new(0.0, 2.0, -5.0));
+
+        let course = build_course_data(
+            "camera_test".to_string(),
+            vec![(&placed, &transform, Some((&cam, &cam_tf)))],
+            Vec::<(&PlacedProp, &Transform)>::new(),
+        );
+
+        let inst = &course.instances[0];
+        assert!(inst.camera.is_some());
+        let gate_cam = inst.camera.as_ref().unwrap();
+        assert_eq!(gate_cam.offset, Vec3::new(0.0, 2.0, -5.0));
+        assert!(gate_cam.is_primary);
     }
 
     // --- next_gate_order_from_instances ---
@@ -187,6 +209,7 @@ mod tests {
             scale: Vec3::ONE,
             gate_order: None,
             gate_forward_flipped: false,
+            camera: None,
         }];
         assert_eq!(next_gate_order_from_instances(&instances), 0);
     }
@@ -201,6 +224,7 @@ mod tests {
                 scale: Vec3::ONE,
                 gate_order: Some(0),
                 gate_forward_flipped: false,
+                camera: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("g".to_string()),
@@ -209,6 +233,7 @@ mod tests {
                 scale: Vec3::ONE,
                 gate_order: Some(1),
                 gate_forward_flipped: false,
+                camera: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("g".to_string()),
@@ -217,6 +242,7 @@ mod tests {
                 scale: Vec3::ONE,
                 gate_order: Some(2),
                 gate_forward_flipped: false,
+                camera: None,
             },
         ];
         assert_eq!(next_gate_order_from_instances(&instances), 3);
@@ -232,6 +258,7 @@ mod tests {
                 scale: Vec3::ONE,
                 gate_order: Some(0),
                 gate_forward_flipped: false,
+                camera: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("g".to_string()),
@@ -240,6 +267,7 @@ mod tests {
                 scale: Vec3::ONE,
                 gate_order: Some(5),
                 gate_forward_flipped: false,
+                camera: None,
             },
         ];
         assert_eq!(next_gate_order_from_instances(&instances), 6);
@@ -255,6 +283,7 @@ mod tests {
                 scale: Vec3::ONE,
                 gate_order: Some(3),
                 gate_forward_flipped: false,
+                camera: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("wall".to_string()),
@@ -263,6 +292,7 @@ mod tests {
                 scale: Vec3::ONE,
                 gate_order: None,
                 gate_forward_flipped: false,
+                camera: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("gate".to_string()),
@@ -271,6 +301,7 @@ mod tests {
                 scale: Vec3::ONE,
                 gate_order: Some(1),
                 gate_forward_flipped: false,
+                camera: None,
             },
         ];
         assert_eq!(next_gate_order_from_instances(&instances), 4);

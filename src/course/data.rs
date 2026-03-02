@@ -4,6 +4,16 @@ use serde::{Deserialize, Serialize};
 use crate::obstacle::definition::ObstacleId;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GateCamera {
+    pub offset: Vec3,
+    pub rotation: Quat,
+    #[serde(default)]
+    pub is_primary: bool,
+    #[serde(default)]
+    pub label: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ObstacleInstance {
     pub obstacle_id: ObstacleId,
     pub translation: Vec3,
@@ -13,6 +23,9 @@ pub struct ObstacleInstance {
     /// When true, the gate's forward direction is flipped 180 degrees.
     #[serde(default)]
     pub gate_forward_flipped: bool,
+    /// Optional camera attached to this gate, with local offset/rotation.
+    #[serde(default)]
+    pub camera: Option<GateCamera>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

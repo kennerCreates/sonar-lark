@@ -8,6 +8,7 @@ use crate::rendering::{CelLightDir, CelMaterial};
 use crate::states::AppState;
 use crate::ui_theme;
 
+use super::camera_interaction::{DEFAULT_CAMERA_OFFSET, spawn_gate_camera};
 use super::types::*;
 
 pub fn handle_palette_selection(
@@ -23,6 +24,7 @@ pub fn handle_palette_selection(
     mut cel_materials: ResMut<Assets<CelMaterial>>,
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
+    camera_meshes: Option<Res<CameraEditorMeshes>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -71,6 +73,21 @@ pub fn handle_palette_selection(
                 gate_order,
                 gate_forward_flipped: false,
             });
+
+            // Auto-spawn a primary camera on the first gate (gate_order == 0)
+            if gate_order == Some(0)
+                && let Some(ref cam_meshes) = camera_meshes
+            {
+                spawn_gate_camera(
+                    &mut commands,
+                    entity,
+                    cam_meshes,
+                    true,
+                    DEFAULT_CAMERA_OFFSET,
+                    Quat::IDENTITY,
+                );
+            }
+
             selection.entity = Some(entity);
             selection.palette_id = None;
         } else {

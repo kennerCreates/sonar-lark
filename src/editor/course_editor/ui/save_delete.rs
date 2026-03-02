@@ -164,12 +164,10 @@ pub fn handle_save_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<SaveCourseButton>)>,
     course_state: Res<EditorCourse>,
-    placed_query: Query<(&PlacedObstacle, &Transform)>,
+    placed_query: Query<(Entity, &PlacedObstacle, &Transform)>,
     prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
-    camera_placed_query: Query<
-        (&PlacedCamera, &Transform),
-        (Without<PlacedObstacle>, Without<PlacedProp>),
-    >,
+    camera_child_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
+    child_of_query: Query<(Entity, &ChildOf), With<PlacedCamera>>,
     existing_courses_container: Query<Entity, With<ExistingCoursesContainer>>,
 ) {
     for interaction in &query {
@@ -182,18 +180,29 @@ pub fn handle_save_button(
             continue;
         }
 
-        let camera_count = camera_placed_query.iter().count();
+        let camera_count = child_of_query.iter().count();
         if camera_count > 9 {
             warn!(
                 "Course has {camera_count} cameras (soft cap is 9). Consider reducing."
             );
         }
 
+        // For each obstacle, find its camera child (if any)
+        let obstacles_with_cameras =
+            placed_query
+                .iter()
+                .map(|(entity, placed, transform)| {
+                    let camera = child_of_query
+                        .iter()
+                        .find(|(_, child_of)| child_of.parent() == entity)
+                        .and_then(|(cam_entity, _)| camera_child_query.get(cam_entity).ok());
+                    (placed, transform, camera)
+                });
+
         let course = build_course_data(
             course_state.name.clone(),
-            placed_query.iter(),
+            obstacles_with_cameras,
             prop_query.iter(),
-            camera_placed_query.iter(),
         );
 
         let path_str = format!("assets/courses/{}.course.ron", course_state.name);
@@ -201,9 +210,10 @@ pub fn handle_save_button(
         match save_course(&course, path) {
             Ok(()) => {
                 info!(
-                    "Saved course '{}' ({} obstacles) to {}",
+                    "Saved course '{}' ({} obstacles, {} cameras) to {}",
                     course_state.name,
                     course.instances.len(),
+                    camera_count,
                     path_str
                 );
                 commands.insert_resource(LastEditedCourse {

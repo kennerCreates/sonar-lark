@@ -17,7 +17,7 @@ pub(in crate::editor::course_editor) fn draw_move_gizmo(
     transform_state: Res<EditorTransform>,
     selection: Res<EditorSelection>,
     widget: Res<MoveWidgetState>,
-    placed_query: Query<&Transform, PlacedFilter>,
+    placed_query: Query<(&Transform, &GlobalTransform), PlacedFilter>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     if transform_state.mode != TransformMode::Move {
@@ -26,14 +26,14 @@ pub(in crate::editor::course_editor) fn draw_move_gizmo(
     let Some(entity) = selection.entity else {
         return;
     };
-    let Ok(transform) = placed_query.get(entity) else {
+    let Ok((transform, global_transform)) = placed_query.get(entity) else {
         return;
     };
 
     let yaw_quat = yaw_quat_from_transform(transform);
     let shift_held = keyboard.pressed(KeyCode::ShiftLeft)
         || keyboard.pressed(KeyCode::ShiftRight);
-    let origin = transform.translation;
+    let origin = global_transform.translation();
 
     let rot_x = Axis::X.rotated_direction(yaw_quat);
     let rot_z = Axis::Z.rotated_direction(yaw_quat);
@@ -68,6 +68,21 @@ pub(in crate::editor::course_editor) fn draw_move_gizmo(
     gizmos.arrow(origin, origin + Vec3::Y * ARROW_LENGTH, y_color);
 }
 
+/// Convert a world-space position to local space if the entity has a parent.
+fn to_local_position(
+    world_pos: Vec3,
+    entity: Entity,
+    child_of_query: &Query<&ChildOf>,
+    parent_gt_query: &Query<&GlobalTransform>,
+) -> Vec3 {
+    if let Ok(child_of) = child_of_query.get(entity)
+        && let Ok(parent_gt) = parent_gt_query.get(child_of.parent())
+    {
+        return parent_gt.affine().inverse().transform_point3(world_pos);
+    }
+    world_pos
+}
+
 pub(in crate::editor::course_editor) fn handle_move_gizmo(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -76,8 +91,10 @@ pub(in crate::editor::course_editor) fn handle_move_gizmo(
     transform_state: Res<EditorTransform>,
     selection: Res<EditorSelection>,
     mut widget: ResMut<MoveWidgetState>,
-    mut placed_query: Query<&mut Transform, PlacedFilter>,
+    mut placed_query: Query<(&mut Transform, &GlobalTransform), PlacedFilter>,
     interaction_query: Query<&Interaction>,
+    child_of_query: Query<&ChildOf>,
+    parent_gt_query: Query<&GlobalTransform>,
 ) {
     if transform_state.mode != TransformMode::Move {
         widget.active_drag = None;
@@ -89,7 +106,7 @@ pub(in crate::editor::course_editor) fn handle_move_gizmo(
         widget.hovered = false;
         return;
     };
-    let Ok(mut transform) = placed_query.get_mut(entity) else {
+    let Ok((mut transform, global_transform)) = placed_query.get_mut(entity) else {
         return;
     };
 
@@ -98,28 +115,32 @@ pub(in crate::editor::course_editor) fn handle_move_gizmo(
     let Ok((camera, camera_gt)) = camera_query.single() else { return };
     let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else { return };
 
-    let origin = transform.translation;
+    let origin = global_transform.translation();
     let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
 
     if let Some(drag_mode) = widget.active_drag {
         if mouse_buttons.pressed(MouseButton::Left) {
-            match drag_mode {
+            let new_world_pos = match drag_mode {
                 MoveDragMode::XzPlane => {
-                    if let Some(hit) = ray_intersect_plane(
+                    ray_intersect_plane(
                         ray,
                         Vec3::new(0.0, widget.entity_start_pos.y, 0.0),
                         Vec3::Y,
-                    ) {
+                    )
+                    .map(|hit| {
                         let delta = hit - widget.drag_anchor;
-                        transform.translation = widget.entity_start_pos
-                            + Vec3::new(delta.x, 0.0, delta.z);
-                    }
+                        widget.entity_start_pos + Vec3::new(delta.x, 0.0, delta.z)
+                    })
                 }
                 MoveDragMode::YAxis => {
                     let t = closest_point_on_axis(ray, widget.entity_start_pos, Vec3::Y);
                     let delta = t - widget.drag_anchor.y;
-                    transform.translation = widget.entity_start_pos + Vec3::Y * delta;
+                    Some(widget.entity_start_pos + Vec3::Y * delta)
                 }
+            };
+            if let Some(world_pos) = new_world_pos {
+                transform.translation =
+                    to_local_position(world_pos, entity, &child_of_query, &parent_gt_query);
             }
         } else {
             widget.active_drag = None;

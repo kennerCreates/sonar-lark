@@ -24,8 +24,8 @@ pub use prop_interaction::{
     update_prop_color_label,
 };
 pub use camera_interaction::{
-    handle_camera_placement, handle_camera_primary_toggle, setup_camera_editor_meshes,
-    update_camera_primary_label,
+    handle_camera_placement, handle_camera_primary_toggle, handle_remove_camera,
+    setup_camera_editor_meshes, update_camera_primary_label,
 };
 pub use display_updates::{
     handle_button_hover, handle_name_field_focus, handle_name_text_input,

@@ -43,7 +43,7 @@ impl Default for CameraState {
     }
 }
 
-/// Build CourseCameras from CourseData. Primary goes first.
+/// Build CourseCameras from gate-attached cameras in CourseData. Primary goes first.
 pub fn build_course_cameras(
     mut commands: Commands,
     course: Option<Res<crate::course::data::CourseData>>,
@@ -56,16 +56,23 @@ pub fn build_course_cameras(
     let mut cameras: Vec<CourseCameraEntry> = Vec::new();
     let mut non_primary: Vec<CourseCameraEntry> = Vec::new();
 
-    for cam in &course.cameras {
-        let entry = CourseCameraEntry {
-            transform: Transform::from_translation(cam.translation)
-                .with_rotation(cam.rotation),
-            label: cam.label.clone(),
-        };
-        if cam.is_primary {
-            cameras.insert(0, entry);
-        } else {
-            non_primary.push(entry);
+    for instance in &course.instances {
+        if let Some(ref cam) = instance.camera {
+            let gate_rot = instance.rotation;
+            let world_translation = instance.translation
+                + gate_rot * (cam.offset * instance.scale);
+            let world_rotation = gate_rot * cam.rotation;
+
+            let entry = CourseCameraEntry {
+                transform: Transform::from_translation(world_translation)
+                    .with_rotation(world_rotation),
+                label: cam.label.clone(),
+            };
+            if cam.is_primary {
+                cameras.insert(0, entry);
+            } else {
+                non_primary.push(entry);
+            }
         }
     }
     cameras.append(&mut non_primary);

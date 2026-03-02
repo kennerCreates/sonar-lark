@@ -85,6 +85,32 @@ fn load_course_into_editor(
                 gate_order: instance.gate_order,
                 gate_forward_flipped: instance.gate_forward_flipped,
             });
+
+            // Spawn camera child if this obstacle has one
+            if let Some(ref cam) = instance.camera
+                && let Some(meshes) = camera_meshes
+            {
+                let material = if cam.is_primary {
+                    meshes.primary_material.clone()
+                } else {
+                    meshes.material.clone()
+                };
+                let cam_transform = Transform::from_translation(cam.offset)
+                    .with_rotation(cam.rotation);
+                let cam_entity = commands
+                    .spawn((
+                        cam_transform,
+                        Visibility::default(),
+                        Mesh3d(meshes.mesh.clone()),
+                        MeshMaterial3d(material),
+                        PlacedCamera {
+                            is_primary: cam.is_primary,
+                            label: cam.label.clone(),
+                        },
+                    ))
+                    .id();
+                commands.entity(entity).add_child(cam_entity);
+            }
         } else {
             warn!(
                 "Failed to spawn '{}' (node '{}') from loaded course",
@@ -119,35 +145,17 @@ fn load_course_into_editor(
         }
     }
 
-    // Spawn cameras from course data
-    if let Some(meshes) = camera_meshes {
-        for cam in &course.cameras {
-            let material = if cam.is_primary {
-                meshes.primary_material.clone()
-            } else {
-                meshes.material.clone()
-            };
-            let transform =
-                Transform::from_translation(cam.translation).with_rotation(cam.rotation);
-            commands.spawn((
-                transform,
-                Visibility::default(),
-                Mesh3d(meshes.mesh.clone()),
-                MeshMaterial3d(material),
-                PlacedCamera {
-                    is_primary: cam.is_primary,
-                    label: cam.label.clone(),
-                },
-            ));
-        }
-    }
-
+    let camera_count = course
+        .instances
+        .iter()
+        .filter(|i| i.camera.is_some())
+        .count();
     info!(
         "Loaded course '{}' for editing ({} obstacles, {} props, {} cameras)",
         course.name,
         course.instances.len(),
         course.props.len(),
-        course.cameras.len(),
+        camera_count,
     );
 }
 

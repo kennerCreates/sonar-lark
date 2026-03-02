@@ -109,16 +109,16 @@ pub(super) fn draw_gate_forward_arrows(
 pub(super) fn draw_selection_highlight(
     mut gizmos: Gizmos<CourseGizmoGroup>,
     selection: Res<EditorSelection>,
-    placed_query: Query<&Transform, PlacedFilter>,
+    placed_query: Query<&GlobalTransform, PlacedFilter>,
 ) {
     let Some(entity) = selection.entity else {
         return;
     };
-    let Ok(transform) = placed_query.get(entity) else {
+    let Ok(gt) = placed_query.get(entity) else {
         return;
     };
 
-    let center = transform.translation + Vec3::Y * 1.5;
+    let center = gt.translation() + Vec3::Y * 1.5;
     let hl_transform = Transform::from_translation(center).with_scale(Vec3::splat(3.5));
     gizmos.cube(hl_transform, Color::srgb(1.0, 1.0, 0.0));
 }
@@ -166,6 +166,7 @@ pub(super) fn draw_flight_spline_preview(
                 scale: transform.scale,
                 gate_order: placed.gate_order,
                 gate_forward_flipped: placed.gate_forward_flipped,
+                camera: None,
             })
             .collect();
 
@@ -219,13 +220,13 @@ pub(super) fn draw_flight_spline_preview(
 
 pub(super) fn draw_camera_gizmos(
     mut gizmos: Gizmos<CourseGizmoGroup>,
-    camera_query: Query<(&PlacedCamera, &Transform)>,
+    camera_query: Query<(&PlacedCamera, &GlobalTransform)>,
 ) {
-    for (camera, transform) in &camera_query {
-        let pos = transform.translation;
-        let forward = transform.rotation * Vec3::NEG_Z;
-        let right = transform.rotation * Vec3::X;
-        let up = transform.rotation * Vec3::Y;
+    for (camera, gt) in &camera_query {
+        let (_, rotation, pos) = gt.to_scale_rotation_translation();
+        let forward = rotation * Vec3::NEG_Z;
+        let right = rotation * Vec3::X;
+        let up = rotation * Vec3::Y;
 
         let color = if camera.is_primary {
             palette::SUNSHINE

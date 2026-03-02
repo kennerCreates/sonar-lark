@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 
 use crate::camera::orbit::MainCamera;
+use std::f32::consts::{PI, TAU};
+
 use crate::editor::gizmos::{
-    ray_intersect_plane, rotated_perpendicular_basis, yaw_quat_from_transform, Axis,
+    rotated_perpendicular_basis, yaw_quat_from_transform, Axis,
 };
 
 use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedFilter, TransformMode};
@@ -22,6 +24,7 @@ fn rotation_axis_from_modifiers(keyboard: &ButtonInput<KeyCode>) -> Axis {
     }
 }
 
+#[cfg(test)]
 fn angle_in_plane(point: Vec3, center: Vec3, ref1: Vec3, ref2: Vec3) -> f32 {
     let local = point - center;
     local.dot(ref2).atan2(local.dot(ref1))
@@ -39,7 +42,7 @@ pub(in crate::editor::course_editor) fn draw_rotate_gizmo(
     transform_state: Res<EditorTransform>,
     selection: Res<EditorSelection>,
     widget: Res<RotateWidgetState>,
-    placed_query: Query<&Transform, PlacedFilter>,
+    placed_query: Query<(&Transform, &GlobalTransform), PlacedFilter>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     if transform_state.mode != TransformMode::Rotate {
@@ -48,11 +51,11 @@ pub(in crate::editor::course_editor) fn draw_rotate_gizmo(
     let Some(entity) = selection.entity else {
         return;
     };
-    let Ok(transform) = placed_query.get(entity) else {
+    let Ok((transform, global_transform)) = placed_query.get(entity) else {
         return;
     };
 
-    let pos = transform.translation;
+    let pos = global_transform.translation();
     let yaw_quat = yaw_quat_from_transform(transform);
 
     let display_axis = if widget.active {
@@ -82,8 +85,10 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
     transform_state: Res<EditorTransform>,
     selection: Res<EditorSelection>,
     mut widget: ResMut<RotateWidgetState>,
-    mut placed_query: Query<&mut Transform, PlacedFilter>,
+    mut placed_query: Query<(&mut Transform, &GlobalTransform), PlacedFilter>,
     interaction_query: Query<&Interaction>,
+    child_of_query: Query<&ChildOf>,
+    parent_gt_query: Query<&GlobalTransform>,
 ) {
     if transform_state.mode != TransformMode::Rotate {
         widget.active = false;
@@ -95,33 +100,49 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
         widget.hovered = false;
         return;
     };
-    let Ok(mut transform) = placed_query.get_mut(entity) else {
+    let Ok((mut transform, global_transform)) = placed_query.get_mut(entity) else {
         return;
     };
 
     let Ok(window) = windows.single() else { return };
     let Some(cursor_pos) = window.cursor_position() else { return };
     let Ok((camera, camera_gt)) = camera_query.single() else { return };
-    let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else { return };
-
-    let pos = transform.translation;
+    let pos = global_transform.translation();
     let yaw_quat = yaw_quat_from_transform(&transform);
     let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
 
     if widget.active {
         if mouse_buttons.pressed(MouseButton::Left) {
-            let axis_dir = widget.active_axis.rotated_direction(yaw_quat);
-            if let Some(hit) = ray_intersect_plane(ray, pos, axis_dir) {
-                let (ref1, ref2) =
-                    rotated_perpendicular_basis(widget.active_axis, yaw_quat);
-                let current_angle = angle_in_plane(hit, pos, ref1, ref2);
-                let raw_delta = current_angle - widget.drag_start_angle;
+            if let Ok(center_screen) = camera.world_to_viewport(camera_gt, pos) {
+                let d = cursor_pos - center_screen;
+                let current_angle = d.y.atan2(d.x);
+                let mut raw_delta = current_angle - widget.drag_start_angle;
+                // Normalize to [-PI, PI] to handle wrapping at ±180°.
+                raw_delta = (raw_delta + PI).rem_euclid(TAU) - PI;
+
+                let axis_dir = widget.active_axis.rotated_direction(yaw_quat);
+                let cam_forward = camera_gt.forward().as_vec3();
+                if cam_forward.dot(axis_dir) < 0.0 {
+                    raw_delta = -raw_delta;
+                }
 
                 let step = ROTATION_STEP_DEG.to_radians();
                 let snapped_delta = (raw_delta / step).round() * step;
 
-                transform.rotation = Quat::from_axis_angle(axis_dir, snapped_delta)
+                let world_rotation = Quat::from_axis_angle(axis_dir, snapped_delta)
                     * widget.entity_start_rotation;
+
+                // Convert world rotation to local if entity has a parent
+                if let Ok(child_of) = child_of_query.get(entity) {
+                    if let Ok(parent_gt) = parent_gt_query.get(child_of.parent()) {
+                        let parent_rot = parent_gt.to_scale_rotation_translation().1;
+                        transform.rotation = parent_rot.inverse() * world_rotation;
+                    } else {
+                        transform.rotation = world_rotation;
+                    }
+                } else {
+                    transform.rotation = world_rotation;
+                }
             }
         } else {
             widget.active = false;
@@ -142,14 +163,15 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
         widget.hovered = min_dist < RING_HIT_THRESHOLD;
 
         if !mouse_over_ui && mouse_buttons.just_pressed(MouseButton::Left) && widget.hovered
+            && let Ok(center_screen) = camera.world_to_viewport(camera_gt, pos)
         {
-            let axis_dir = current_axis.rotated_direction(yaw_quat);
-            if let Some(hit) = ray_intersect_plane(ray, pos, axis_dir) {
-                widget.active = true;
-                widget.active_axis = current_axis;
-                widget.drag_start_angle = angle_in_plane(hit, pos, ref1, ref2);
-                widget.entity_start_rotation = transform.rotation;
-            }
+            let d = cursor_pos - center_screen;
+            widget.active = true;
+            widget.active_axis = current_axis;
+            widget.drag_start_angle = d.y.atan2(d.x);
+            // Store the world-space rotation at drag start
+            let (_, world_rot, _) = global_transform.to_scale_rotation_translation();
+            widget.entity_start_rotation = world_rot;
         }
     }
 }

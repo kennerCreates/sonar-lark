@@ -154,6 +154,7 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_prop_color_cycle,
                     ui::update_prop_color_label,
                     ui::handle_camera_placement,
+                    ui::handle_remove_camera,
                     ui::handle_camera_primary_toggle,
                     ui::update_camera_primary_label,
                 )
@@ -186,6 +187,19 @@ impl Plugin for CourseEditorPlugin {
             .add_systems(
                 Update,
                 (
+                    transform_gizmos::draw_move_gizmo,
+                    transform_gizmos::handle_move_gizmo,
+                    transform_gizmos::draw_rotate_gizmo,
+                    transform_gizmos::handle_rotate_gizmo,
+                    transform_gizmos::draw_scale_gizmo,
+                    transform_gizmos::handle_scale_gizmo,
+                )
+                    .before(handle_placement_and_selection)
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
+                (
                     handle_placement_and_selection,
                     handle_delete_key,
                     handle_transform_mode_keys,
@@ -197,18 +211,6 @@ impl Plugin for CourseEditorPlugin {
                     overlays::draw_flight_spline_preview,
                     overlays::draw_prop_gizmos,
                     overlays::draw_camera_gizmos,
-                )
-                    .run_if(in_state(EditorMode::CourseEditor)),
-            )
-            .add_systems(
-                Update,
-                (
-                    transform_gizmos::draw_move_gizmo,
-                    transform_gizmos::handle_move_gizmo,
-                    transform_gizmos::draw_rotate_gizmo,
-                    transform_gizmos::handle_rotate_gizmo,
-                    transform_gizmos::draw_scale_gizmo,
-                    transform_gizmos::handle_scale_gizmo,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -300,10 +302,14 @@ fn handle_placement_and_selection(
     interaction_query: Query<&Interaction>,
     mut ray_cast: MeshRayCast,
 ) {
-    // Don't process clicks when a gizmo drag is active
+    // Don't process clicks when a gizmo is hovered or being dragged
     if move_widget.active_drag.is_some()
+        || move_widget.hovered
         || rotate_widget.active
+        || rotate_widget.hovered
         || scale_widget.active_drag.is_some()
+        || scale_widget.hovered_axis.is_some()
+        || scale_widget.hovered_center
     {
         return;
     }

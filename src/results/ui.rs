@@ -222,7 +222,7 @@ pub fn setup_results_ui(
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "START NEXT RACE", RaceAgainButton, 200.0);
+                    ui_theme::spawn_menu_button(row, "START NEXT RACE", RaceAgainButton, 260.0);
                     ui_theme::spawn_menu_button(row, "MAIN MENU", MainMenuButton, 200.0);
                 });
         });

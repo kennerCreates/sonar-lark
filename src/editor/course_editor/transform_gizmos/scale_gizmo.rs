@@ -5,7 +5,9 @@ use crate::editor::gizmos::{
     closest_point_on_axis, point_to_segment_distance, yaw_quat_from_transform, Axis,
 };
 
-use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedFilter, TransformMode};
+use crate::editor::course_editor::{
+    EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, TransformMode,
+};
 
 use super::{
     ScaleDragMode, ScaleWidgetState, SCALE_CUBE_SIZE, SCALE_HANDLE_LENGTH, SCALE_HIT_THRESHOLD,
@@ -18,6 +20,7 @@ pub(in crate::editor::course_editor) fn draw_scale_gizmo(
     selection: Res<EditorSelection>,
     widget: Res<ScaleWidgetState>,
     placed_query: Query<&Transform, PlacedFilter>,
+    camera_check: Query<(), With<PlacedCamera>>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     if transform_state.mode != TransformMode::Scale {
@@ -26,6 +29,10 @@ pub(in crate::editor::course_editor) fn draw_scale_gizmo(
     let Some(entity) = selection.entity else {
         return;
     };
+    // Skip scale gizmo for cameras
+    if camera_check.get(entity).is_ok() {
+        return;
+    }
     let Ok(transform) = placed_query.get(entity) else {
         return;
     };
@@ -78,6 +85,7 @@ pub(in crate::editor::course_editor) fn handle_scale_gizmo(
     mut widget: ResMut<ScaleWidgetState>,
     mut placed_query: Query<&mut Transform, PlacedFilter>,
     interaction_query: Query<&Interaction>,
+    camera_check: Query<(), With<PlacedCamera>>,
 ) {
     if transform_state.mode != TransformMode::Scale {
         widget.active_drag = None;
@@ -91,6 +99,13 @@ pub(in crate::editor::course_editor) fn handle_scale_gizmo(
         widget.hovered_center = false;
         return;
     };
+    // Skip scale gizmo for cameras
+    if camera_check.get(entity).is_ok() {
+        widget.active_drag = None;
+        widget.hovered_axis = None;
+        widget.hovered_center = false;
+        return;
+    }
     let Ok(mut transform) = placed_query.get_mut(entity) else {
         return;
     };

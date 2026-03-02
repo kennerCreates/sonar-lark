@@ -106,6 +106,9 @@ pub struct CameraPaletteContent;
 pub struct PlaceCameraButton;
 
 #[derive(Component)]
+pub struct RemoveCameraButton;
+
+#[derive(Component)]
 pub struct CameraPrimaryToggle;
 
 #[derive(Component)]

@@ -121,7 +121,7 @@ pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Im
 
 pub fn sync_preview_camera(
     selection: Res<EditorSelection>,
-    placed_cameras: Query<(&PlacedCamera, &Transform), Without<PreviewCamera>>,
+    placed_cameras: Query<(&PlacedCamera, &GlobalTransform), Without<PreviewCamera>>,
     mut preview_camera: Query<
         (&mut Camera, &mut Transform, &mut Projection),
         (With<PreviewCamera>, Without<MainCamera>),
@@ -139,8 +139,9 @@ pub fn sync_preview_camera(
         .and_then(|e| placed_cameras.get(e).ok());
 
     match selected_camera {
-        Some((placed, transform)) => {
-            *cam_tf = *transform;
+        Some((placed, gt)) => {
+            let (_, rotation, translation) = gt.to_scale_rotation_translation();
+            *cam_tf = Transform::from_translation(translation).with_rotation(rotation);
 
             if !cam.is_active {
                 cam.is_active = true;
