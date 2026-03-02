@@ -7,6 +7,10 @@ use super::components::*;
 const RACE_DURATION_ESTIMATE: f32 = 90.0;
 const GROUND_HEIGHT: f32 = 0.3;
 const INTEGRAL_CLAMP: f32 = 10.0;
+/// Leaky integrator decay rate (1/s). Prevents stale integral buildup
+/// during PID bypass (maneuvers) and limits windup from tilt-clamp saturation.
+/// At 1.5/s: integral decays to 22% after 1s bypass, <5% after 2s.
+const INTEGRAL_DECAY_RATE: f32 = 1.5;
 
 /// Noise-driven hover target. Layered sine waves produce organic 1–3 cm drift.
 pub fn hover_target(
@@ -71,7 +75,8 @@ pub fn position_to_acceleration(
         }
         let error = desired.position - transform.translation;
 
-        pid.integral = (pid.integral + error * dt).clamp(
+        let decay = (-INTEGRAL_DECAY_RATE * dt).exp();
+        pid.integral = (pid.integral * decay + error * dt).clamp(
             Vec3::splat(-INTEGRAL_CLAMP),
             Vec3::splat(INTEGRAL_CLAMP),
         );
