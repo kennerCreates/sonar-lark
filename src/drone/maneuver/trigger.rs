@@ -121,10 +121,10 @@ pub fn activate_pending_maneuvers(
             continue;
         }
 
-        // For flip maneuvers (SplitS/PowerLoop), defer activation if an uncrossed
-        // gate sits between the drone and the maneuver exit. The drone must cross
-        // the gate physically before position_pid is bypassed.
-        if matches!(pending.kind, ManeuverKind::SplitS | ManeuverKind::PowerLoop)
+        // For SplitS, defer activation if an uncrossed gate sits between the drone
+        // and the maneuver exit. The drone must cross the gate physically before
+        // position_pid is bypassed.
+        if pending.kind == ManeuverKind::SplitS
             && let Some(ref progress) = progress
         {
             let drone_idx = drone.index as usize;
@@ -139,28 +139,37 @@ pub fn activate_pending_maneuvers(
         commands.entity(entity).remove::<PendingManeuver>();
 
         match pending.kind {
-            ManeuverKind::SplitS | ManeuverKind::PowerLoop => {
-                // Re-check altitude at activation time (may have changed since detection)
-                let kind = if pending.kind == ManeuverKind::SplitS
-                    && transform.translation.y < tuning.maneuver_altitude_min
-                {
-                    ManeuverKind::PowerLoop
-                } else {
-                    pending.kind
-                };
+            ManeuverKind::SplitS => {
+                // Re-check altitude at activation time — downgrade to AggressiveBank if too low
+                if transform.translation.y < tuning.maneuver_altitude_min {
+                    info!(
+                        "Drone {} SplitS→AggressiveBank (alt {:.1} < min {:.1})",
+                        drone.index, transform.translation.y, tuning.maneuver_altitude_min
+                    );
+                    commands.entity(entity).insert(TiltOverride {
+                        max_tilt: AGGRESSIVE_BANK_TILT,
+                        exit_spline_t: pending.exit_t,
+                    });
+                    continue;
+                }
 
                 let entry_velocity = dynamics.velocity;
                 let yaw_flat = Vec3::new(entry_velocity.x, 0.0, entry_velocity.z);
                 let entry_yaw_dir = yaw_flat.normalize_or(Vec3::NEG_Z);
                 let entry_speed = entry_velocity.length();
 
+                info!(
+                    "Drone {} activated SplitS at spline_t={:.1}, exit_t={:.1}, alt={:.1}",
+                    drone.index, ai.spline_t, pending.exit_t, transform.translation.y
+                );
+
                 commands.entity(entity).insert(ActiveManeuver {
-                    kind,
+                    kind: ManeuverKind::SplitS,
                     phase: ManeuverPhaseTag::Entry,
                     phase_progress: 0.0,
                     phase_start_time: now,
                     phase_duration: profiles::phase_duration(
-                        kind,
+                        ManeuverKind::SplitS,
                         ManeuverPhaseTag::Entry,
                         entry_speed,
                     ),
@@ -171,7 +180,11 @@ pub fn activate_pending_maneuvers(
                     entry_altitude: transform.translation.y,
                 });
             }
-            ManeuverKind::AggressiveBank => {
+            ManeuverKind::PowerLoop | ManeuverKind::AggressiveBank => {
+                info!(
+                    "Drone {} activated AggressiveBank at spline_t={:.1}, exit_t={:.1}",
+                    drone.index, ai.spline_t, pending.exit_t
+                );
                 commands.entity(entity).insert(TiltOverride {
                     max_tilt: AGGRESSIVE_BANK_TILT,
                     exit_spline_t: pending.exit_t,

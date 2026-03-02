@@ -138,12 +138,8 @@ pub fn detect_maneuver(
         return None;
     }
 
-    let kind = if total_angle > FLIP_ANGLE_THRESHOLD {
-        if altitude > maneuver_altitude_min {
-            ManeuverKind::SplitS
-        } else {
-            ManeuverKind::PowerLoop
-        }
+    let kind = if total_angle > FLIP_ANGLE_THRESHOLD && altitude > maneuver_altitude_min {
+        ManeuverKind::SplitS
     } else {
         ManeuverKind::AggressiveBank
     };
@@ -332,7 +328,7 @@ mod tests {
     }
 
     #[test]
-    fn low_altitude_selects_power_loop_for_big_turn() {
+    fn low_altitude_selects_aggressive_bank_for_big_turn() {
         let (spline, cycle_t) = make_hairpin_spline();
         let result = detect_hairpin(&spline, cycle_t, |a| {
             a.altitude = 1.0;
@@ -341,9 +337,8 @@ mod tests {
             a.turn_threshold = 30.0;
         });
         if let Some(trigger) = result {
-            if trigger.turn_angle > FLIP_ANGLE_THRESHOLD {
-                assert_eq!(trigger.kind, ManeuverKind::PowerLoop);
-            }
+            // Low altitude prevents SplitS, falls back to AggressiveBank
+            assert_eq!(trigger.kind, ManeuverKind::AggressiveBank);
         }
     }
 

@@ -75,8 +75,8 @@ fn power_loop_orientation(phase: ManeuverPhaseTag, t: f32, entry_yaw_dir: Vec3) 
 
     match phase {
         ManeuverPhaseTag::Entry => {
-            // Pitch up 45° (local X rotation).
-            let pitch_up = Quat::from_rotation_x(t * PI / 4.0);
+            // Gentle pitch-up to ~15° to initiate the loop without flinging upward.
+            let pitch_up = Quat::from_rotation_x(t * PI / 12.0);
             (level_entry * pitch_up).normalize()
         }
         ManeuverPhaseTag::Ballistic => {
@@ -100,19 +100,20 @@ pub fn maneuver_thrust_fraction(
 ) -> f32 {
     match kind {
         ManeuverKind::SplitS => match phase {
-            ManeuverPhaseTag::Entry => 0.2,
-            // Ramps from 0.3 (inverted, low thrust) to 0.9 (exiting dive, high thrust).
-            ManeuverPhaseTag::Ballistic => 0.3 + 0.6 * progress * progress,
+            ManeuverPhaseTag::Entry => 0.55,
+            // Linear ramp from 0.4 (inverted, moderate thrust) to 1.0 (exiting dive, full thrust).
+            // Front-loaded compared to old quadratic ramp so the drone pulls out of the dive earlier.
+            ManeuverPhaseTag::Ballistic => 0.4 + 0.6 * progress,
             ManeuverPhaseTag::Recovery => 1.0,
         },
         ManeuverKind::PowerLoop => match phase {
-            ManeuverPhaseTag::Entry => 1.0,
+            ManeuverPhaseTag::Entry => 0.9,
             ManeuverPhaseTag::Ballistic => {
-                // U-shaped: 0.8 at start/end, 0.4 at midpoint (top of loop).
+                // U-shaped: 0.7 at start/end, 0.3 at midpoint (top of loop).
                 let centered = 2.0 * progress - 1.0;
-                0.4 + 0.4 * centered * centered
+                0.3 + 0.4 * centered * centered
             }
-            ManeuverPhaseTag::Recovery => 0.9,
+            ManeuverPhaseTag::Recovery => 1.0,
         },
         ManeuverKind::AggressiveBank => 0.5,
     }
@@ -125,14 +126,14 @@ pub fn phase_duration(kind: ManeuverKind, phase: ManeuverPhaseTag, entry_speed: 
 
     match kind {
         ManeuverKind::SplitS => match phase {
-            ManeuverPhaseTag::Entry => 0.10 * scale,
-            ManeuverPhaseTag::Ballistic => 0.40 * scale,
-            ManeuverPhaseTag::Recovery => 0.20 * scale,
+            ManeuverPhaseTag::Entry => 0.08 * scale,
+            ManeuverPhaseTag::Ballistic => 0.28 * scale,
+            ManeuverPhaseTag::Recovery => 0.15 * scale,
         },
         ManeuverKind::PowerLoop => match phase {
-            ManeuverPhaseTag::Entry => 0.175 * scale,
-            ManeuverPhaseTag::Ballistic => 0.50 * scale,
-            ManeuverPhaseTag::Recovery => 0.15 * scale,
+            ManeuverPhaseTag::Entry => 0.10 * scale,
+            ManeuverPhaseTag::Ballistic => 0.35 * scale,
+            ManeuverPhaseTag::Recovery => 0.10 * scale,
         },
         ManeuverKind::AggressiveBank => match phase {
             ManeuverPhaseTag::Entry => 0.10,
@@ -249,12 +250,12 @@ mod tests {
             VELOCITY,
         );
         let body_up = q.mul_vec3(Vec3::Y);
-        // Pitched up 45°: body-up tilts backward (toward +Z since facing -Z).
-        // Expected body-up ≈ (0, cos(45°), sin(45°)) ≈ (0, 0.707, 0.707).
-        let expected_up = Vec3::new(0.0, (PI / 4.0).cos(), (PI / 4.0).sin());
+        // Pitched up 15° (PI/12): body-up tilts backward (toward +Z since facing -Z).
+        let angle = PI / 12.0;
+        let expected_up = Vec3::new(0.0, angle.cos(), angle.sin());
         assert!(
             (body_up - expected_up).length() < TOLERANCE,
-            "body-up should be tilted 45° back, got {body_up}"
+            "body-up should be tilted 15° back, got {body_up}"
         );
     }
 
@@ -331,19 +332,19 @@ mod tests {
     #[test]
     fn split_s_thrust_curve_shape() {
         let entry = maneuver_thrust_fraction(ManeuverKind::SplitS, ManeuverPhaseTag::Entry, 0.5);
-        assert!((entry - 0.2).abs() < f32::EPSILON, "entry should be constant 0.2");
+        assert!((entry - 0.55).abs() < f32::EPSILON, "entry should be constant 0.55");
 
         let ballistic_start =
             maneuver_thrust_fraction(ManeuverKind::SplitS, ManeuverPhaseTag::Ballistic, 0.0);
         let ballistic_end =
             maneuver_thrust_fraction(ManeuverKind::SplitS, ManeuverPhaseTag::Ballistic, 1.0);
         assert!(
-            (ballistic_start - 0.3).abs() < f32::EPSILON,
-            "ballistic start should be 0.3"
+            (ballistic_start - 0.4).abs() < f32::EPSILON,
+            "ballistic start should be 0.4"
         );
         assert!(
-            (ballistic_end - 0.9).abs() < f32::EPSILON,
-            "ballistic end should be 0.9"
+            (ballistic_end - 1.0).abs() < f32::EPSILON,
+            "ballistic end should be 1.0"
         );
 
         let recovery =
@@ -360,9 +361,9 @@ mod tests {
         let at_end =
             maneuver_thrust_fraction(ManeuverKind::PowerLoop, ManeuverPhaseTag::Ballistic, 1.0);
 
-        assert!((at_start - 0.8).abs() < f32::EPSILON, "start should be 0.8");
-        assert!((at_mid - 0.4).abs() < f32::EPSILON, "midpoint should be 0.4");
-        assert!((at_end - 0.8).abs() < f32::EPSILON, "end should be 0.8");
+        assert!((at_start - 0.7).abs() < f32::EPSILON, "start should be 0.7");
+        assert!((at_mid - 0.3).abs() < f32::EPSILON, "midpoint should be 0.3");
+        assert!((at_end - 0.7).abs() < f32::EPSILON, "end should be 0.7");
     }
 
     // --- Phase durations ---
@@ -382,14 +383,14 @@ mod tests {
         // Very slow (1 m/s) should clamp at 1.4x scale
         let very_slow = phase_duration(ManeuverKind::SplitS, ManeuverPhaseTag::Entry, 1.0);
         assert!(
-            (very_slow - 0.10 * 1.4).abs() < f32::EPSILON,
+            (very_slow - 0.08 * 1.4).abs() < f32::EPSILON,
             "very slow should clamp to 1.4x: got {very_slow}"
         );
 
         // Very fast (100 m/s) should clamp at 0.6x scale
         let very_fast = phase_duration(ManeuverKind::SplitS, ManeuverPhaseTag::Entry, 100.0);
         assert!(
-            (very_fast - 0.10 * 0.6).abs() < f32::EPSILON,
+            (very_fast - 0.08 * 0.6).abs() < f32::EPSILON,
             "very fast should clamp to 0.6x: got {very_fast}"
         );
     }
