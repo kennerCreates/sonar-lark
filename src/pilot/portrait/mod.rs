@@ -7,7 +7,7 @@ pub mod slot_enums;
 
 pub use descriptor::{PortraitDescriptor, SecondaryColor};
 pub use slot_enums::{
-    Accessory, EarringKind, EyeStyle, FaceShape, HairStyle, MouthStyle, NecklaceKind, ShirtStyle,
+    Accessory, EarringKind, EyeStyle, FaceShape, HairStyle, MouthStyle, ShirtStyle,
     ALL_ACCESSORIES, ALL_EYE_STYLES, ALL_FACE_SHAPES, ALL_HAIR_STYLES,
     ALL_MOUTH_STYLES, ALL_SHIRT_STYLES,
 };

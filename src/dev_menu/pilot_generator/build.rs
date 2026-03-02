@@ -7,7 +7,7 @@ use crate::ui_theme::ThemedButton;
 use super::{
     AcceptButton, DroneColorSwatch, GamertagLabel, GenBackButton, PaletteEditorButton,
     PersonalityLabel, PilotGeneratorState, PreviewImage, RerollGamertagButton,
-    RerollPortraitButton, RosterCountLabel, format_personality,
+    RerollPersonalityButton, RerollPortraitButton, RosterCountLabel, format_personality,
 };
 
 const PANEL_BG: Color = Color::srgba(0.02, 0.04, 0.08, 0.95);
@@ -209,6 +209,12 @@ pub fn build_ui(
                         right,
                         "REROLL NAME",
                         RerollGamertagButton,
+                        palette::INDIGO,
+                    );
+                    spawn_action_button(
+                        right,
+                        "REROLL PERSONALITY",
+                        RerollPersonalityButton,
                         palette::INDIGO,
                     );
                     spawn_action_button(right, "ACCEPT", AcceptButton, palette::FROG);

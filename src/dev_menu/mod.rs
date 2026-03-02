@@ -71,6 +71,7 @@ impl Plugin for DevMenuPlugin {
                 pilot_generator::handle_palette_editor_button,
                 pilot_generator::handle_reroll_portrait_button,
                 pilot_generator::handle_reroll_gamertag_button,
+                pilot_generator::handle_reroll_personality_button,
                 pilot_generator::handle_accept_button,
                 pilot_generator::update_preview,
                 pilot_generator::update_pilot_info,

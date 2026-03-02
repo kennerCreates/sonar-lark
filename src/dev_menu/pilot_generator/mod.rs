@@ -42,6 +42,9 @@ pub struct RerollPortraitButton;
 pub struct RerollGamertagButton;
 
 #[derive(Component)]
+pub struct RerollPersonalityButton;
+
+#[derive(Component)]
 pub struct AcceptButton;
 
 #[derive(Component)]
@@ -230,6 +233,17 @@ pub fn handle_reroll_gamertag_button(
                 .map(|r| r.pilots.iter().map(|p| p.gamertag.clone()).collect())
                 .unwrap_or_default();
             state.candidate.gamertag = generate_gamertag(&mut rng, &used_tags);
+        }
+    }
+}
+
+pub fn handle_reroll_personality_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<RerollPersonalityButton>)>,
+    mut state: ResMut<PilotGeneratorState>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            let mut rng = rand::thread_rng();
             state.candidate.personality = pick_personality_traits(&mut rng);
             state.candidate.skill = SkillProfile {
                 level: rng.gen_range(0.2..=0.95),

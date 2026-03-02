@@ -280,6 +280,7 @@ pub fn assemble_svg(
 mod tests {
     use super::*;
     use super::super::*;
+    use super::super::slot_enums::NecklaceKind;
 
     #[test]
     fn color_to_hex_black() {
