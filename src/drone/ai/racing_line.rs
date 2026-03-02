@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
 use super::super::components::*;
-use super::super::maneuver::{ActiveManeuver, PendingManeuver};
 use super::{
     FINISH_EPSILON, VELOCITY_LOOK_AHEAD_T,
     cyclic_curvature, cyclic_pos, cyclic_vel, max_curvature_ahead,
@@ -26,13 +25,11 @@ pub fn compute_racing_line(
         &DroneConfig,
         &DronePhase,
         &mut DesiredPosition,
-        Option<&ActiveManeuver>,
-        Option<&PendingManeuver>,
     )>,
 ) {
     let elapsed = time.elapsed_secs();
 
-    for (transform, ai, config, phase, mut desired, active_maneuver, pending_maneuver) in &mut query {
+    for (transform, ai, config, phase, mut desired) in &mut query {
         match *phase {
             DronePhase::Idle | DronePhase::Crashed | DronePhase::Wandering => continue,
             DronePhase::Racing => {
@@ -133,13 +130,6 @@ pub fn compute_racing_line(
                 );
                 let per_drone_accel = tuning.safe_lateral_accel * config.cornering_aggression;
                 desired.max_speed = safe_speed_for_curvature_with(max_k, per_drone_accel, &tuning);
-
-                // Bypass curvature braking during maneuvers — the maneuver system controls speed.
-                // Also bypass when a maneuver is pending so the drone arrives at the turn hot
-                // instead of braking for curvature it's about to flip through.
-                if active_maneuver.is_some() || pending_maneuver.is_some() {
-                    desired.max_speed = tuning.max_speed;
-                }
             }
             DronePhase::VictoryLap => {
                 let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
@@ -176,10 +166,6 @@ pub fn compute_racing_line(
                 );
                 let per_drone_accel = tuning.safe_lateral_accel * config.cornering_aggression;
                 desired.max_speed = safe_speed_for_curvature_with(max_k, per_drone_accel, &tuning);
-
-                if active_maneuver.is_some() || pending_maneuver.is_some() {
-                    desired.max_speed = tuning.max_speed;
-                }
             }
         }
     }

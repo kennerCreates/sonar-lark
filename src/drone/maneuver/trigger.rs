@@ -1,14 +1,9 @@
 use bevy::prelude::*;
 
 use super::detection::detect_maneuver;
-use super::profiles;
-use super::{
-    ActiveManeuver, ManeuverCooldown, ManeuverKind, ManeuverPhaseTag, PendingManeuver,
-    TiltOverride,
-};
+use super::{ActiveManeuver, ManeuverCooldown, PendingManeuver, TiltOverride};
 use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
 use crate::drone::components::*;
-use crate::race::progress::RaceProgress;
 
 /// Raised tilt limit for Aggressive Bank (~103 degrees in radians).
 const AGGRESSIVE_BANK_TILT: f32 = 1.80;
@@ -92,26 +87,21 @@ pub fn trigger_maneuvers(
     }
 }
 
-/// Converts `PendingManeuver` into `ActiveManeuver` or `TiltOverride` once the
-/// drone's spline_t reaches the trigger point.
+/// Converts `PendingManeuver` into `TiltOverride` once the drone's spline_t
+/// reaches the trigger point. All maneuver kinds use TiltOverride so the
+/// position PID stays in control — the drone just gets a raised tilt limit
+/// for aggressive banking through tight turns.
 pub fn activate_pending_maneuvers(
     mut commands: Commands,
-    time: Res<Time>,
-    tuning: Res<AiTuningParams>,
-    progress: Option<Res<RaceProgress>>,
     query: Query<(
         Entity,
-        &Transform,
         &AIController,
-        &DroneDynamics,
         &DronePhase,
         &PendingManeuver,
         &Drone,
     )>,
 ) {
-    let now = time.elapsed_secs();
-
-    for (entity, transform, ai, dynamics, phase, pending, drone) in &query {
+    for (entity, ai, phase, pending, drone) in &query {
         if *phase == DronePhase::Crashed {
             commands.entity(entity).remove::<PendingManeuver>();
             continue;
@@ -121,75 +111,15 @@ pub fn activate_pending_maneuvers(
             continue;
         }
 
-        // For SplitS, defer activation if an uncrossed gate sits between the drone
-        // and the maneuver exit. The drone must cross the gate physically before
-        // position_pid is bypassed.
-        if pending.kind == ManeuverKind::SplitS
-            && let Some(ref progress) = progress
-        {
-            let drone_idx = drone.index as usize;
-            if let Some(state) = progress.drone_states.get(drone_idx) {
-                let next_gate_t = state.next_gate as f32 * POINTS_PER_GATE;
-                if next_gate_t < pending.exit_t {
-                    continue; // Wait for gate crossing
-                }
-            }
-        }
-
         commands.entity(entity).remove::<PendingManeuver>();
 
-        match pending.kind {
-            ManeuverKind::SplitS => {
-                // Re-check altitude at activation time — downgrade to AggressiveBank if too low
-                if transform.translation.y < tuning.maneuver_altitude_min {
-                    info!(
-                        "Drone {} SplitS→AggressiveBank (alt {:.1} < min {:.1})",
-                        drone.index, transform.translation.y, tuning.maneuver_altitude_min
-                    );
-                    commands.entity(entity).insert(TiltOverride {
-                        max_tilt: AGGRESSIVE_BANK_TILT,
-                        exit_spline_t: pending.exit_t,
-                    });
-                    continue;
-                }
-
-                let entry_velocity = dynamics.velocity;
-                let yaw_flat = Vec3::new(entry_velocity.x, 0.0, entry_velocity.z);
-                let entry_yaw_dir = yaw_flat.normalize_or(Vec3::NEG_Z);
-                let entry_speed = entry_velocity.length();
-
-                info!(
-                    "Drone {} activated SplitS at spline_t={:.1}, exit_t={:.1}, alt={:.1}",
-                    drone.index, ai.spline_t, pending.exit_t, transform.translation.y
-                );
-
-                commands.entity(entity).insert(ActiveManeuver {
-                    kind: ManeuverKind::SplitS,
-                    phase: ManeuverPhaseTag::Entry,
-                    phase_progress: 0.0,
-                    phase_start_time: now,
-                    phase_duration: profiles::phase_duration(
-                        ManeuverKind::SplitS,
-                        ManeuverPhaseTag::Entry,
-                        entry_speed,
-                    ),
-                    entry_velocity,
-                    entry_position: transform.translation,
-                    exit_spline_t: pending.exit_t,
-                    entry_yaw_dir,
-                    entry_altitude: transform.translation.y,
-                });
-            }
-            ManeuverKind::PowerLoop | ManeuverKind::AggressiveBank => {
-                info!(
-                    "Drone {} activated AggressiveBank at spline_t={:.1}, exit_t={:.1}",
-                    drone.index, ai.spline_t, pending.exit_t
-                );
-                commands.entity(entity).insert(TiltOverride {
-                    max_tilt: AGGRESSIVE_BANK_TILT,
-                    exit_spline_t: pending.exit_t,
-                });
-            }
-        }
+        info!(
+            "Drone {} activated {:?} as TiltOverride at spline_t={:.1}, exit_t={:.1}",
+            drone.index, pending.kind, ai.spline_t, pending.exit_t
+        );
+        commands.entity(entity).insert(TiltOverride {
+            max_tilt: AGGRESSIVE_BANK_TILT,
+            exit_spline_t: pending.exit_t,
+        });
     }
 }
