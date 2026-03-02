@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::race::timing::RaceClock;
 use super::components::*;
+use super::maneuver::{ActiveManeuver, TiltOverride};
 
 /// Approximate full-pack race duration for battery sag curve (seconds).
 const RACE_DURATION_ESTIMATE: f32 = 90.0;
@@ -58,14 +59,15 @@ pub fn position_pid(
         &DroneDynamics,
         &mut DesiredAttitude,
         &DronePhase,
-    )>,
+        Option<&TiltOverride>,
+    ), Without<ActiveManeuver>>,
 ) {
     let dt = time.delta_secs();
     if dt == 0.0 {
         return;
     }
 
-    for (transform, desired, mut pid, dynamics, mut attitude, phase) in &mut query {
+    for (transform, desired, mut pid, dynamics, mut attitude, phase, tilt_override) in &mut query {
         if *phase == DronePhase::Crashed {
             continue;
         }
@@ -91,8 +93,8 @@ pub fn position_pid(
         // Desired body-up direction: aligned with desired acceleration
         let desired_up = desired_accel.normalize_or(Vec3::Y);
 
-        // Clamp tilt angle (read from tuning resource)
-        let max_tilt = tuning.max_tilt_angle;
+        // Clamp tilt angle (override from TiltOverride if present, else tuning resource)
+        let max_tilt = tilt_override.map(|o| o.max_tilt).unwrap_or(tuning.max_tilt_angle);
         let tilt_angle = desired_up.angle_between(Vec3::Y);
         let clamped_up = if tilt_angle > max_tilt {
             let tilt_axis = Vec3::Y.cross(desired_up).normalize_or(Vec3::X);

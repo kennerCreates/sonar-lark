@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use super::components::*;
+use super::maneuver::{ActiveManeuver, ManeuverKind, TiltOverride};
 use super::paths::adaptive_approach_offset;
 use crate::common::POINTS_PER_GATE;
 use crate::race::gate::GatePlanes;
@@ -267,5 +268,78 @@ pub fn draw_progress_indicators(
             1.5,
             color,
         );
+    }
+}
+
+/// Draw maneuver state for drones with an active maneuver or tilt override.
+/// - Colored ring: red = Split-S, blue = Power Loop, yellow = Aggressive Bank
+/// - Arrow showing target orientation (body-up direction)
+/// - Line from drone to exit point on spline
+pub fn draw_maneuver_state(
+    mut gizmos: Gizmos,
+    debug: Option<Res<FlightDebugDraw>>,
+    active_query: Query<(
+        &Transform,
+        &ActiveManeuver,
+        &AIController,
+        &DesiredAttitude,
+    )>,
+    tilt_query: Query<(&Transform, &AIController, &TiltOverride)>,
+) {
+    let Some(debug) = debug else { return };
+    if !debug.enabled {
+        return;
+    }
+
+    // Drones with full maneuver override (Split-S / Power Loop)
+    for (transform, maneuver, ai, attitude) in &active_query {
+        let pos = transform.translation;
+        let color = maneuver_color(maneuver.kind);
+        let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
+
+        // Colored ring around the drone
+        gizmos.circle(
+            Isometry3d::new(pos, Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
+            2.0,
+            color,
+        );
+
+        // Arrow showing target body-up direction
+        let target_up = attitude.orientation.mul_vec3(Vec3::Y);
+        gizmos.arrow(pos, pos + target_up * 3.0, color);
+
+        // Line from drone to exit point on spline
+        let exit_t = maneuver.exit_spline_t.rem_euclid(cycle_t);
+        let exit_pos = ai.spline.position(exit_t);
+        gizmos.line(pos, exit_pos, Color::srgba(1.0, 1.0, 1.0, 0.3));
+        gizmos.sphere(Isometry3d::from_translation(exit_pos), 0.3, color);
+    }
+
+    // Drones with tilt override (Aggressive Bank)
+    for (transform, ai, tilt) in &tilt_query {
+        let pos = transform.translation;
+        let color = maneuver_color(ManeuverKind::AggressiveBank);
+        let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
+
+        // Yellow ring
+        gizmos.circle(
+            Isometry3d::new(pos, Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
+            2.0,
+            color,
+        );
+
+        // Line to exit point
+        let exit_t = tilt.exit_spline_t.rem_euclid(cycle_t);
+        let exit_pos = ai.spline.position(exit_t);
+        gizmos.line(pos, exit_pos, Color::srgba(1.0, 1.0, 0.0, 0.3));
+        gizmos.sphere(Isometry3d::from_translation(exit_pos), 0.3, color);
+    }
+}
+
+fn maneuver_color(kind: ManeuverKind) -> Color {
+    match kind {
+        ManeuverKind::SplitS => Color::srgb(1.0, 0.2, 0.2),       // red
+        ManeuverKind::PowerLoop => Color::srgb(0.2, 0.4, 1.0),    // blue
+        ManeuverKind::AggressiveBank => Color::srgb(1.0, 1.0, 0.2), // yellow
     }
 }

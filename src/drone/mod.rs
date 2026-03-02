@@ -3,6 +3,7 @@ pub mod components;
 pub mod debug_draw;
 pub mod dev_dashboard;
 pub mod droning;
+pub mod maneuver;
 pub mod explosion;
 pub mod fireworks;
 pub mod interpolation;
@@ -65,8 +66,8 @@ impl Plugin for DronePlugin {
                     .run_if(resource_exists::<spawning::DroneAssets>)
                     .run_if(resource_exists::<CourseData>),
             )
-            // Physics chain in FixedUpdate.
-            // AI systems only run when racing; physics always runs so drones hover at start.
+            // Physics chain in FixedUpdate — split into two groups (12-system limit per run_if tuple).
+            // Group 1: AI + maneuver + physics core
             .add_systems(
                 FixedUpdate,
                 (
@@ -75,15 +76,34 @@ impl Plugin for DronePlugin {
                     ai::proximity_avoidance.run_if(drones_are_active),
                     wander::update_wander_targets.run_if(drones_are_active),
                     physics::hover_target.run_if(not(drones_are_active)),
+                    maneuver::trigger::trigger_maneuvers.run_if(drones_are_active),
+                    maneuver::execution::execute_maneuvers,
                     physics::position_pid,
                     physics::attitude_controller,
                     physics::dirty_air_perturbation,
                     physics::motor_lag,
                     physics::apply_forces,
-                    physics::integrate_motion,
-                    physics::clamp_transform,
                 )
                     .chain()
+                    .run_if(in_race_or_results),
+            )
+            // Group 2: integration + cleanup (ordered after apply_forces)
+            .add_systems(
+                FixedUpdate,
+                (
+                    physics::integrate_motion,
+                    physics::clamp_transform,
+                    maneuver::cleanup::cleanup_completed_maneuvers,
+                )
+                    .chain()
+                    .after(physics::apply_forces)
+                    .run_if(in_race_or_results),
+            )
+            // Tilt override cleanup (independent, after maneuver cleanup)
+            .add_systems(
+                FixedUpdate,
+                maneuver::cleanup::cleanup_tilt_overrides
+                    .after(maneuver::cleanup::cleanup_completed_maneuvers)
                     .run_if(in_race_or_results),
             )
             // Save authoritative physics state after the physics chain
@@ -108,6 +128,7 @@ impl Plugin for DronePlugin {
                     debug_draw::draw_gate_planes,
                     debug_draw::draw_drone_state,
                     debug_draw::draw_progress_indicators,
+                    debug_draw::draw_maneuver_state,
                 )
                     .run_if(in_state(AppState::Race)),
             )
