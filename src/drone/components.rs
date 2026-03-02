@@ -63,7 +63,22 @@ impl Default for AttitudePd {
     }
 }
 
-/// Bridge between position PID (outer loop) and attitude controller (inner loop).
+/// Bridge between position PID and attitude mapping.
+/// Separates "where to accelerate" from "how to orient for that acceleration."
+#[derive(Component)]
+pub struct DesiredAcceleration {
+    pub acceleration: Vec3,
+}
+
+/// Per-entity tilt angle limit (radians from vertical).
+/// Synced from AiTuningParams.max_tilt_angle during normal flight.
+/// Maneuver systems will override this for individual drones.
+#[derive(Component)]
+pub struct TiltClamp {
+    pub max_angle: f32,
+}
+
+/// Bridge between attitude mapping and attitude controller (inner loop).
 #[derive(Component)]
 pub struct DesiredAttitude {
     pub orientation: Quat,

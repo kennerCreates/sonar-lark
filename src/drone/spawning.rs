@@ -171,6 +171,9 @@ pub fn spawn_drones(
                 velocity_hint: look_dir,
                 max_speed: 45.0,
             },
+            DesiredAcceleration {
+                acceleration: Vec3::Y * GRAVITY,
+            },
             DesiredAttitude {
                 orientation: rotation,
                 thrust_magnitude: hover_thrust,
@@ -182,6 +185,7 @@ pub fn spawn_drones(
             DespawnOnExit(AppState::Results),
         ));
         entity_cmd.insert((
+            TiltClamp { max_angle: 1.45 },
             PreviousTranslation(position),
             PreviousRotation(rotation),
             PhysicsTranslation(position),

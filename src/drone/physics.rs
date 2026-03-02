@@ -46,9 +46,9 @@ pub fn hover_target(
     }
 }
 
-/// Outer-loop position PID. Computes desired acceleration from position error,
-/// then maps that to a desired body orientation and thrust magnitude.
-pub fn position_pid(
+/// Outer-loop position PID. Computes desired acceleration from position error
+/// with gravity compensation. Writes `DesiredAcceleration` for the next stage.
+pub fn position_to_acceleration(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
     mut query: Query<(
@@ -56,7 +56,7 @@ pub fn position_pid(
         &DesiredPosition,
         &mut PositionPid,
         &DroneDynamics,
-        &mut DesiredAttitude,
+        &mut DesiredAcceleration,
         &DronePhase,
     )>,
 ) {
@@ -65,7 +65,7 @@ pub fn position_pid(
         return;
     }
 
-    for (transform, desired, mut pid, dynamics, mut attitude, phase) in &mut query {
+    for (transform, desired, mut pid, dynamics, mut accel, phase) in &mut query {
         if *phase == DronePhase::Crashed {
             continue;
         }
@@ -86,13 +86,45 @@ pub fn position_pid(
         let pid_output = pid.kp * error + pid.ki * pid.integral + pid.kd * derivative;
 
         // Desired acceleration = PID + gravity compensation
-        let desired_accel = pid_output + Vec3::Y * GRAVITY;
+        accel.acceleration = pid_output + Vec3::Y * GRAVITY;
+    }
+}
+
+/// Propagates the global max_tilt_angle to all drones' TiltClamp components.
+/// Keeps the dev dashboard (F4) working. Future maneuver systems will
+/// exclude maneuvering drones from this sync.
+pub fn sync_tilt_clamp(
+    tuning: Res<AiTuningParams>,
+    mut query: Query<&mut TiltClamp, With<Drone>>,
+) {
+    for mut clamp in &mut query {
+        clamp.max_angle = tuning.max_tilt_angle;
+    }
+}
+
+/// Maps desired acceleration to a body orientation and thrust magnitude.
+/// Reads `DesiredAcceleration`, writes `DesiredAttitude`.
+pub fn acceleration_to_attitude(
+    mut query: Query<(
+        &Transform,
+        &DesiredPosition,
+        &DesiredAcceleration,
+        &DroneDynamics,
+        &mut DesiredAttitude,
+        &TiltClamp,
+        &DronePhase,
+    )>,
+) {
+    for (transform, desired, accel, dynamics, mut attitude, tilt_clamp, phase) in &mut query {
+        if *phase == DronePhase::Crashed {
+            continue;
+        }
+        let desired_accel = accel.acceleration;
 
         // Desired body-up direction: aligned with desired acceleration
         let desired_up = desired_accel.normalize_or(Vec3::Y);
 
-        // Clamp tilt angle (read from tuning resource)
-        let max_tilt = tuning.max_tilt_angle;
+        let max_tilt = tilt_clamp.max_angle;
         let tilt_angle = desired_up.angle_between(Vec3::Y);
         let clamped_up = if tilt_angle > max_tilt {
             let tilt_axis = Vec3::Y.cross(desired_up).normalize_or(Vec3::X);

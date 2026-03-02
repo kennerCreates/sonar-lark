@@ -75,7 +75,7 @@ impl Plugin for DronePlugin {
                     ai::proximity_avoidance.run_if(drones_are_active),
                     wander::update_wander_targets.run_if(drones_are_active),
                     physics::hover_target.run_if(not(drones_are_active)),
-                    physics::position_pid,
+                    (physics::sync_tilt_clamp, physics::position_to_acceleration, physics::acceleration_to_attitude).chain(),
                     physics::attitude_controller,
                     physics::dirty_air_perturbation,
                     physics::motor_lag,
