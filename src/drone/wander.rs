@@ -40,7 +40,7 @@ impl WanderBounds {
 }
 
 /// Deterministic waypoint from drone index + step counter.
-fn wander_waypoint(drone_index: u8, step: u32, bounds: &WanderBounds) -> Vec3 {
+pub(super) fn wander_waypoint(drone_index: u8, step: u32, bounds: &WanderBounds) -> Vec3 {
     // Fibonacci hashing for good distribution
     let hash = (drone_index as u32)
         .wrapping_mul(2654435769)

@@ -5,7 +5,7 @@ use crate::palette;
 use crate::states::AppState;
 use crate::ui_theme;
 
-use super::lifecycle::{CountdownTimer, RacePhase, ResultsTransitionTimer};
+use super::lifecycle::{RacePhase, ResultsTransitionTimer};
 use super::progress::RaceProgress;
 use super::timing::RaceClock;
 
@@ -78,12 +78,10 @@ pub fn handle_start_race_button(
 
         match *phase {
             RacePhase::WaitingToStart => {
-                *phase = RacePhase::Countdown;
-                commands.insert_resource(CountdownTimer::default());
-                // Sound is played by tick_countdown when the visible 3-2-1 starts
-                info!("Countdown started!");
+                *phase = RacePhase::Converging;
+                info!("Drones converging to start positions!");
             }
-            RacePhase::Countdown | RacePhase::Racing => {}
+            RacePhase::Converging | RacePhase::Countdown | RacePhase::Racing => {}
             RacePhase::Finished => {
                 // Despawn all drones so spawn_drones re-runs next frame
                 // with a fresh RaceSeed and new randomized configs/splines.
@@ -93,6 +91,8 @@ pub fn handle_start_race_button(
                 commands.remove_resource::<RaceProgress>();
                 commands.remove_resource::<RaceClock>();
                 commands.remove_resource::<ResultsTransitionTimer>();
+                commands.remove_resource::<super::script::RaceScript>();
+                commands.remove_resource::<super::script::RaceEventLog>();
                 *phase = RacePhase::WaitingToStart;
                 info!("Race reset — drones will respawn with new randomization");
             }
@@ -113,7 +113,7 @@ pub fn update_start_button_visuals(
     }
     for (interaction, mut bg, mut border) in &mut button_query {
         match *phase {
-            RacePhase::Countdown | RacePhase::Racing => {
+            RacePhase::Converging | RacePhase::Countdown | RacePhase::Racing => {
                 *bg = BackgroundColor(ui_theme::BUTTON_DISABLED);
                 *border = BorderColor::all(ui_theme::BORDER_DISABLED);
             }
@@ -136,6 +136,10 @@ pub fn update_start_button_text(
             RacePhase::WaitingToStart => {
                 text.0 = "START RACE".to_string();
                 *color = TextColor(palette::VANILLA);
+            }
+            RacePhase::Converging => {
+                text.0 = "ASSEMBLING...".to_string();
+                *color = TextColor(palette::STONE);
             }
             RacePhase::Countdown => {
                 text.0 = "GET READY...".to_string();

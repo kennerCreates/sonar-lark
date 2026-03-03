@@ -529,45 +529,90 @@ pub fn apply_visual_noise(
 // System: set_convergence_targets
 // ---------------------------------------------------------------------------
 
-/// When countdown starts, sets each drone's DesiredPosition to its spline start position.
-/// The existing wander/physics chain naturally flies them there.
-/// Also checks convergence: if all drones are within 2m of start and remaining > 3.0,
-/// reduces the countdown to 3.0 to start the visible 3-2-1.
+/// During Converging and Countdown, sets each Idle drone's DesiredPosition to its
+/// start grid position (straight line behind the first gate).
 pub fn set_convergence_targets(
     phase: Res<crate::race::lifecycle::RacePhase>,
-    mut timer: Option<ResMut<CountdownTimer>>,
-    mut query: Query<(&AIController, &Transform, &mut DesiredPosition, &DronePhase), With<Drone>>,
+    mut query: Query<(&DroneStartPosition, &mut DesiredPosition, &DronePhase), With<Drone>>,
 ) {
-    if *phase != crate::race::lifecycle::RacePhase::Countdown {
+    if !matches!(
+        *phase,
+        crate::race::lifecycle::RacePhase::Converging
+            | crate::race::lifecycle::RacePhase::Countdown
+    ) {
         return;
     }
 
-    let mut all_converged = true;
-    let mut any_idle = false;
-
-    for (ai, transform, mut desired, drone_phase) in &mut query {
+    for (start, mut desired, drone_phase) in &mut query {
         if *drone_phase != DronePhase::Idle {
             continue;
         }
-        any_idle = true;
-        let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
-        let start_pos = ai.spline.position(0.0_f32.rem_euclid(cycle_t.max(0.01)));
-        desired.position = start_pos;
+        desired.position = start.translation;
         desired.velocity_hint = Vec3::ZERO;
         desired.max_speed = 15.0;
+    }
+}
 
-        if (transform.translation - start_pos).length() > 2.0 {
+// ---------------------------------------------------------------------------
+// System: begin_convergence
+// ---------------------------------------------------------------------------
+
+/// When Converging begins, transitions all Wandering drones to Idle and removes
+/// their WanderState so convergence targets take effect. Idempotent.
+pub fn begin_convergence(
+    mut commands: Commands,
+    phase: Res<crate::race::lifecycle::RacePhase>,
+    mut query: Query<(Entity, &mut DronePhase), With<Drone>>,
+) {
+    if *phase != crate::race::lifecycle::RacePhase::Converging {
+        return;
+    }
+    for (entity, mut drone_phase) in &mut query {
+        if *drone_phase == DronePhase::Wandering {
+            *drone_phase = DronePhase::Idle;
+            commands.entity(entity).remove::<WanderState>();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// System: check_convergence_complete
+// ---------------------------------------------------------------------------
+
+const CONVERGENCE_THRESHOLD: f32 = 2.0;
+
+/// During Converging, checks if all non-crashed drones have arrived at their
+/// start grid positions. When all converged, transitions to Countdown.
+pub fn check_convergence_complete(
+    mut commands: Commands,
+    mut phase: ResMut<crate::race::lifecycle::RacePhase>,
+    query: Query<(&DroneStartPosition, &Transform, &DronePhase), With<Drone>>,
+) {
+    if *phase != crate::race::lifecycle::RacePhase::Converging {
+        return;
+    }
+
+    let mut any_idle = false;
+    let mut all_converged = true;
+
+    for (start, transform, drone_phase) in &query {
+        if *drone_phase == DronePhase::Crashed {
+            continue;
+        }
+        if *drone_phase != DronePhase::Idle {
+            all_converged = false;
+            continue;
+        }
+        any_idle = true;
+        if (transform.translation - start.translation).length() > CONVERGENCE_THRESHOLD {
             all_converged = false;
         }
     }
 
-    // Once all drones are within 2m of start, skip ahead to the 3-2-1 countdown
-    if any_idle
-        && all_converged
-        && let Some(ref mut timer) = timer
-        && timer.remaining > 3.0
-    {
-        timer.remaining = 3.0;
+    if any_idle && all_converged {
+        *phase = crate::race::lifecycle::RacePhase::Countdown;
+        commands.insert_resource(CountdownTimer::default());
+        info!("All drones converged — starting countdown!");
     }
 }
 

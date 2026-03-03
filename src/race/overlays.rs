@@ -31,14 +31,42 @@ pub fn manage_countdown_text(
     mut inner_query: Query<&mut Text, With<CountdownTextContent>>,
 ) {
     match *phase {
+        RacePhase::Converging => {
+            let display = "ASSEMBLING".to_string();
+            if let Ok(mut text) = inner_query.single_mut() {
+                text.0 = display;
+            } else if wrapper_query.is_empty() {
+                commands
+                    .spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            position_type: PositionType::Absolute,
+                            align_items: AlignItems::Center,
+                            justify_content: JustifyContent::Center,
+                            ..default()
+                        },
+                        CountdownText,
+                        DespawnOnExit(AppState::Race),
+                    ))
+                    .with_children(|parent| {
+                        parent.spawn((
+                            Text::new(display),
+                            TextFont {
+                                font_size: 120.0,
+                                ..default()
+                            },
+                            TextColor(palette::VANILLA),
+                            CountdownTextContent,
+                        ));
+                    });
+            }
+        }
         RacePhase::Countdown => {
             let display = timer
                 .map(|t| {
                     let secs = t.remaining.ceil() as u32;
-                    if secs > 3 {
-                        // Convergence phase — no visible countdown yet
-                        String::new()
-                    } else if secs > 0 {
+                    if secs > 0 {
                         format!("{}", secs)
                     } else {
                         "GO!".to_string()

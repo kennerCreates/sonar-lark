@@ -59,6 +59,14 @@ impl Plugin for DronePlugin {
                     .run_if(spawning::drone_gltf_ready)
                     .run_if(not(resource_exists::<spawning::DroneAssets>)),
             )
+            // Build WanderBounds from CourseData (needed for pre-race wandering)
+            .add_systems(
+                Update,
+                wander::build_wander_bounds
+                    .run_if(in_state(AppState::Race))
+                    .run_if(resource_exists::<CourseData>)
+                    .run_if(not(resource_exists::<wander::WanderBounds>)),
+            )
             // Spawn drones once assets and course data are available
             .add_systems(
                 Update,
@@ -102,10 +110,14 @@ impl Plugin for DronePlugin {
                     .chain()
                     .run_if(in_race_or_results),
             )
-            // Convergence: set drone targets to start positions during countdown
+            // Convergence: transition wandering drones to idle, set targets, detect arrival
             .add_systems(
                 Update,
-                choreography::set_convergence_targets
+                (
+                    choreography::begin_convergence,
+                    choreography::set_convergence_targets,
+                    choreography::check_convergence_complete,
+                )
                     .run_if(in_state(AppState::Race)),
             )
             // Snap drones to exact start positions when Racing begins
@@ -178,10 +190,10 @@ impl Plugin for DronePlugin {
                 (fireworks::tick_firework_shells, fireworks::update_firework_particles)
                     .run_if(in_race_or_results),
             )
-            // Transition drones to wandering on Results entry
+            // Transition any remaining non-wandering drones on Results entry
             .add_systems(
                 OnEnter(AppState::Results),
-                (wander::build_wander_bounds, wander::transition_to_wandering).chain(),
+                wander::transition_to_wandering,
             )
             // Cleanup resources when leaving Results (drones persist Race → Results)
             .add_systems(OnExit(AppState::Results), (

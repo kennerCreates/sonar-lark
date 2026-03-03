@@ -21,6 +21,7 @@ pub struct RaceEndSound(pub Handle<bevy::audio::AudioSource>);
 pub enum RacePhase {
     #[default]
     WaitingToStart,
+    Converging,
     Countdown,
     Racing,
     Finished,
@@ -34,10 +35,9 @@ pub struct CountdownTimer {
 
 impl Default for CountdownTimer {
     fn default() -> Self {
-        // 5s convergence window + 3s visible 3-2-1 countdown.
-        // Convergence check in set_convergence_targets can skip ahead to 3.0 early.
+        // 3s visible 3-2-1 countdown (convergence is handled by RacePhase::Converging).
         Self {
-            remaining: 8.0,
+            remaining: 3.0,
             sound_played: false,
         }
     }
@@ -54,13 +54,13 @@ pub fn load_race_sounds(mut commands: Commands, asset_server: Res<AssetServer>) 
     commands.insert_resource(RaceEndSound(asset_server.load("sounds/race_end.wav")));
 }
 
-/// Run condition: returns true when any drone is actively racing, victory-lapping, or returning.
-/// Used to keep AI systems running during and after the race.
+/// Run condition: returns true when any drone is actively racing, converging, or wandering.
+/// Used to keep AI/wander systems running instead of hover_target.
 pub fn drones_are_active(
     phase: Option<Res<RacePhase>>,
     drones: Query<&DronePhase, With<Drone>>,
 ) -> bool {
-    if phase.is_some_and(|p| *p == RacePhase::Racing) {
+    if phase.is_some_and(|p| matches!(*p, RacePhase::Racing | RacePhase::Converging)) {
         return true;
     }
     drones

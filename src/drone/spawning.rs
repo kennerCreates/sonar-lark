@@ -13,6 +13,8 @@ use crate::states::AppState;
 use super::components::*;
 use super::interpolation::{PhysicsRotation, PhysicsTranslation, PreviousRotation, PreviousTranslation};
 use super::paths::{RacePath, generate_race_path, generate_drone_race_path, compute_start_positions};
+use super::components::WanderState;
+use super::wander::{WanderBounds, wander_waypoint};
 
 
 /// Marker resource inserted when `spawn_drones` detects the course has no gates.
@@ -96,6 +98,7 @@ pub fn spawn_drones(
     light_dir: Res<CelLightDir>,
     selected_pilots: Option<Res<SelectedPilots>>,
     pilot_configs: Option<Res<PilotConfigs>>,
+    wander_bounds: Option<Res<WanderBounds>>,
 ) {
     if !existing_drones.is_empty() || no_gates.is_some() {
         return;
@@ -181,7 +184,7 @@ pub fn spawn_drones(
             DroneStartPosition {
                 translation: position,
             },
-            DronePhase::default(),
+            DronePhase::Wandering,
             DespawnOnExit(AppState::Results),
         ));
         entity_cmd.insert((
@@ -211,6 +214,17 @@ pub fn spawn_drones(
             drone_color,
             light_dir.0,
         );
+
+        // Start wandering immediately
+        let wander_target = wander_bounds
+            .as_ref()
+            .map(|b| wander_waypoint(i, 0, b))
+            .unwrap_or(position + Vec3::Y * 5.0);
+        entity_cmd.insert(WanderState {
+            target: wander_target,
+            dwell_timer: 2.0 + (i % 3) as f32,
+            step: 0,
+        });
     }
 
     info!(
