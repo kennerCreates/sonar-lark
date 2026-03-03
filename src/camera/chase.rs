@@ -32,16 +32,16 @@ impl Default for ChaseState {
     }
 }
 
-const CHASE_HEIGHT: f32 = 5.0;
-const CHASE_BEHIND: f32 = 10.0;
-const LOOK_AHEAD: f32 = 5.0;
+const CHASE_HEIGHT: f32 = 6.5;
+const CHASE_BEHIND: f32 = 14.0;
+const LOOK_AHEAD: f32 = 8.0;
 const PROXIMITY_RADIUS: f32 = 15.0;
 const LEADER_WEIGHT: f32 = 0.7;
 
 // Spring half-lives (seconds to reach halfway to target)
-const CENTER_HALF_LIFE: f32 = 0.15;
-const VELOCITY_HALF_LIFE: f32 = 0.20;
-const LOOK_TARGET_HALF_LIFE: f32 = 0.08;
+const CENTER_HALF_LIFE: f32 = 0.30;
+const VELOCITY_HALF_LIFE: f32 = 0.40;
+const LOOK_TARGET_HALF_LIFE: f32 = 0.18;
 
 // Dynamic FOV
 const CHASE_BASE_FOV_DEG: f32 = 60.0;
