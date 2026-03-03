@@ -13,6 +13,7 @@ pub mod spawning;
 pub mod wander;
 
 use bevy::prelude::*;
+use bevy::transform::TransformSystems;
 
 use crate::course::data::CourseData;
 use crate::race::lifecycle::drones_are_active;
@@ -119,11 +120,15 @@ impl Plugin for DronePlugin {
                 interpolation::save_physics_transforms
                     .run_if(in_race_or_results),
             )
-            // Interpolate drone transforms for smooth rendering between physics ticks
+            // Interpolate drone transforms for smooth rendering between physics ticks.
+            // Must run before TransformPropagate so that child mesh GlobalTransforms
+            // are computed from the interpolated parent Transform, not the raw
+            // FixedUpdate position.
             .add_systems(
                 PostUpdate,
                 interpolation::interpolate_visual_transforms
-                    .run_if(in_race_or_results),
+                    .run_if(in_race_or_results)
+                    .before(TransformSystems::Propagate),
             )
             // Flight debug visualization (F3 to toggle)
             .add_systems(
