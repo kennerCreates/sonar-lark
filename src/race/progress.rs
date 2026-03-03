@@ -7,6 +7,7 @@ use crate::drone::components::{AIController, Drone, DronePhase};
 pub enum DnfReason {
     MissedGate(u32),
     ObstacleCollision,
+    DroneCollision,
 }
 
 #[derive(Clone, Debug)]

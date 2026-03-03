@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod choreography;
 pub mod components;
 pub mod debug_draw;
 pub mod dev_dashboard;
@@ -65,8 +66,22 @@ impl Plugin for DronePlugin {
                     .run_if(resource_exists::<spawning::DroneAssets>)
                     .run_if(resource_exists::<CourseData>),
             )
+            // Choreography chain in FixedUpdate (Racing drones only).
+            // Runs before the physics chain so both chains see fresh transforms.
+            .add_systems(
+                FixedUpdate,
+                (
+                    choreography::advance_choreography,
+                    choreography::compute_choreographed_rotation,
+                    choreography::apply_visual_noise,
+                    choreography::fire_scripted_events,
+                )
+                    .chain()
+                    .run_if(in_race_or_results),
+            )
             // Physics chain in FixedUpdate.
             // AI systems only run when racing; physics always runs so drones hover at start.
+            // Per-entity phase guards in each system skip DronePhase::Racing (handled by choreography).
             .add_systems(
                 FixedUpdate,
                 (
@@ -85,6 +100,18 @@ impl Plugin for DronePlugin {
                 )
                     .chain()
                     .run_if(in_race_or_results),
+            )
+            // Convergence: set drone targets to start positions during countdown
+            .add_systems(
+                Update,
+                choreography::set_convergence_targets
+                    .run_if(in_state(AppState::Race)),
+            )
+            // Snap drones to exact start positions when Racing begins
+            .add_systems(
+                Update,
+                choreography::snap_to_start_positions
+                    .run_if(in_state(AppState::Race)),
             )
             // Save authoritative physics state after the physics chain
             .add_systems(

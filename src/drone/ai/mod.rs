@@ -85,45 +85,21 @@ pub fn safe_speed_for_curvature(curvature: f32, tuning: &AiTuningParams) -> f32 
 pub fn update_ai_targets(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
-    race_progress: Option<Res<RaceProgress>>,
+    _race_progress: Option<Res<RaceProgress>>,
     mut query: Query<(
         &Transform,
         &mut AIController,
-        &mut DronePhase,
+        &DronePhase,
         &DroneDynamics,
         &Drone,
     )>,
 ) {
     let dt = time.delta_secs();
 
-    for (transform, mut ai, mut phase, dynamics, drone) in &mut query {
+    for (transform, mut ai, phase, dynamics, _drone) in &mut query {
         match *phase {
-            DronePhase::Idle | DronePhase::Crashed | DronePhase::Wandering => continue,
-            DronePhase::Racing => {
-                let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
-                let finish_t = cycle_t + FINISH_EXTENSION;
-
-                if ai.spline_t >= finish_t + FINISH_EPSILON {
-                    // Only transition to VictoryLap if RaceProgress confirms the drone finished.
-                    // If not finished, stay Racing so miss_detection (in Update) can crash it.
-                    let confirmed = race_progress.as_ref().is_none_or(|p| {
-                        p.drone_states
-                            .get(drone.index as usize)
-                            .is_some_and(|s| s.finished || s.crashed)
-                    });
-
-                    if !confirmed {
-                        continue;
-                    }
-
-                    // Transition: Racing → VictoryLap, wrap spline_t for continued lapping
-                    *phase = DronePhase::VictoryLap;
-                    ai.spline_t -= cycle_t;
-                    continue;
-                }
-
-                advance_racing_spline(transform, &mut ai, dynamics, &tuning, dt);
-            }
+            // Racing drones are handled by the choreography chain.
+            DronePhase::Idle | DronePhase::Crashed | DronePhase::Wandering | DronePhase::Racing => continue,
             DronePhase::VictoryLap => {
                 let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
                 advance_cyclic_spline(transform, &mut ai, dynamics, &tuning, dt, cycle_t);

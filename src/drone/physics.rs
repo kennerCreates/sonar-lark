@@ -73,7 +73,7 @@ pub fn position_to_acceleration(
     }
 
     for (transform, desired, mut pid, dynamics, mut accel, phase) in &mut query {
-        if *phase == DronePhase::Crashed {
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
         let error = desired.position - transform.translation;
@@ -124,7 +124,7 @@ pub fn acceleration_to_attitude(
     )>,
 ) {
     for (transform, desired, accel, dynamics, mut attitude, tilt_clamp, phase) in &mut query {
-        if *phase == DronePhase::Crashed {
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
         let desired_accel = accel.acceleration;
@@ -184,7 +184,7 @@ pub fn attitude_controller(
     }
 
     for (mut transform, mut dynamics, attitude, pd, phase, body_rates) in &mut query {
-        if *phase == DronePhase::Crashed {
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
 
@@ -254,7 +254,7 @@ pub fn dirty_air_perturbation(
     let mut drone_data = [(0u8, Vec3::ZERO, Vec3::ZERO, 0.0f32); 12];
     let mut drone_count = 0;
     for (tr, drone, dyn_, phase) in query.iter() {
-        if *phase == DronePhase::Crashed { continue; }
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) { continue; }
         if drone_count < 12 {
             drone_data[drone_count] = (drone.index, tr.translation, dyn_.velocity, dyn_.velocity.length());
             drone_count += 1;
@@ -263,7 +263,7 @@ pub fn dirty_air_perturbation(
     let drone_data = &drone_data[..drone_count];
 
     for (transform, drone, mut dynamics, phase) in &mut query {
-        if *phase == DronePhase::Crashed {
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
         let my_pos = transform.translation;
@@ -326,7 +326,7 @@ pub fn motor_lag(
     }
 
     for (mut dynamics, attitude, phase, body_rates) in &mut query {
-        if *phase == DronePhase::Crashed {
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
         let commanded = body_rates.map(|br| br.thrust).unwrap_or(attitude.thrust_magnitude);
@@ -364,7 +364,7 @@ pub fn apply_forces(
     };
 
     for (transform, mut dynamics, desired, phase) in &mut query {
-        if *phase == DronePhase::Crashed {
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
         // Thrust always along body-up axis, reduced by battery sag
@@ -411,7 +411,7 @@ pub fn integrate_motion(
     }
 
     for (mut transform, dynamics, phase) in &mut query {
-        if *phase == DronePhase::Crashed {
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
         transform.translation += dynamics.velocity * dt;
@@ -421,7 +421,7 @@ pub fn integrate_motion(
 /// Prevents drones from going below ground.
 pub fn clamp_transform(mut query: Query<(&mut Transform, &mut DroneDynamics, &DronePhase), With<Drone>>) {
     for (mut transform, mut dynamics, phase) in &mut query {
-        if *phase == DronePhase::Crashed {
+        if matches!(*phase, DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
         if transform.translation.y < GROUND_HEIGHT {

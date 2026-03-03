@@ -35,7 +35,8 @@ pub fn proximity_avoidance(
     let mut drone_data = [(0u8, Vec3::ZERO, Vec3::ZERO); 12];
     let mut drone_count = 0;
     for (tr, drone, dyn_, phase, _, _) in query.iter() {
-        if matches!(*phase, DronePhase::Idle | DronePhase::Crashed) { continue; }
+        // Racing drones are handled by the choreography chain.
+        if matches!(*phase, DronePhase::Idle | DronePhase::Crashed | DronePhase::Racing) { continue; }
         if drone_count < 12 {
             drone_data[drone_count] = (drone.index, tr.translation, dyn_.velocity);
             drone_count += 1;
@@ -44,7 +45,7 @@ pub fn proximity_avoidance(
     let drone_data = &drone_data[..drone_count];
 
     for (transform, drone, dynamics, phase, ai, mut desired) in &mut query {
-        if matches!(*phase, DronePhase::Idle | DronePhase::Crashed) {
+        if matches!(*phase, DronePhase::Idle | DronePhase::Crashed | DronePhase::Racing) {
             continue;
         }
 

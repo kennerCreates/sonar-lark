@@ -2,10 +2,13 @@ use bevy::prelude::*;
 
 use crate::camera::switching::{CameraMode, CameraState, CourseCameras};
 use crate::course::loader::SelectedCourse;
-use crate::drone::components::{AIController, Drone, DronePhase};
+use crate::drone::components::{AIController, Drone, DroneConfig, DronePhase, RaceSeed};
+use crate::pilot::roster::PilotRoster;
+use crate::pilot::SelectedPilots;
 use crate::states::AppState;
 
 use super::progress::{DroneRaceState, RaceProgress};
+use super::script::{self, DroneScriptInput, RaceEventLog, RaceScript};
 use super::timing::RaceClock;
 
 #[derive(Resource)]
@@ -107,6 +110,100 @@ pub fn tick_countdown(
             drone_count, total_gates
         );
     }
+}
+
+/// Generates the RaceScript resource once when RacePhase transitions to Racing.
+/// Runs as a one-shot system in the race logic chain, after tick_countdown.
+pub fn generate_race_script_system(
+    mut commands: Commands,
+    phase: Res<RacePhase>,
+    existing_script: Option<Res<RaceScript>>,
+    race_seed: Option<Res<RaceSeed>>,
+    tuning: Res<crate::drone::components::AiTuningParams>,
+    drones: Query<(&Drone, &AIController, &DroneConfig), With<Drone>>,
+    selected_pilots: Option<Res<SelectedPilots>>,
+    roster: Option<Res<PilotRoster>>,
+) {
+    if *phase != RacePhase::Racing || existing_script.is_some() {
+        return;
+    }
+
+    let Some(seed_res) = race_seed else { return };
+    if drones.is_empty() {
+        return;
+    }
+
+    // Collect drone data sorted by index
+    let mut drone_data: Vec<(&Drone, &AIController, &DroneConfig)> = drones.iter().collect();
+    drone_data.sort_by_key(|(d, _, _)| d.index);
+
+    let gate_count = drone_data[0].1.gate_count;
+    if gate_count == 0 {
+        return;
+    }
+    let gate_positions = &drone_data[0].1.gate_positions;
+
+    // Build script inputs
+    let inputs: Vec<DroneScriptInput> = drone_data
+        .iter()
+        .map(|(drone, ai, config)| {
+            // Look up pilot skill/personality from roster
+            let (skill, traits) = if let (Some(selected), Some(roster)) =
+                (&selected_pilots, &roster)
+            {
+                if let Some(sel) = selected.pilots.get(drone.index as usize)
+                    && let Some(pilot) = roster.get(sel.pilot_id)
+                {
+                    (pilot.skill.clone(), pilot.personality.clone())
+                } else {
+                    default_pilot_data()
+                }
+            } else {
+                default_pilot_data()
+            };
+
+            DroneScriptInput {
+                spline: &ai.spline,
+                config,
+                skill,
+                traits,
+            }
+        })
+        .collect();
+
+    let race_script = script::generate_race_script(
+        gate_count,
+        gate_positions,
+        &inputs,
+        seed_res.0,
+        &tuning,
+    );
+
+    info!(
+        "Generated race script: {} drones, {} overtakes, {} crashes",
+        race_script.drone_scripts.len(),
+        race_script.overtakes.len(),
+        race_script
+            .drone_scripts
+            .iter()
+            .filter(|ds| ds.crash.is_some())
+            .count(),
+    );
+
+    commands.insert_resource(race_script);
+    commands.insert_resource(RaceEventLog::default());
+}
+
+fn default_pilot_data() -> (crate::pilot::skill::SkillProfile, Vec<crate::pilot::personality::PersonalityTrait>) {
+    (
+        crate::pilot::skill::SkillProfile {
+            level: 0.5,
+            speed: 0.5,
+            cornering: 0.5,
+            consistency: 0.5,
+        },
+        Vec::new(),
+    )
 }
 
 /// Transitions from Racing → Finished when every drone has finished or crashed.

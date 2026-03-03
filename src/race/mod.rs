@@ -6,6 +6,7 @@ pub mod leaderboard;
 pub mod lifecycle;
 pub mod overlays;
 pub mod progress;
+pub mod script;
 pub mod start_button;
 pub mod timing;
 
@@ -36,15 +37,14 @@ impl Plugin for RacePlugin {
                     .run_if(in_state(AppState::Race))
                     .run_if(not(resource_exists::<collision::ObstacleCollisionCache>)),
             )
-            // Race logic chain: ordering matters for correctness
+            // Race logic chain: ordering matters for correctness.
+            // Gate/collision detection replaced by fire_scripted_events in the choreography chain.
             .add_systems(
                 Update,
                 (
                     lifecycle::tick_countdown,
+                    lifecycle::generate_race_script_system,
                     timing::tick_race_clock,
-                    gate::gate_trigger_check,
-                    collision::obstacle_collision_check,
-                    gate::miss_detection,
                     progress::sync_spline_progress,
                     lifecycle::check_race_finished,
                 )
@@ -91,6 +91,8 @@ fn cleanup_race(mut commands: Commands) {
     commands.remove_resource::<lifecycle::RaceEndSound>();
     commands.remove_resource::<gate::GatePlanes>();
     commands.remove_resource::<collision::ObstacleCollisionCache>();
+    commands.remove_resource::<script::RaceScript>();
+    commands.remove_resource::<script::RaceEventLog>();
 }
 
 fn cleanup_race_progress(mut commands: Commands) {
