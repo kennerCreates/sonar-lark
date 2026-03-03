@@ -220,7 +220,13 @@ pub fn spawn_drones(
     );
 }
 
-pub fn cleanup_drone_resources(mut commands: Commands) {
+pub fn cleanup_drone_resources(
+    mut commands: Commands,
+    drones: Query<Entity, With<Drone>>,
+) {
+    for entity in &drones {
+        commands.entity(entity).despawn();
+    }
     commands.remove_resource::<DroneAssets>();
     commands.remove_resource::<DroneGltfHandle>();
     commands.remove_resource::<NoGatesCourse>();
