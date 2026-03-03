@@ -93,9 +93,10 @@ pub fn advance_choreography(
     if dt == 0.0 {
         return;
     }
-    let Some(script) = script else { return };
 
     // --- Ballistic arc update (Phase 4): crashed drones falling under gravity ---
+    // Runs independently of RaceScript so drones mid-crash-arc continue falling
+    // even after the script is cleaned up (e.g., during Results transition).
     for (entity, drone, identity, mut phase, mut dynamics, mut transform, mut visibility, mut ballistic) in &mut ballistic_query {
         if *phase != DronePhase::Racing {
             continue;
@@ -127,7 +128,9 @@ pub fn advance_choreography(
         }
     }
 
-    // --- Racing spline advancement ---
+    // --- Racing spline advancement (requires RaceScript) ---
+    let Some(script) = script else { return };
+
     for (_entity, drone, _identity, phase, mut ai, mut dynamics, mut transform, _visibility, mut choreo) in &mut racing_query {
         if *phase != DronePhase::Racing {
             continue;
@@ -307,9 +310,12 @@ pub fn compute_choreographed_rotation(
 }
 
 /// Compute a look rotation toward a direction with an up hint.
+/// Bevy convention: local -Z is forward. The Z column of the rotation
+/// matrix is set to -forward so that local -Z aligns with `forward`.
 /// Returns None if direction is zero-length or parallel to up.
 fn look_toward(forward: Vec3, up: Vec3) -> Option<Quat> {
-    let f = forward.normalize_or_zero();
+    // Negate: we want local -Z = forward, so Z column = -forward.
+    let f = (-forward).normalize_or_zero();
     if f.length_squared() < 0.001 {
         return None;
     }
@@ -786,6 +792,7 @@ pub fn fire_scripted_events(
 
             // Transition Racing → Wandering
             *phase = DronePhase::Wandering;
+            commands.entity(entity).remove::<ChoreographyState>();
             reset_physics_for_wandering(
                 &mut commands,
                 entity,

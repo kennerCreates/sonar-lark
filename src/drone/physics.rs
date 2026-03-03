@@ -16,9 +16,12 @@ const INTEGRAL_DECAY_RATE: f32 = 1.5;
 const RATE_TRACKING_BANDWIDTH: f32 = 30.0;
 
 /// Noise-driven hover target. Layered sine waves produce organic 1–3 cm drift.
+/// Skipped during Countdown so that set_convergence_targets can drive drones
+/// to their spline start positions instead.
 pub fn hover_target(
     time: Res<Time>,
     tuning: Res<AiTuningParams>,
+    race_phase: Option<Res<crate::race::lifecycle::RacePhase>>,
     mut query: Query<(
         &Drone,
         &DroneStartPosition,
@@ -27,6 +30,11 @@ pub fn hover_target(
         &mut DesiredPosition,
     )>,
 ) {
+    // During countdown, set_convergence_targets drives drone positions.
+    if race_phase.is_some_and(|p| *p == crate::race::lifecycle::RacePhase::Countdown) {
+        return;
+    }
+
     let t = time.elapsed_secs();
 
     for (drone, start, config, phase, mut desired) in &mut query {

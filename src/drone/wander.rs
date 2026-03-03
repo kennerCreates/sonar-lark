@@ -90,7 +90,9 @@ pub fn update_wander_targets(
     }
 }
 
-/// Transition VictoryLap drones to Wandering on Results entry.
+/// Transition VictoryLap and Racing drones to Wandering on Results entry.
+/// Racing drones can still exist here if a timing edge case prevented their
+/// finish/crash transition during the race.
 pub fn transition_to_wandering(
     mut commands: Commands,
     mut query: Query<(Entity, &Drone, &Transform, &mut DronePhase)>,
@@ -98,8 +100,13 @@ pub fn transition_to_wandering(
 ) {
     let bounds = bounds.as_deref();
     for (entity, drone, transform, mut phase) in &mut query {
-        if *phase == DronePhase::VictoryLap {
+        if matches!(*phase, DronePhase::VictoryLap | DronePhase::Racing) {
             *phase = DronePhase::Wandering;
+            // Clean up choreography components if still present
+            commands
+                .entity(entity)
+                .remove::<ChoreographyState>()
+                .remove::<BallisticState>();
             let target = bounds.map_or(
                 transform.translation + Vec3::Y * 5.0,
                 |b| wander_waypoint(drone.index, 0, b),

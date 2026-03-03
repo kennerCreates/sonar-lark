@@ -29,13 +29,17 @@ pub enum RacePhase {
 #[derive(Resource)]
 pub struct CountdownTimer {
     pub remaining: f32,
+    pub sound_played: bool,
 }
 
 impl Default for CountdownTimer {
     fn default() -> Self {
         // 5s convergence window + 3s visible 3-2-1 countdown.
         // Convergence check in set_convergence_targets can skip ahead to 3.0 early.
-        Self { remaining: 8.0 }
+        Self {
+            remaining: 8.0,
+            sound_played: false,
+        }
     }
 }
 
@@ -72,6 +76,7 @@ pub fn tick_countdown(
     mut commands: Commands,
     mut drones: Query<(&mut DronePhase, &AIController), With<Drone>>,
     drone_count: Query<(), With<Drone>>,
+    race_start_sound: Option<Res<RaceStartSound>>,
 ) {
     if *phase != RacePhase::Countdown {
         return;
@@ -79,6 +84,17 @@ pub fn tick_countdown(
     let Some(ref mut timer) = timer else { return };
 
     timer.remaining -= time.delta_secs();
+
+    // Play the countdown sound when the visible 3-2-1 begins
+    if timer.remaining <= 3.0 && !timer.sound_played {
+        timer.sound_played = true;
+        if let Some(ref sound) = race_start_sound {
+            commands.spawn((
+                AudioPlayer::new(sound.0.clone()),
+                PlaybackSettings::DESPAWN,
+            ));
+        }
+    }
 
     if timer.remaining <= 0.0 {
         *phase = RacePhase::Racing;

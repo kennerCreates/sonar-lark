@@ -5,7 +5,7 @@ use crate::palette;
 use crate::states::AppState;
 use crate::ui_theme;
 
-use super::lifecycle::{CountdownTimer, RacePhase, RaceStartSound, ResultsTransitionTimer};
+use super::lifecycle::{CountdownTimer, RacePhase, ResultsTransitionTimer};
 use super::progress::RaceProgress;
 use super::timing::RaceClock;
 
@@ -70,7 +70,6 @@ pub fn handle_start_race_button(
     query: Query<&Interaction, (Changed<Interaction>, With<StartRaceButton>)>,
     mut phase: ResMut<RacePhase>,
     drones: Query<Entity, With<Drone>>,
-    race_start_sound: Option<Res<RaceStartSound>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -81,12 +80,7 @@ pub fn handle_start_race_button(
             RacePhase::WaitingToStart => {
                 *phase = RacePhase::Countdown;
                 commands.insert_resource(CountdownTimer::default());
-                if let Some(ref sound) = race_start_sound {
-                    commands.spawn((
-                        AudioPlayer::new(sound.0.clone()),
-                        PlaybackSettings::DESPAWN,
-                    ));
-                }
+                // Sound is played by tick_countdown when the visible 3-2-1 starts
                 info!("Countdown started!");
             }
             RacePhase::Countdown | RacePhase::Racing => {}
