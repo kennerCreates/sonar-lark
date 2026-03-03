@@ -8,23 +8,6 @@ Complete. `Pilot` struct with gamertag, personality traits (8 variants with `Dro
 ### Phase 2 — SVG Portrait Generation ✅
 Complete. Pilot avatars using hand-drawn Inkscape SVG fragments assembled at runtime, rasterized via `resvg` 0.47, and displayed as Bevy `Image` textures in UI. `portrait/` submodule with 4 files: `mod.rs` (data model, 6 slot enums including `ShirtStyle`, `PortraitDescriptor` with `generate()`), `fragments.rs` (hand-drawn Inkscape SVG fragments with viewBox `"9.5 11.5 20.1 20.1"`, `assemble_svg()`, `shirt_fragment()`, color helpers with `SHIRT_COLOR` token, portrait-03 fragments use `translate(-28,0)` wrapper), `rasterize.rs` (resvg pipeline -> Bevy `Image`), `cache.rs` (`PortraitCache` resource, 48x48 at race start). Layer order: bg -> hair_back -> face -> shirt -> eyes -> mouth -> hair_front -> accessory. Accessory reduced to 4 variants (Necklace, SpikedCollar, Piercings, Earring) with serde aliases for backward compat. Fallback mappings for old enum variants (Long->Oval, Diamond->Angular, Goggles->Wide, Winking->Normal, Gritted->Frown, Helmet->Beanie, Bald->ShortCrop, Ponytail->LongSwept). Portraits displayed in leaderboard (16x16) and results (20x20) with fallback solid-color squares. Backward-compatible: Phase 1 rosters auto-backfill portraits via deterministic seeding.
 
-### Pre-Phase-3 Refactoring
-
-#### 1. ~~Fix delete-course state reset bug + extract `reset_editor_state()` helper~~ ✅
-
-#### 2. ~~Split `spawn_drones` into sub-functions~~ ✅
-
-#### 3. ~~Shared `GRAVITY` constant~~ ✅
-
-#### 4. ~~Move `POINTS_PER_GATE` and `FINISH_EXTENSION` to `common/`~~ ✅
-
-#### 5. ~~Extract drone name/color resolution helper~~ ✅
-
-#### 6. ~~Promote `fmt_time()` to shared utility~~ ✅
-
-#### 7. ~~Unify button visual handlers with `ThemedButton` marker~~ ✅
-
-#### 8. ~~Re-enable or remove disconnected firework sounds~~ ✅
 
 ### Phase 3 — Modular Drone Models
 - [ ] Model part library in Blender: frames (5-6), arms (4), canopies (3-4), optional extras (prop guards, antennas)
