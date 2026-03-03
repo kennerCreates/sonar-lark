@@ -2,19 +2,11 @@ use bevy::prelude::*;
 
 use super::super::components::*;
 use super::{
-    FINISH_EPSILON, VELOCITY_LOOK_AHEAD_T,
+    VELOCITY_LOOK_AHEAD_T,
     cyclic_curvature, cyclic_pos, cyclic_vel, max_curvature_ahead,
     safe_speed_for_curvature_with,
 };
-use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
-
-/// How far ahead (in spline parameter units) gate correction begins.
-/// 2.0 = starts from the previous gate's midleg waypoint.
-const GATE_CORRECTION_RANGE: f32 = 2.0;
-
-/// Maximum blend factor toward the gate position (0.0–1.0).
-/// 0.7 = at the gate midpoint, 70% gate target / 30% spline look-ahead.
-const GATE_CORRECTION_STRENGTH: f32 = 0.7;
+use crate::common::POINTS_PER_GATE;
 
 pub fn compute_racing_line(
     time: Res<Time>,
@@ -29,7 +21,7 @@ pub fn compute_racing_line(
 ) {
     let elapsed = time.elapsed_secs();
 
-    for (transform, ai, config, phase, mut desired) in &mut query {
+    for (_transform, ai, config, phase, mut desired) in &mut query {
         match *phase {
             // Racing drones are handled by the choreography chain.
             DronePhase::Idle | DronePhase::Crashed | DronePhase::Wandering | DronePhase::Racing => continue,

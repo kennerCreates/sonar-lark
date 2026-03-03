@@ -14,6 +14,7 @@ use super::progress::{DnfReason, RaceProgress};
 // Collision cache
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 pub struct GateOpening {
     pub center: Vec3,
     pub right: Vec3,
@@ -22,6 +23,7 @@ pub struct GateOpening {
     pub half_height: f32,
 }
 
+#[allow(dead_code)]
 pub struct ObstacleObb {
     pub center: Vec3,
     pub axes: [Vec3; 3],
@@ -30,6 +32,7 @@ pub struct ObstacleObb {
 }
 
 #[derive(Resource)]
+#[allow(dead_code)]
 pub struct ObstacleCollisionCache(pub Vec<ObstacleObb>);
 
 /// Builds the `ObstacleCollisionCache` resource from spawned obstacle entities.
@@ -166,10 +169,12 @@ pub fn crash_drone(
 // Collision detection system
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 const DRONE_COLLISION_RADIUS: f32 = 0.35;
 
 /// Tests each racing/victory-lap drone's swept segment against obstacle OBBs.
 /// Gate openings are exempted — a hit inside the opening is a safe pass.
+#[allow(dead_code)]
 pub fn obstacle_collision_check(
     mut commands: Commands,
     mut progress: Option<ResMut<RaceProgress>>,

@@ -5,6 +5,7 @@ use super::collision::{GateOpening, ObstacleObb};
 /// Swept segment vs OBB intersection using slab method.
 /// `expansion` (drone radius) is added to half_extents at test time.
 /// Returns the first hit point on the (expanded) OBB surface, or `None`.
+#[allow(dead_code)]
 pub fn segment_obb_intersection(
     p0: Vec3,
     p1: Vec3,
@@ -55,6 +56,7 @@ pub fn segment_obb_intersection(
 /// Returns true if `point` is within the gate opening (infinite depth tube).
 /// Projects the offset onto the opening's right and up axes; ignores the
 /// depth axis entirely so any approach angle works.
+#[allow(dead_code)]
 pub fn point_in_gate_opening(point: Vec3, opening: &GateOpening) -> bool {
     let offset = point - opening.center;
     let x = offset.dot(opening.right).abs();

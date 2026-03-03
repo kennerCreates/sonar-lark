@@ -21,6 +21,7 @@ pub struct GateForward(pub Vec3);
 // --- Plane-crossing gate detection ---
 
 /// Cached plane data for a single gate, built once at race start.
+#[allow(dead_code)]
 pub struct GatePlane {
     pub gate_index: u32,
     /// Gate center in world space (trigger volume center).
@@ -41,11 +42,12 @@ pub struct GatePlane {
 #[derive(Resource)]
 pub struct GatePlanes(pub Vec<GatePlane>);
 
-/// 10% margin on plane bounds check — forgives edge-grazing passes.
+#[allow(dead_code)]
 const GATE_PASS_MARGIN: f32 = 1.1;
 
 /// Pure function: test if a line segment (prev_pos → curr_pos) crosses a gate plane
 /// in the correct direction (front-to-back) and within bounds.
+#[allow(dead_code)]
 pub fn plane_crossing_check(
     prev_pos: Vec3,
     curr_pos: Vec3,
@@ -127,6 +129,7 @@ pub fn build_gate_planes(
 /// Checks each racing drone against gate planes using line-segment crossing detection.
 /// Uses PreviousTranslation → current Transform to detect plane crossings, eliminating
 /// tunneling at any speed. Only counts front-to-back crossings (directional validation).
+#[allow(dead_code)]
 pub fn gate_trigger_check(
     mut progress: Option<ResMut<RaceProgress>>,
     clock: Option<Res<RaceClock>>,
@@ -183,6 +186,7 @@ pub fn gate_trigger_check(
 
 /// Detects when a drone has advanced past its expected gate without triggering it.
 /// On miss: crash with explosion effect (hidden + particles + sound).
+#[allow(dead_code)]
 pub fn miss_detection(
     mut commands: Commands,
     mut progress: Option<ResMut<RaceProgress>>,

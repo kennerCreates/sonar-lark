@@ -40,6 +40,7 @@ pub enum ScriptedCrashType {
 }
 
 /// A position swap between two drones at a known gate.
+#[allow(dead_code)]
 pub struct ScriptedOvertake {
     pub gate_index: u32,
     pub overtaker_idx: u8,
@@ -59,6 +60,7 @@ pub struct RaceScript {
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum RaceEventKind {
     GatePass { drone_idx: u8, gate_index: u32 },
     Overtake { overtaker_idx: u8, overtaken_idx: u8, gate_index: u32 },
@@ -67,6 +69,7 @@ pub enum RaceEventKind {
     Finish { drone_idx: u8, time: f32 },
 }
 
+#[allow(dead_code)]
 pub struct TimestampedEvent {
     pub race_time: f32,
     pub kind: RaceEventKind,
@@ -235,10 +238,9 @@ fn compute_gate_pass_t(
     let cycle_t = gate_count as f32 * POINTS_PER_GATE;
     let mut pass_t_values = Vec::with_capacity(gate_count as usize);
 
-    for gate_idx in 0..gate_count as usize {
+    for (gate_idx, &gate_pos) in gate_positions.iter().enumerate().take(gate_count as usize) {
         let seg_start = gate_idx as f32 * POINTS_PER_GATE;
         let seg_end = seg_start + POINTS_PER_GATE;
-        let gate_pos = gate_positions[gate_idx];
 
         let mut best_t = seg_start + POINTS_PER_GATE * 0.5;
         let mut best_dist_sq = f32::MAX;
@@ -416,6 +418,7 @@ fn simulate_race(
 // Detect overtakes from gate arrival times
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::needless_range_loop)]
 fn detect_overtakes(
     gate_arrival_times: &[Vec<f32>],
     gate_count: u32,
@@ -448,8 +451,7 @@ fn detect_overtakes(
             let prev_pos = prev_order.iter().position(|&d| d == drone_idx).unwrap();
             if pos < prev_pos {
                 // This drone gained positions — find who it overtook
-                for lost_pos in pos..prev_pos {
-                    let overtaken_drone = prev_order[lost_pos];
+                for &overtaken_drone in &prev_order[pos..prev_pos] {
                     if overtaken_drone != drone_idx {
                         overtakes.push(ScriptedOvertake {
                             gate_index: g as u32,
@@ -629,8 +631,7 @@ pub fn generate_race_script(
         };
 
         let mut paces = Vec::with_capacity(num_segments);
-        for seg_idx in 0..num_segments {
-            let tightness = tightness_all[d_idx][seg_idx];
+        for (seg_idx, &tightness) in tightness_all[d_idx].iter().enumerate().take(num_segments) {
             let consistency_noise = {
                 let noise_range = 0.10 * (1.0 - skill.consistency);
                 det_range(race_seed, d_idx as u32, seg_idx as u32, -noise_range, noise_range)
@@ -708,8 +709,8 @@ pub fn generate_race_script(
             // Nudge slower drone's last 2-3 segments up by up to 5%
             let segments_to_nudge = 3.min(num_segments);
             let nudge_per_seg = (MAX_TOP2_NUDGE / segments_to_nudge as f32).min(MAX_TOP2_NUDGE);
-            for seg in (num_segments - segments_to_nudge)..num_segments {
-                segment_paces[second_idx][seg] *= 1.0 + nudge_per_seg;
+            for p in &mut segment_paces[second_idx][(num_segments - segments_to_nudge)..num_segments] {
+                *p *= 1.0 + nudge_per_seg;
             }
         }
     }
@@ -731,8 +732,8 @@ pub fn generate_race_script(
             if gap_ahead > PACK_GAP_THRESHOLD && gap_behind > PACK_GAP_THRESHOLD {
                 // Isolated — nudge toward the pack ahead
                 let segments_to_nudge = 2.min(num_segments);
-                for seg in (num_segments - segments_to_nudge)..num_segments {
-                    segment_paces[d_idx][seg] *= 1.0 + MAX_MIDPACK_NUDGE;
+                for p in &mut segment_paces[d_idx][(num_segments - segments_to_nudge)..num_segments] {
+                    *p *= 1.0 + MAX_MIDPACK_NUDGE;
                 }
                 nudge_count += 1;
             }
@@ -745,6 +746,87 @@ pub fn generate_race_script(
     let _ = final_finish_times;
 
     let overtakes = detect_overtakes(&final_gate_arrivals, gate_count);
+
+    // -----------------------------------------------------------------------
+    // Step 8: Drone-on-drone crash assignment (after drama pass)
+    // -----------------------------------------------------------------------
+    let cycle_t = gate_count as f32 * POINTS_PER_GATE;
+
+    // Find pairs of drones that arrive at the same gate within 1s of each other
+    // and whose spline positions are within 3m at that gate.
+    let mut collision_candidates: Vec<(usize, usize, u32, f32)> = Vec::new();
+    for g in 0..gate_count as usize {
+        for d1 in 0..drone_count {
+            if crashes[d1].is_some() {
+                continue;
+            }
+            for d2 in (d1 + 1)..drone_count {
+                if crashes[d2].is_some() {
+                    continue;
+                }
+                let t1 = final_gate_arrivals[d1][g];
+                let t2 = final_gate_arrivals[d2][g];
+                if (t1 - t2).abs() > 1.0 || t1 == f32::MAX || t2 == f32::MAX {
+                    continue;
+                }
+                let pos1 = drones[d1]
+                    .spline
+                    .position(gate_pass_t_all[d1][g].rem_euclid(cycle_t));
+                let pos2 = drones[d2]
+                    .spline
+                    .position(gate_pass_t_all[d2][g].rem_euclid(cycle_t));
+                let dist = (pos1 - pos2).length();
+                if dist < 3.0 {
+                    collision_candidates.push((d1, d2, g as u32, dist));
+                }
+            }
+        }
+    }
+
+    // Sort by proximity (closest = most dramatic)
+    collision_candidates
+        .sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap_or(std::cmp::Ordering::Equal));
+
+    for &(d1, d2, gate, _) in &collision_candidates {
+        if crash_count >= MAX_DNFS {
+            break;
+        }
+        if drone_count - crash_count <= MIN_FINISHERS {
+            break;
+        }
+        if crashes[d1].is_some() || crashes[d2].is_some() {
+            continue;
+        }
+        // Weaker drone crashes; stronger survives
+        let (crasher, survivor) = if drones[d1].skill.level <= drones[d2].skill.level {
+            (d1, d2)
+        } else {
+            (d2, d1)
+        };
+        let progress = det_range(race_seed, crasher as u32, 3000 + gate, 0.1, 0.5);
+        crashes[crasher] = Some(CrashScript {
+            gate_index: gate,
+            progress_past_gate: progress,
+            crash_type: ScriptedCrashType::DroneCollision {
+                other_drone_idx: survivor as u8,
+            },
+        });
+        crash_count += 1;
+    }
+
+    // Re-check minimum finishers after drone-on-drone crashes
+    while drone_count - crash_count < MIN_FINISHERS && crash_count > 0 {
+        // Remove least-dramatic crash (last assigned drone collision)
+        if let Some(pos) = crashes.iter().rposition(|c| {
+            c.as_ref()
+                .is_some_and(|cs| matches!(cs.crash_type, ScriptedCrashType::DroneCollision { .. }))
+        }) {
+            crashes[pos] = None;
+            crash_count -= 1;
+        } else {
+            break;
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Assemble RaceScript

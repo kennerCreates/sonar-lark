@@ -35,7 +35,10 @@ pub fn manage_countdown_text(
             let display = timer
                 .map(|t| {
                     let secs = t.remaining.ceil() as u32;
-                    if secs > 0 {
+                    if secs > 3 {
+                        // Convergence phase — no visible countdown yet
+                        String::new()
+                    } else if secs > 0 {
                         format!("{}", secs)
                     } else {
                         "GO!".to_string()

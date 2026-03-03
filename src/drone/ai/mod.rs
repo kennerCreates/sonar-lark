@@ -10,16 +10,10 @@ use crate::race::progress::RaceProgress;
 
 use super::components::*;
 
-const WAYPOINT_REACH_DISTANCE: f32 = 5.0;
 pub(super) const VELOCITY_LOOK_AHEAD_T: f32 = 0.5;
 const MAX_ADVANCE_PER_TICK: f32 = 0.15;
 
-use crate::common::{FINISH_EXTENSION, POINTS_PER_GATE};
-
-/// Small epsilon added to finish_t guards so that spline_t can advance slightly
-/// past the finish, allowing miss_detection's strict `>` check to fire on drones
-/// that miss the finish gate.
-pub(super) const FINISH_EPSILON: f32 = 0.01;
+use crate::common::POINTS_PER_GATE;
 
 /// How many samples ahead to scan for upcoming curvature (for speed limiting).
 const SPEED_CURVATURE_SAMPLES: usize = 5;
@@ -106,57 +100,6 @@ pub fn update_ai_targets(
             }
         }
     }
-}
-
-/// Advance spline_t for a racing drone (with gate snap and finish-line logic).
-fn advance_racing_spline(
-    transform: &Transform,
-    ai: &mut AIController,
-    dynamics: &DroneDynamics,
-    tuning: &AiTuningParams,
-    dt: f32,
-) {
-    let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
-
-    // Local projection: advance spline_t along the cyclic spline tangent.
-    let curve_pos = cyclic_pos(&ai.spline, ai.spline_t, cycle_t);
-    let tangent = cyclic_vel(&ai.spline, ai.spline_t, cycle_t);
-    let tangent_len = tangent.length();
-    if tangent_len > 0.001 {
-        let tangent_dir = tangent / tangent_len;
-        let displacement = transform.translation - curve_pos;
-        let forward_proj = displacement.dot(tangent_dir);
-        let projection_advance = forward_proj / tangent_len;
-
-        let speed = dynamics.velocity.length();
-        let min_advance = speed * dt * tuning.min_advance_speed_fraction / tangent_len;
-
-        let advance = projection_advance
-            .max(min_advance)
-            .clamp(0.0, MAX_ADVANCE_PER_TICK * POINTS_PER_GATE);
-        ai.spline_t += advance;
-    }
-
-    // Fallback: snap forward if drone is close to the next gate center.
-    let next_gate_idx = ((ai.spline_t - 0.5) / POINTS_PER_GATE + 1.0).floor() as usize;
-    if next_gate_idx < ai.gate_positions.len() {
-        let next_center_t = next_gate_idx as f32 * POINTS_PER_GATE + 0.5;
-        let dist_to_next =
-            (transform.translation - ai.gate_positions[next_gate_idx]).length();
-        if dist_to_next < WAYPOINT_REACH_DISTANCE {
-            ai.spline_t = ai.spline_t.max(next_center_t);
-        }
-    } else if next_gate_idx == ai.gate_positions.len() {
-        // Wrap-around: snap past gate 0 when completing the lap
-        let finish_gate_t = cycle_t + 0.5;
-        let dist_to_finish = (transform.translation - ai.gate_positions[0]).length();
-        if dist_to_finish < WAYPOINT_REACH_DISTANCE {
-            ai.spline_t = ai.spline_t.max(finish_gate_t);
-        }
-    }
-
-    ai.target_gate_index = (ai.spline_t / POINTS_PER_GATE).floor() as u32;
-    ai.target_gate_index = ai.target_gate_index.min(ai.gate_count - 1);
 }
 
 /// Advance spline_t cyclically for a victory-lapping drone (no finish check, wraps around).

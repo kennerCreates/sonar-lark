@@ -187,6 +187,22 @@ pub struct DroneStartPosition {
     pub translation: Vec3,
 }
 
+/// Per-entity choreography tracking, inserted when DronePhase transitions to Racing.
+#[derive(Component)]
+pub struct ChoreographyState {
+    /// spline_t from the previous tick — needed by fire_scripted_events
+    /// for gate crossing detection (previous_t < threshold <= current_t).
+    pub previous_spline_t: f32,
+    /// Pilot consistency (0..1), cached at race start for jitter scaling.
+    pub consistency: f32,
+}
+
+/// Ballistic arc state for crashed drones (inserted on crash, removed on ground impact).
+#[derive(Component)]
+pub struct BallisticState {
+    pub velocity: Vec3,
+}
+
 /// Random seed generated fresh each race, mixed into deterministic hashes so that
 /// race outcomes vary between runs.
 #[derive(Resource)]

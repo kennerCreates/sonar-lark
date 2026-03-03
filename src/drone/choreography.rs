@@ -10,26 +10,14 @@ use crate::race::script::{
 };
 use crate::race::timing::RaceClock;
 
+use crate::pilot::roster::PilotRoster;
+use crate::pilot::SelectedPilots;
+use crate::race::lifecycle::CountdownTimer;
+
 use super::components::*;
 use super::wander::WanderBounds;
 
-// ---------------------------------------------------------------------------
-// Components
-// ---------------------------------------------------------------------------
-
-/// Per-entity choreography tracking, inserted when DronePhase transitions to Racing.
-#[derive(Component)]
-pub struct ChoreographyState {
-    /// spline_t from the previous tick — needed by fire_scripted_events
-    /// for gate crossing detection (previous_t < threshold <= current_t).
-    pub previous_spline_t: f32,
-}
-
-/// Ballistic arc state for crashed drones (inserted on crash, removed on ground impact).
-#[derive(Component)]
-pub struct BallisticState {
-    pub velocity: Vec3,
-}
+const SKILL_JITTER_SCALE: f32 = 3.0;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -479,12 +467,14 @@ fn slerp_keyframes(keyframes: &[(f32, Quat)], t: f32) -> Quat {
 // ---------------------------------------------------------------------------
 
 /// Adds attitude jitter, dirty air wobble, and position micro-drift to Racing drones.
+/// Jitter amplitude scales with (1 - consistency) so less-skilled pilots wobble more.
 pub fn apply_visual_noise(
     time: Res<Time>,
     script: Option<Res<RaceScript>>,
     mut query: Query<(
         &Drone,
         &DronePhase,
+        &ChoreographyState,
         &mut Transform,
     ), Without<BallisticState>>,
 ) {
@@ -494,17 +484,17 @@ pub fn apply_visual_noise(
     // Collect Racing drone positions for dirty air proximity check
     let racing_positions: Vec<(u8, Vec3)> = query
         .iter()
-        .filter(|(_, phase, _)| **phase == DronePhase::Racing)
-        .map(|(drone, _, transform)| (drone.index, transform.translation))
+        .filter(|(_, phase, _, _)| **phase == DronePhase::Racing)
+        .map(|(drone, _, _, transform)| (drone.index, transform.translation))
         .collect();
 
-    for (drone, phase, mut transform) in &mut query {
+    for (drone, phase, choreo, mut transform) in &mut query {
         if *phase != DronePhase::Racing {
             continue;
         }
 
         let phase_offset = drone.index as f32 * 2.39996;
-        let base_amp = BASE_JITTER_AMP;
+        let base_amp = BASE_JITTER_AMP * (1.0 + (1.0 - choreo.consistency) * SKILL_JITTER_SCALE);
 
         // Dirty air: increase jitter when near another drone
         let mut dirty_air_factor: f32 = 1.0;
@@ -535,23 +525,43 @@ pub fn apply_visual_noise(
 
 /// When countdown starts, sets each drone's DesiredPosition to its spline start position.
 /// The existing wander/physics chain naturally flies them there.
+/// Also checks convergence: if all drones are within 2m of start and remaining > 3.0,
+/// reduces the countdown to 3.0 to start the visible 3-2-1.
 pub fn set_convergence_targets(
     phase: Res<crate::race::lifecycle::RacePhase>,
-    mut query: Query<(&AIController, &mut DesiredPosition, &DronePhase), With<Drone>>,
+    mut timer: Option<ResMut<CountdownTimer>>,
+    mut query: Query<(&AIController, &Transform, &mut DesiredPosition, &DronePhase), With<Drone>>,
 ) {
     if *phase != crate::race::lifecycle::RacePhase::Countdown {
         return;
     }
 
-    for (ai, mut desired, drone_phase) in &mut query {
+    let mut all_converged = true;
+    let mut any_idle = false;
+
+    for (ai, transform, mut desired, drone_phase) in &mut query {
         if *drone_phase != DronePhase::Idle {
             continue;
         }
+        any_idle = true;
         let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
         let start_pos = ai.spline.position(0.0_f32.rem_euclid(cycle_t.max(0.01)));
         desired.position = start_pos;
         desired.velocity_hint = Vec3::ZERO;
-        desired.max_speed = 15.0; // Gentle convergence speed
+        desired.max_speed = 15.0;
+
+        if (transform.translation - start_pos).length() > 2.0 {
+            all_converged = false;
+        }
+    }
+
+    // Once all drones are within 2m of start, skip ahead to the 3-2-1 countdown
+    if any_idle
+        && all_converged
+        && let Some(ref mut timer) = timer
+        && timer.remaining > 3.0
+    {
+        timer.remaining = 3.0;
     }
 }
 
@@ -560,12 +570,14 @@ pub fn set_convergence_targets(
 // ---------------------------------------------------------------------------
 
 /// On the frame when Racing begins, snap drones to exact spline start positions
-/// and insert ChoreographyState.
+/// and insert ChoreographyState with pilot consistency cached for jitter scaling.
 pub fn snap_to_start_positions(
     mut commands: Commands,
     phase: Res<crate::race::lifecycle::RacePhase>,
+    selected_pilots: Option<Res<SelectedPilots>>,
+    roster: Option<Res<PilotRoster>>,
     mut query: Query<
-        (Entity, &AIController, &mut Transform, &DronePhase),
+        (Entity, &Drone, &AIController, &mut Transform, &DronePhase),
         (With<Drone>, Without<ChoreographyState>),
     >,
 ) {
@@ -573,15 +585,24 @@ pub fn snap_to_start_positions(
         return;
     }
 
-    for (entity, ai, mut transform, drone_phase) in &mut query {
+    for (entity, drone, ai, mut transform, drone_phase) in &mut query {
         if *drone_phase != DronePhase::Racing {
             continue;
         }
         let cycle_t = ai.gate_count as f32 * POINTS_PER_GATE;
         let start_pos = ai.spline.position(0.0_f32.rem_euclid(cycle_t.max(0.01)));
         transform.translation = start_pos;
+
+        let consistency = selected_pilots
+            .as_ref()
+            .and_then(|sel| sel.pilots.get(drone.index as usize))
+            .and_then(|sel| roster.as_ref().and_then(|r| r.get(sel.pilot_id)))
+            .map(|pilot| pilot.skill.consistency)
+            .unwrap_or(0.5);
+
         commands.entity(entity).insert(ChoreographyState {
             previous_spline_t: 0.0,
+            consistency,
         });
     }
 }
@@ -718,9 +739,10 @@ pub fn fire_scripted_events(
                     + lateral * (CRASH_DEFLECTION_SPEED * deflection_sign)
                     + Vec3::Y * 2.0; // slight upward kick for visible arc
 
-                commands.entity(entity).insert(BallisticState {
-                    velocity: crash_velocity,
-                });
+                commands
+                    .entity(entity)
+                    .insert(BallisticState { velocity: crash_velocity })
+                    .remove::<ChoreographyState>();
 
                 let dnf_reason = match crash.crash_type {
                     ScriptedCrashType::ObstacleCollision => DnfReason::ObstacleCollision,

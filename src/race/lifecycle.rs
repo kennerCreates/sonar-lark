@@ -33,7 +33,9 @@ pub struct CountdownTimer {
 
 impl Default for CountdownTimer {
     fn default() -> Self {
-        Self { remaining: 3.0 }
+        // 5s convergence window + 3s visible 3-2-1 countdown.
+        // Convergence check in set_convergence_targets can skip ahead to 3.0 early.
+        Self { remaining: 8.0 }
     }
 }
 

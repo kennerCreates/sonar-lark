@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use crate::drone::components::{AIController, Drone, DronePhase};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum DnfReason {
     MissedGate(u32),
     ObstacleCollision,
@@ -71,6 +72,7 @@ impl RaceProgress {
         state.dnf_reason = Some(reason);
     }
 
+    #[allow(dead_code)]
     pub fn is_active(&self, drone_index: usize) -> bool {
         self.drone_states
             .get(drone_index)
