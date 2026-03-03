@@ -584,7 +584,7 @@ pub fn snap_to_start_positions(
     roster: Option<Res<PilotRoster>>,
     mut query: Query<
         (Entity, &Drone, &AIController, &mut Transform, &DronePhase),
-        (With<Drone>, Without<ChoreographyState>),
+        (With<Drone>, Without<ChoreographyState>, Without<BallisticState>),
     >,
 ) {
     if *phase != crate::race::lifecycle::RacePhase::Racing {
