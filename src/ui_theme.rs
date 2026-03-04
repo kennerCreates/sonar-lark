@@ -187,6 +187,37 @@ pub fn spawn_menu_button(
         });
 }
 
+/// Spawn a disabled menu button (non-interactive, dimmed).
+pub fn spawn_disabled_menu_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    width: f32,
+) {
+    parent
+        .spawn((
+            Node {
+                width: Val::Px(width),
+                height: Val::Px(60.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(3.0)),
+                ..default()
+            },
+            BackgroundColor(BUTTON_DISABLED),
+            BorderColor::all(BORDER_DISABLED),
+        ))
+        .with_children(|btn: &mut ChildSpawnerCommands| {
+            btn.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 24.0,
+                    ..default()
+                },
+                TextColor(palette::CHAINMAIL),
+            ));
+        });
+}
+
 /// Spawn a horizontal divider line.
 pub fn spawn_divider(parent: &mut ChildSpawnerCommands) {
     parent.spawn((

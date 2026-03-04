@@ -95,6 +95,8 @@ pub fn setup_menu(mut commands: Commands) {
                 })
                 .with_children(|col| {
                     ui_theme::spawn_menu_button(col, "Start Game", StartGameButton, 260.0);
+                    ui_theme::spawn_disabled_menu_button(col, "Sandbox", 260.0);
+                    ui_theme::spawn_disabled_menu_button(col, "Settings", 260.0);
                     ui_theme::spawn_menu_button(col, "Dev Mode", DevModeButton, 260.0);
                 });
         });
