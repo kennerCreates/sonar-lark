@@ -8,12 +8,18 @@ Sonar Lark is a drone racing league organizer with a built-in map editor. Users 
 
 ```
 AppState::Menu ──► AppState::Editor ──► AppState::Race ──► AppState::Results
-                        │                                         │
-                        │                                         └──► AppState::Menu
-                        ▼
-                   EditorMode (SubStates)
-                   ├── ObstacleWorkshop
-                   └── CourseEditor
+      │                  │                                         │
+      │                  │                                         └──► AppState::Menu
+      │                  ▼
+      │             EditorMode (SubStates)
+      │             └── CourseEditor
+      │
+      └────────► AppState::DevMenu
+                      ▼
+                 DevMenuPage (SubStates)
+                 ├── PilotGenerator
+                 ├── PaletteEditor
+                 └── ObstacleWorkshop
 ```
 
 ## Module Structure
@@ -21,7 +27,7 @@ AppState::Menu ──► AppState::Editor ──► AppState::Race ──► App
 ```
 src/
 ├── main.rs              App builder, plugin registration
-├── states.rs            AppState, EditorMode
+├── states.rs            AppState, EditorMode, DevMenuPage
 ├── rendering/           Custom shaders and materials
 │   ├── mod.rs           RenderingPlugin, CelLightDir resource
 │   ├── cel_material.rs  CelMaterial (cel-shading with halftone + hue shifting)
@@ -44,7 +50,7 @@ src/
 │   ├── discovery.rs     CourseEntry, discover_courses(), discover_courses_in() + tests
 │   └── loader.rs        Load/save/spawn courses from RON
 ├── editor/              Map editor
-│   ├── workshop/        Define new obstacle types from glb scenes
+│   ├── workshop/        Define new obstacle types from glb scenes (registered by DevMenuPlugin)
 │   │   ├── mod.rs       WorkshopPlugin, WorkshopState, lifecycle, node list population
 │   │   ├── preview.rs   spawn_preview(), spawn_placeholder_preview()
 │   │   ├── gizmos.rs    draw_trigger_gizmo(), draw_collision_gizmo(), draw_ground_gizmo()
@@ -73,7 +79,10 @@ src/
 │           ├── save_delete.rs Navigation, save/delete flows, gate ordering
 │           └── systems.rs Interaction handlers, display updates, prop color
 ├── dev_menu/            Development tools (accessible via Dev button on main menu)
-│   ├── mod.rs           DevMenuPlugin, system registration
+│   ├── mod.rs           DevMenuPlugin, system registration (includes WorkshopPlugin)
+│   ├── pilot_generator/ Generate random pilots for roster
+│   │   ├── mod.rs       PilotGeneratorState, setup/cleanup, button handlers
+│   │   └── build.rs     UI hierarchy construction
 │   ├── portrait_config.rs PortraitColorSlot, PortraitPaletteConfig, RON persistence
 │   ├── color_picker_data.rs PALETTE_COLORS (64 named sRGB colors from palette)
 │   └── portrait_editor/ Portrait palette editor
