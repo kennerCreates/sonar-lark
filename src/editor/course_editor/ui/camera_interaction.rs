@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::editor::course_editor::{EditorSelection, PlacedCamera, PlacedObstacle};
+use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 
@@ -74,6 +75,7 @@ pub fn handle_camera_placement(
     obstacle_query: Query<&PlacedObstacle>,
     camera_child_query: Query<&ChildOf, With<PlacedCamera>>,
     camera_meshes: Option<Res<CameraEditorMeshes>>,
+    library: Res<ObstacleLibrary>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -100,13 +102,19 @@ pub fn handle_camera_placement(
             continue;
         }
 
+        let (offset, rotation) = library
+            .get(&placed.obstacle_id)
+            .and_then(|def| def.default_camera.as_ref())
+            .map(|cam| (cam.offset, cam.rotation))
+            .unwrap_or((DEFAULT_CAMERA_OFFSET, Quat::IDENTITY));
+
         let cam_entity = spawn_gate_camera(
             &mut commands,
             gate_entity,
             meshes,
             false,
-            DEFAULT_CAMERA_OFFSET,
-            Quat::IDENTITY,
+            offset,
+            rotation,
         );
         selection.entity = Some(cam_entity);
         selection.palette_id = None;

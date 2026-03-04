@@ -4,7 +4,7 @@ use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 
-use super::{PreviewObstacle, WorkshopState};
+use super::{CameraPreview, PreviewObstacle, WorkshopState};
 
 /// Spawn a preview from a named node in the glTF.
 ///
@@ -125,4 +125,51 @@ pub(super) fn spawn_placeholder_preview(
         ))
         .id();
     state.preview_entity = Some(entity);
+}
+
+/// Spawns, updates, or despawns the camera preview mesh based on workshop state.
+pub(super) fn update_camera_preview(
+    mut commands: Commands,
+    state: Res<WorkshopState>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    light_dir: Res<CelLightDir>,
+    preview_query: Query<&Transform, With<PreviewObstacle>>,
+    mut camera_preview: Query<
+        (Entity, &mut Transform),
+        (With<CameraPreview>, Without<PreviewObstacle>),
+    >,
+) {
+    let should_exist = state.has_camera && state.preview_entity.is_some();
+
+    if !should_exist {
+        for (entity, _) in &camera_preview {
+            commands.entity(entity).despawn();
+        }
+        return;
+    }
+
+    let preview_pos = state
+        .preview_entity
+        .and_then(|e| preview_query.get(e).ok())
+        .map(|t| t.translation)
+        .unwrap_or(Vec3::ZERO);
+
+    let target = Transform::from_translation(preview_pos + state.camera_offset)
+        .with_rotation(state.camera_rotation);
+
+    if let Some((_, mut transform)) = camera_preview.iter_mut().next() {
+        *transform = target;
+    } else {
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.3, 0.3, 0.5))),
+            MeshMaterial3d(cel_materials.add(cel_material_from_color(
+                palette::SKY,
+                light_dir.0,
+            ))),
+            target,
+            Visibility::default(),
+            CameraPreview,
+        ));
+    }
 }

@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::palette;
+
 use super::{PreviewObstacle, TriggerGizmoGroup, WorkshopState};
 
 pub(super) fn draw_trigger_gizmo(
@@ -73,6 +75,53 @@ pub(super) fn draw_collision_gizmo(
         scale: size,
     };
     gizmos.cube(transform, Color::srgb(1.0, 0.4, 0.1));
+}
+
+pub(super) fn draw_camera_gizmo(
+    mut gizmos: Gizmos<TriggerGizmoGroup>,
+    state: Res<WorkshopState>,
+    preview_query: Query<&Transform, With<PreviewObstacle>>,
+) {
+    if !state.has_camera || state.node_name.is_empty() {
+        return;
+    }
+
+    let preview_pos = state
+        .preview_entity
+        .and_then(|e| preview_query.get(e).ok())
+        .map(|t| t.translation)
+        .unwrap_or(Vec3::ZERO);
+
+    let pos = preview_pos + state.camera_offset;
+    let rotation = state.camera_rotation;
+    let forward = rotation * Vec3::NEG_Z;
+    let right = rotation * Vec3::X;
+    let up = rotation * Vec3::Y;
+    let color = palette::SKY;
+
+    let iso = Isometry3d::new(pos, Quat::IDENTITY);
+    gizmos.sphere(iso, 0.35, color);
+
+    // Frustum wireframe (16:9 aspect, matching course editor)
+    let dist = 2.0;
+    let half_h = 0.6;
+    let half_w = half_h * 1.778;
+
+    let center = pos + forward * dist;
+    let corners = [
+        center + right * half_w + up * half_h,
+        center - right * half_w + up * half_h,
+        center - right * half_w - up * half_h,
+        center + right * half_w - up * half_h,
+    ];
+
+    for i in 0..4 {
+        gizmos.line(corners[i], corners[(i + 1) % 4], color);
+        gizmos.line(pos, corners[i], color);
+    }
+
+    // Up indicator
+    gizmos.arrow(pos, pos + up * 0.8, color);
 }
 
 // --- Ground Center Gizmo ---

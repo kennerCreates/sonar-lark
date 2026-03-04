@@ -79,13 +79,18 @@ pub fn handle_palette_selection(
             if gate_order == Some(0)
                 && let Some(ref cam_meshes) = camera_meshes
             {
+                let (cam_offset, cam_rotation) = def
+                    .default_camera
+                    .as_ref()
+                    .map(|cam| (cam.offset, cam.rotation))
+                    .unwrap_or((DEFAULT_CAMERA_OFFSET, Quat::IDENTITY));
                 spawn_gate_camera(
                     &mut commands,
                     entity,
                     cam_meshes,
                     true,
-                    DEFAULT_CAMERA_OFFSET,
-                    Quat::IDENTITY,
+                    cam_offset,
+                    cam_rotation,
                 );
             }
 

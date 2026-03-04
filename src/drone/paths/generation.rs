@@ -219,6 +219,7 @@ mod tests {
             model_offset: Vec3::ZERO,
             model_rotation: Quat::IDENTITY,
             collision_volumes: vec![],
+            default_camera: None,
         });
         lib
     }

@@ -38,6 +38,15 @@ pub struct EditTargetRadioTrigger;
 pub struct EditTargetRadioCollision;
 
 #[derive(Component)]
+pub struct EditTargetRadioCamera;
+
+#[derive(Component)]
+pub struct HasCameraToggle;
+
+#[derive(Component)]
+pub struct HasCameraText;
+
+#[derive(Component)]
 pub struct SaveButton;
 
 #[derive(Component)]
@@ -261,6 +270,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
 
             spawn_toggle_row(panel, "Trigger Volume", HasTriggerToggle, HasTriggerText, true);
             spawn_toggle_row(panel, "Collision Volume", HasCollisionToggle, HasCollisionText, false);
+            spawn_toggle_row(panel, "Default Camera", HasCameraToggle, HasCameraText, false);
 
             // Collision shape navigation: [<] Shape 1/1 [>] [+] [-]
             spawn_collision_shape_row(panel);
@@ -397,6 +407,7 @@ fn spawn_edit_target_row(parent: &mut ChildSpawnerCommands) {
             spawn_radio_option(row, "Model", EditTargetRadioModel, true);
             spawn_radio_option(row, "Trigger", EditTargetRadioTrigger, false);
             spawn_radio_option(row, "Collision", EditTargetRadioCollision, false);
+            spawn_radio_option(row, "Camera", EditTargetRadioCamera, false);
         });
 }
 

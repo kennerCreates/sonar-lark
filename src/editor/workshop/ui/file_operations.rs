@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::obstacle::definition::{CollisionVolumeConfig, ObstacleDef, ObstacleId, TriggerVolumeConfig};
+use crate::obstacle::definition::{CameraPlacement, CollisionVolumeConfig, ObstacleDef, ObstacleId, TriggerVolumeConfig};
 use crate::obstacle::library::{save_obstacle_library, ObstacleLibrary};
 use crate::palette;
 use crate::states::DevMenuPage;
@@ -59,6 +59,15 @@ pub fn handle_save_button(
             vec![]
         };
 
+        let default_camera = if state.has_camera {
+            Some(CameraPlacement {
+                offset: state.model_offset + state.camera_offset,
+                rotation: state.camera_rotation,
+            })
+        } else {
+            None
+        };
+
         let def = ObstacleDef {
             id: ObstacleId(state.obstacle_name.clone()),
             glb_node_name: state.node_name.clone(),
@@ -67,6 +76,7 @@ pub fn handle_save_button(
             model_offset: state.model_offset,
             model_rotation: state.model_rotation,
             collision_volumes,
+            default_camera,
         };
 
         library.insert(def);

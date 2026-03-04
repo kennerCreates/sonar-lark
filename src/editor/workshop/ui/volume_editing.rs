@@ -7,6 +7,17 @@ use crate::ui_theme;
 use super::build::*;
 use crate::editor::workshop::{CollisionVolumeData, EditTarget, WorkshopState};
 
+pub fn handle_camera_toggle(
+    mut state: ResMut<WorkshopState>,
+    query: Query<&Interaction, (Changed<Interaction>, With<HasCameraToggle>)>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            state.has_camera = !state.has_camera;
+        }
+    }
+}
+
 pub fn handle_trigger_toggle(
     mut state: ResMut<WorkshopState>,
     query: Query<&Interaction, (Changed<Interaction>, With<HasTriggerToggle>)>,
@@ -46,6 +57,7 @@ pub fn handle_edit_target_toggle(
     model_query: Query<&Interaction, (Changed<Interaction>, With<EditTargetRadioModel>)>,
     trigger_query: Query<&Interaction, (Changed<Interaction>, With<EditTargetRadioTrigger>)>,
     collision_query: Query<&Interaction, (Changed<Interaction>, With<EditTargetRadioCollision>)>,
+    camera_query: Query<&Interaction, (Changed<Interaction>, With<EditTargetRadioCamera>)>,
 ) {
     for interaction in &model_query {
         if *interaction == Interaction::Pressed {
@@ -60,6 +72,11 @@ pub fn handle_edit_target_toggle(
     for interaction in &collision_query {
         if *interaction == Interaction::Pressed {
             state.edit_target = EditTarget::Collision;
+        }
+    }
+    for interaction in &camera_query {
+        if *interaction == Interaction::Pressed {
+            state.edit_target = EditTarget::Camera;
         }
     }
 }
@@ -120,16 +137,19 @@ pub fn handle_name_text_input(
 
 pub fn update_display_values(
     state: Res<WorkshopState>,
-    mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>)>,
-    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>, Without<HasCollisionText>, Without<CollisionShapeLabel>)>,
-    mut collision_text: Query<&mut Text, (With<HasCollisionText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<CollisionShapeLabel>)>,
-    mut shape_label: Query<&mut Text, (With<CollisionShapeLabel>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>)>,
+    mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<HasCameraText>)>,
+    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<HasCameraText>)>,
+    mut collision_text: Query<&mut Text, (With<HasCollisionText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<CollisionShapeLabel>, Without<HasCameraText>)>,
+    mut shape_label: Query<&mut Text, (With<CollisionShapeLabel>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<HasCameraText>)>,
+    mut camera_text: Query<&mut Text, (With<HasCameraText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>)>,
     mut bgs: ParamSet<(
         Query<&mut BackgroundColor, With<HasTriggerToggle>>,
         Query<&mut BackgroundColor, With<HasCollisionToggle>>,
         Query<&mut BackgroundColor, With<EditTargetRadioModel>>,
         Query<&mut BackgroundColor, With<EditTargetRadioTrigger>>,
         Query<&mut BackgroundColor, With<EditTargetRadioCollision>>,
+        Query<&mut BackgroundColor, With<HasCameraToggle>>,
+        Query<&mut BackgroundColor, With<EditTargetRadioCamera>>,
     )>,
 ) {
     if !state.is_changed() {
@@ -157,6 +177,9 @@ pub fn update_display_values(
     if let Ok(mut text) = collision_text.single_mut() {
         **text = if state.has_collision { "ON" } else { "OFF" }.to_string();
     }
+    if let Ok(mut text) = camera_text.single_mut() {
+        **text = if state.has_camera { "ON" } else { "OFF" }.to_string();
+    }
     if let Ok(mut text) = shape_label.single_mut() {
         let total = state.collision_volumes.len();
         if total == 0 {
@@ -172,6 +195,9 @@ pub fn update_display_values(
     if let Ok(mut bg) = bgs.p1().single_mut() {
         *bg = BackgroundColor(if state.has_collision { ui_theme::TOGGLE_ON } else { ui_theme::TOGGLE_OFF });
     }
+    if let Ok(mut bg) = bgs.p5().single_mut() {
+        *bg = BackgroundColor(if state.has_camera { ui_theme::TOGGLE_ON } else { ui_theme::TOGGLE_OFF });
+    }
 
     if let Ok(mut bg) = bgs.p2().single_mut() {
         *bg = BackgroundColor(if state.edit_target == EditTarget::Model { RADIO_ACTIVE } else { RADIO_INACTIVE });
@@ -181,6 +207,9 @@ pub fn update_display_values(
     }
     if let Ok(mut bg) = bgs.p4().single_mut() {
         *bg = BackgroundColor(if state.edit_target == EditTarget::Collision { RADIO_ACTIVE } else { RADIO_INACTIVE });
+    }
+    if let Ok(mut bg) = bgs.p6().single_mut() {
+        *bg = BackgroundColor(if state.edit_target == EditTarget::Camera { RADIO_ACTIVE } else { RADIO_INACTIVE });
     }
 }
 

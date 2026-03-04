@@ -51,6 +51,9 @@ pub struct WorkshopState {
     pub collision_volumes: Vec<CollisionVolumeData>,
     /// Index of the currently-edited volume in `collision_volumes`.
     pub active_collision_idx: usize,
+    pub has_camera: bool,
+    pub camera_offset: Vec3,
+    pub camera_rotation: Quat,
     pub preview_entity: Option<Entity>,
     pub available_nodes: Vec<String>,
     pub nodes_loaded: bool,
@@ -77,6 +80,9 @@ impl Default for WorkshopState {
             collision_rotation: Quat::IDENTITY,
             collision_volumes: Vec::new(),
             active_collision_idx: 0,
+            has_camera: false,
+            camera_offset: Vec3::new(0.0, 2.0, -5.0),
+            camera_rotation: Quat::IDENTITY,
             preview_entity: None,
             available_nodes: Vec::new(),
             nodes_loaded: false,
@@ -115,6 +121,7 @@ pub enum EditTarget {
     Model,
     Trigger,
     Collision,
+    Camera,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -127,6 +134,9 @@ pub enum TransformMode {
 
 #[derive(Component)]
 pub struct PreviewObstacle;
+
+#[derive(Component)]
+pub struct CameraPreview;
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
 struct TriggerGizmoGroup;
@@ -188,6 +198,7 @@ impl Plugin for WorkshopPlugin {
                 ui::handle_library_selection,
                 ui::handle_trigger_toggle,
                 ui::handle_collision_toggle,
+                ui::handle_camera_toggle,
                 ui::handle_add_collision_shape,
                 ui::handle_remove_collision_shape,
                 ui::handle_prev_collision_shape,
@@ -208,8 +219,10 @@ impl Plugin for WorkshopPlugin {
                 ui::update_display_values,
                 ui::handle_button_hover,
                 preview::spawn_placeholder_preview,
+                preview::update_camera_preview,
                 gizmos::draw_trigger_gizmo,
                 gizmos::draw_collision_gizmo,
+                gizmos::draw_camera_gizmo,
             )
                 .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
         )
@@ -265,6 +278,7 @@ fn setup_workshop(
 fn cleanup_workshop(
     mut commands: Commands,
     preview_query: Query<Entity, With<PreviewObstacle>>,
+    camera_preview_query: Query<Entity, With<CameraPreview>>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
     commands.remove_resource::<WorkshopState>();
@@ -272,6 +286,9 @@ fn cleanup_workshop(
     commands.remove_resource::<RotateWidgetState>();
     commands.remove_resource::<ResizeWidgetState>();
     for entity in &preview_query {
+        commands.entity(entity).despawn();
+    }
+    for entity in &camera_preview_query {
         commands.entity(entity).despawn();
     }
 

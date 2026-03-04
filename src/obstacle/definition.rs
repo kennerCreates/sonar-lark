@@ -32,6 +32,13 @@ pub struct CollisionVolumeConfig {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CameraPlacement {
+    pub offset: Vec3,
+    #[serde(default = "default_rotation")]
+    pub rotation: Quat,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ObstacleDef {
     pub id: ObstacleId,
     pub glb_node_name: String,
@@ -43,4 +50,6 @@ pub struct ObstacleDef {
     pub model_rotation: Quat,
     #[serde(default)]
     pub collision_volumes: Vec<CollisionVolumeConfig>,
+    #[serde(default)]
+    pub default_camera: Option<CameraPlacement>,
 }

@@ -72,6 +72,15 @@ pub fn handle_library_selection(
         state.active_collision_idx = 0;
         state.load_active_from_vec();
 
+        state.has_camera = def.default_camera.is_some();
+        if let Some(cam) = &def.default_camera {
+            state.camera_offset = cam.offset - def.model_offset;
+            state.camera_rotation = cam.rotation;
+        } else {
+            state.camera_offset = Vec3::new(0.0, 2.0, -5.0);
+            state.camera_rotation = Quat::IDENTITY;
+        }
+
         for entity in &preview_query {
             commands.entity(entity).despawn();
         }

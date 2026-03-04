@@ -76,6 +76,13 @@ fn move_arrow_origin(
                 None
             }
         }
+        EditTarget::Camera => {
+            if state.has_camera {
+                Some(transform.translation + state.camera_offset)
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -186,6 +193,14 @@ pub(super) fn handle_move_widget(
             }
             preview_transform.translation + state.collision_offset
         }
+        EditTarget::Camera => {
+            if !state.has_camera {
+                widget.active_drag = None;
+                widget.hovered = false;
+                return;
+            }
+            preview_transform.translation + state.camera_offset
+        }
     };
 
     let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
@@ -226,6 +241,9 @@ pub(super) fn handle_move_widget(
                     EditTarget::Collision => {
                         state.collision_offset = offset;
                     }
+                    EditTarget::Camera => {
+                        state.camera_offset = offset;
+                    }
                 }
             }
         } else {
@@ -262,6 +280,7 @@ pub(super) fn handle_move_widget(
                 EditTarget::Model => preview_transform.translation,
                 EditTarget::Trigger => state.trigger_offset,
                 EditTarget::Collision => state.collision_offset,
+                EditTarget::Camera => state.camera_offset,
             };
 
             let mode = if shift_held {
@@ -315,6 +334,10 @@ fn volume_rotate_params(
         EditTarget::Collision if state.has_collision => Some((
             transform.translation + state.collision_offset,
             state.collision_rotation,
+        )),
+        EditTarget::Camera if state.has_camera => Some((
+            transform.translation + state.camera_offset,
+            state.camera_rotation,
         )),
         _ => None,
     }
@@ -403,6 +426,7 @@ pub(super) fn handle_rotate_gizmo(
                 match state.edit_target {
                     EditTarget::Trigger => state.trigger_rotation = new_rotation,
                     EditTarget::Collision => state.collision_rotation = new_rotation,
+                    EditTarget::Camera => state.camera_rotation = new_rotation,
                     EditTarget::Model => {}
                 }
             }
