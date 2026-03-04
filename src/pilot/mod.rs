@@ -117,6 +117,7 @@ pub struct SelectedPilots {
 }
 
 /// Per-slot data for a pilot in the current race.
+#[derive(Clone)]
 pub struct SelectedPilot {
     pub pilot_id: PilotId,
     pub gamertag: String,
@@ -132,7 +133,20 @@ pub struct PilotConfigs {
 fn select_pilots_for_race(
     mut commands: Commands,
     roster: Option<Res<roster::PilotRoster>>,
+    replay: Option<Res<crate::drone::spawning::ReplayRequest>>,
 ) {
+    // On replay, restore the exact same pilot lineup instead of re-rolling.
+    if let Some(req) = &replay {
+        commands.insert_resource(SelectedPilots {
+            pilots: req.selected_pilots.clone(),
+        });
+        commands.insert_resource(PilotConfigs {
+            configs: req.pilot_configs.clone(),
+        });
+        info!("Restored {} pilots from replay", req.selected_pilots.len());
+        return;
+    }
+
     let Some(roster) = roster else {
         warn!("No PilotRoster resource — pilots will not be selected");
         return;

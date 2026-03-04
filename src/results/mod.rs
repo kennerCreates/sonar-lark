@@ -13,7 +13,8 @@ impl Plugin for ResultsPlugin {
             .add_systems(
                 Update,
                 (
-                    ui::handle_race_again_button,
+                    ui::handle_replay_button,
+                    ui::handle_new_race_button,
                     ui::handle_main_menu_button,
                 )
                     .run_if(in_state(AppState::Results)),

@@ -22,6 +22,17 @@ use super::wander::{WanderBounds, wander_waypoint};
 #[derive(Resource)]
 pub struct NoGatesCourse;
 
+/// When present, `spawn_drones` reuses the stored seed and configs instead of
+/// generating fresh ones — producing an identical replay of the previous race.
+/// Also carries pilot selections so the same pilots fly the same drones.
+#[derive(Resource)]
+pub struct ReplayRequest {
+    pub race_seed: u32,
+    pub drone_configs: Vec<DroneConfig>,
+    pub selected_pilots: Vec<crate::pilot::SelectedPilot>,
+    pub pilot_configs: Vec<DroneConfig>,
+}
+
 #[derive(Resource)]
 pub struct DroneGltfHandle(pub Handle<bevy::gltf::Gltf>);
 
@@ -99,6 +110,7 @@ pub fn spawn_drones(
     selected_pilots: Option<Res<SelectedPilots>>,
     pilot_configs: Option<Res<PilotConfigs>>,
     wander_bounds: Option<Res<WanderBounds>>,
+    replay: Option<Res<ReplayRequest>>,
 ) {
     if !existing_drones.is_empty() || no_gates.is_some() {
         return;
@@ -111,14 +123,21 @@ pub fn spawn_drones(
     };
 
     let mut rng = rand::thread_rng();
-    let race_seed = rng.gen_range(0u32..=u32::MAX);
+
+    let (race_seed, replay_configs) = if let Some(ref req) = replay {
+        (req.race_seed, Some(&req.drone_configs))
+    } else {
+        (rng.gen_range(0u32..=u32::MAX), None)
+    };
     commands.insert_resource(RaceSeed(race_seed));
 
     let mut grid_slots: Vec<u8> = (0..DRONE_COUNT).collect();
     grid_slots.shuffle(&mut rng);
 
     for i in 0..DRONE_COUNT {
-        let config = build_drone_config(pilot_configs.as_deref(), &mut rng, i);
+        let config = replay_configs
+            .and_then(|cfgs| cfgs.get(i as usize).cloned())
+            .unwrap_or_else(|| build_drone_config(pilot_configs.as_deref(), &mut rng, i));
 
         // Generate per-drone unique spline path
         let drone_path = generate_drone_race_path(&course, &library, &config, i, race_seed)
@@ -225,6 +244,10 @@ pub fn spawn_drones(
             dwell_timer: 2.0 + (i % 3) as f32,
             step: 0,
         });
+    }
+
+    if replay.is_some() {
+        commands.remove_resource::<ReplayRequest>();
     }
 
     info!(

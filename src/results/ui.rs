@@ -1,16 +1,20 @@
 use bevy::prelude::*;
 
 use crate::common::drone_identity::{resolve_drone_color, resolve_drone_name};
-use crate::drone::components::{Drone, DroneIdentity};
+use crate::drone::components::{Drone, DroneConfig, DroneIdentity, RaceSeed};
+use crate::drone::spawning::ReplayRequest;
 use crate::palette;
-use crate::pilot::SelectedPilots;
+use crate::pilot::{PilotConfigs, SelectedPilots};
 use crate::pilot::portrait::cache::PortraitCache;
 use crate::race::progress::RaceResults;
 use crate::states::AppState;
 use crate::ui_theme;
 
 #[derive(Component)]
-pub(crate) struct RaceAgainButton;
+pub(crate) struct ReplayRaceButton;
+
+#[derive(Component)]
+pub(crate) struct NewRaceButton;
 
 #[derive(Component)]
 pub(crate) struct MainMenuButton;
@@ -222,15 +226,49 @@ pub fn setup_results_ui(
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "START NEXT RACE", RaceAgainButton, 260.0);
+                    ui_theme::spawn_menu_button(row, "REPLAY RACE", ReplayRaceButton, 220.0);
+                    ui_theme::spawn_menu_button(row, "NEW RACE", NewRaceButton, 180.0);
                     ui_theme::spawn_menu_button(row, "MAIN MENU", MainMenuButton, 200.0);
                 });
         });
 }
 
 
-pub fn handle_race_again_button(
-    query: Query<&Interaction, (Changed<Interaction>, With<RaceAgainButton>)>,
+pub fn handle_replay_button(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<ReplayRaceButton>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+    race_seed: Option<Res<RaceSeed>>,
+    drones: Query<(&Drone, &DroneConfig)>,
+    selected_pilots: Option<Res<SelectedPilots>>,
+    pilot_configs: Option<Res<PilotConfigs>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            if let Some(seed) = &race_seed {
+                let mut configs: Vec<(u8, DroneConfig)> =
+                    drones.iter().map(|(d, c)| (d.index, c.clone())).collect();
+                configs.sort_by_key(|(idx, _)| *idx);
+                commands.insert_resource(ReplayRequest {
+                    race_seed: seed.0,
+                    drone_configs: configs.into_iter().map(|(_, c)| c).collect(),
+                    selected_pilots: selected_pilots
+                        .as_ref()
+                        .map(|s| s.pilots.clone())
+                        .unwrap_or_default(),
+                    pilot_configs: pilot_configs
+                        .as_ref()
+                        .map(|p| p.configs.clone())
+                        .unwrap_or_default(),
+                });
+            }
+            next_state.set(AppState::Race);
+        }
+    }
+}
+
+pub fn handle_new_race_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<NewRaceButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     for interaction in &query {
