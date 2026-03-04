@@ -4,6 +4,7 @@ use crate::camera::orbit::MainCamera;
 use crate::editor::gizmos::{
     closest_point_on_axis, point_to_segment_distance, yaw_quat_from_transform, Axis,
 };
+use crate::palette;
 
 use crate::editor::course_editor::{
     EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, TransformMode,
@@ -70,7 +71,8 @@ pub(in crate::editor::course_editor) fn draw_scale_gizmo(
     } else {
         0.4
     };
-    let center_color = Color::srgb(center_brightness, center_brightness, center_brightness);
+    let Color::Srgba(center_base) = palette::VANILLA else { unreachable!() };
+    let center_color = Color::srgb(center_base.red * center_brightness, center_base.green * center_brightness, center_base.blue * center_brightness);
     let center_tf =
         Transform::from_translation(origin).with_scale(Vec3::splat(SCALE_CUBE_SIZE * 1.5));
     gizmos.cube(center_tf, center_color);

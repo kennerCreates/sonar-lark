@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::palette;
+
 // --- Axis ---
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -31,11 +33,13 @@ impl Axis {
         } else {
             0.5
         };
-        match self {
-            Axis::X => Color::srgb(brightness, 0.0, 0.0),
-            Axis::Y => Color::srgb(0.0, brightness, 0.0),
-            Axis::Z => Color::srgb(0.0, 0.0, brightness),
-        }
+        let base = match self {
+            Axis::X => palette::NEON_RED,
+            Axis::Y => palette::GREEN,
+            Axis::Z => palette::CAROLINA,
+        };
+        let Color::Srgba(c) = base else { unreachable!() };
+        Color::srgb(c.red * brightness, c.green * brightness, c.blue * brightness)
     }
 }
 

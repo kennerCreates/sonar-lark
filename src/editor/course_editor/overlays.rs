@@ -28,7 +28,7 @@ pub(super) fn draw_gate_sequence_lines(
 
     gates.sort_by_key(|(order, _)| *order);
 
-    let line_color = Color::srgb(1.0, 0.8, 0.0);
+    let line_color = palette::SUNSHINE;
 
     for pair in gates.windows(2) {
         let (_, from) = pair[0];
@@ -40,10 +40,12 @@ pub(super) fn draw_gate_sequence_lines(
     if gates.len() >= 2 {
         let (_, first) = gates[0];
         let (_, last) = gates[gates.len() - 1];
-        let loop_color = Color::srgb(0.4, 0.8, 1.0);
+        let loop_color = palette::SKY;
         gizmos.line(last, first, loop_color);
     }
 
+    let Color::Srgba(gate_start) = palette::GREEN else { unreachable!() };
+    let Color::Srgba(gate_end) = palette::SUNFLOWER else { unreachable!() };
     let count = gates.len();
     for (i, (_, pos)) in gates.iter().enumerate() {
         let t = if count > 1 {
@@ -51,7 +53,11 @@ pub(super) fn draw_gate_sequence_lines(
         } else {
             0.0
         };
-        let color = Color::srgb(t, 1.0 - t * 0.7, 0.0);
+        let color = Color::srgb(
+            gate_start.red + (gate_end.red - gate_start.red) * t,
+            gate_start.green + (gate_end.green - gate_start.green) * t,
+            gate_start.blue + (gate_end.blue - gate_start.blue) * t,
+        );
         let iso = Isometry3d::new(*pos, Quat::IDENTITY);
         gizmos.sphere(iso, 0.5, color);
     }
@@ -81,7 +87,7 @@ pub(super) fn draw_gate_forward_arrows(
             tv.forward
         };
         let world_fwd = transform.rotation * local_fwd;
-        gizmos.arrow(center, center + world_fwd * 3.0, Color::srgb(0.0, 1.0, 1.0));
+        gizmos.arrow(center, center + world_fwd * 3.0, palette::CERULEAN);
     }
 }
 
@@ -147,6 +153,8 @@ pub(super) fn draw_flight_spline_preview(
         let cycle_t = gate_count * POINTS_PER_GATE;
         let spline = &race_path.spline;
         let speed_range = (tuning.max_speed - tuning.min_curvature_speed).max(0.001);
+        let Color::Srgba(slow_c) = palette::NEON_RED else { unreachable!() };
+        let Color::Srgba(fast_c) = palette::GREEN else { unreachable!() };
 
         let mut t = 0.0f32;
         let mut prev_pos = spline.position(0.0);
@@ -157,7 +165,11 @@ pub(super) fn draw_flight_spline_preview(
             let k = cyclic_curvature(spline, t, cycle_t);
             let v_safe = safe_speed_for_curvature(k, &tuning);
             let ratio = ((v_safe - tuning.min_curvature_speed) / speed_range).clamp(0.0, 1.0);
-            let color = Color::srgb(1.0 - ratio * 0.8, 0.2 + ratio * 0.8, 0.2);
+            let color = Color::srgb(
+                slow_c.red + (fast_c.red - slow_c.red) * ratio,
+                slow_c.green + (fast_c.green - slow_c.green) * ratio,
+                slow_c.blue + (fast_c.blue - slow_c.blue) * ratio,
+            );
             cache.segments.push((prev_pos, pos, color));
             prev_pos = pos;
             t += SPLINE_PREVIEW_STEP;
@@ -168,7 +180,11 @@ pub(super) fn draw_flight_spline_preview(
         let k = cyclic_curvature(spline, 0.0, cycle_t);
         let v_safe = safe_speed_for_curvature(k, &tuning);
         let ratio = ((v_safe - tuning.min_curvature_speed) / speed_range).clamp(0.0, 1.0);
-        let color = Color::srgb(1.0 - ratio * 0.8, 0.2 + ratio * 0.8, 0.2);
+        let color = Color::srgb(
+            slow_c.red + (fast_c.red - slow_c.red) * ratio,
+            slow_c.green + (fast_c.green - slow_c.green) * ratio,
+            slow_c.blue + (fast_c.blue - slow_c.blue) * ratio,
+        );
         cache.segments.push((prev_pos, start_pos, color));
     }
 

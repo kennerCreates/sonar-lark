@@ -20,9 +20,9 @@ pub(super) fn draw_trigger_gizmo(
         .unwrap_or(Vec3::ZERO);
 
     let color = if state.is_gate {
-        Color::srgb(0.2, 1.0, 0.2)
+        palette::GREEN
     } else {
-        Color::srgb(1.0, 0.8, 0.2)
+        palette::SUNSHINE
     };
 
     let center = preview_pos + state.trigger_offset;
@@ -63,7 +63,7 @@ pub(super) fn draw_collision_gizmo(
             rotation: vol.rotation,
             scale: size,
         };
-        gizmos.cube(transform, Color::srgb(0.5, 0.25, 0.05));
+        gizmos.cube(transform, palette::CLAY);
     }
 
     // Draw the active shape in bright orange (uses working-copy fields)
@@ -74,7 +74,7 @@ pub(super) fn draw_collision_gizmo(
         rotation: state.collision_rotation,
         scale: size,
     };
-    gizmos.cube(transform, Color::srgb(1.0, 0.4, 0.1));
+    gizmos.cube(transform, palette::TANGERINE);
 }
 
 pub(super) fn draw_camera_gizmo(
@@ -134,20 +134,18 @@ pub(super) fn draw_ground_gizmo(mut gizmos: Gizmos, state: Res<WorkshopState>) {
     // Fixed at the world origin — this is the obstacle's ground center
     // that will be used as the placement anchor in the course editor.
     let ground_pos = Vec3::ZERO;
-    let magenta = Color::srgb(1.0, 0.0, 1.0);
-
     let iso = Isometry3d::new(ground_pos, Quat::IDENTITY);
-    gizmos.circle(iso, 0.5, magenta);
+    gizmos.circle(iso, 0.5, palette::MAGENTA);
 
     let cross_size = 0.4;
     gizmos.line(
         ground_pos + Vec3::new(-cross_size, 0.0, 0.0),
         ground_pos + Vec3::new(cross_size, 0.0, 0.0),
-        magenta,
+        palette::MAGENTA,
     );
     gizmos.line(
         ground_pos + Vec3::new(0.0, 0.0, -cross_size),
         ground_pos + Vec3::new(0.0, 0.0, cross_size),
-        magenta,
+        palette::MAGENTA,
     );
 }

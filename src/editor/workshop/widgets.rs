@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use std::f32::consts::{PI, TAU};
 
 use crate::camera::orbit::MainCamera;
+use crate::palette;
 
 use crate::editor::gizmos::{
     closest_point_on_axis, point_to_segment_distance, ray_intersect_plane,
@@ -119,7 +120,8 @@ pub(super) fn draw_move_arrows(
     } else {
         0.5
     };
-    let sq_color = Color::srgb(sq_brightness, sq_brightness, 0.0);
+    let Color::Srgba(sq_base) = palette::LIMON else { unreachable!() };
+    let sq_color = Color::srgb(sq_base.red * sq_brightness, sq_base.green * sq_brightness, sq_base.blue * sq_brightness);
     let sq = ARROW_LENGTH * PLANE_INDICATOR_FRAC;
     gizmos.line(
         origin + Vec3::X * sq,
@@ -555,11 +557,7 @@ pub(super) fn draw_resize_handles(
             let color = if is_active || is_hovered {
                 base
             } else {
-                match axis {
-                    Axis::X => Color::srgb(0.7, 0.3, 0.3),
-                    Axis::Y => Color::srgb(0.3, 0.7, 0.3),
-                    Axis::Z => Color::srgb(0.3, 0.3, 0.7),
-                }
+                axis.color(false, false)
             };
 
             let transform =

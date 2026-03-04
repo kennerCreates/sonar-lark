@@ -5,6 +5,7 @@ use crate::editor::gizmos::{
     closest_point_on_axis, point_to_segment_distance, ray_intersect_plane,
     yaw_quat_from_transform, Axis,
 };
+use crate::palette;
 
 use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedFilter, TransformMode};
 use crate::editor::undo::{CourseEditorAction, UndoStack};
@@ -58,7 +59,8 @@ pub(in crate::editor::course_editor) fn draw_move_gizmo(
     } else {
         0.5
     };
-    let sq_color = Color::srgb(sq_brightness, sq_brightness, 0.0);
+    let Color::Srgba(sq_base) = palette::LIMON else { unreachable!() };
+    let sq_color = Color::srgb(sq_base.red * sq_brightness, sq_base.green * sq_brightness, sq_base.blue * sq_brightness);
     let sq = ARROW_LENGTH * PLANE_INDICATOR_FRAC;
     gizmos.line(origin + rot_x * sq, origin + rot_x * sq + rot_z * sq, sq_color);
     gizmos.line(origin + rot_z * sq, origin + rot_x * sq + rot_z * sq, sq_color);

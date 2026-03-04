@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use super::components::*;
 use super::paths::adaptive_approach_offset;
 use crate::common::POINTS_PER_GATE;
+use crate::palette;
 use crate::race::gate::GatePlanes;
 
 /// Toggle resource for flight debug visualization. Press F3 during race to toggle.
@@ -89,28 +90,28 @@ pub fn draw_gate_markers(
         let departure = *pos + *fwd * offset;
 
         // Gate center (physical position, not a control point): green sphere
-        gizmos.sphere(Isometry3d::from_translation(*pos), 0.6, Color::srgb(0.1, 1.0, 0.1));
+        gizmos.sphere(Isometry3d::from_translation(*pos), 0.6, palette::GREEN);
 
         // Approach control point: red sphere
         gizmos.sphere(
             Isometry3d::from_translation(approach),
             0.4,
-            Color::srgb(1.0, 0.2, 0.2),
+            palette::NEON_RED,
         );
 
         // Departure control point: blue sphere
         gizmos.sphere(
             Isometry3d::from_translation(departure),
             0.4,
-            Color::srgb(0.2, 0.4, 1.0),
+            palette::CAROLINA,
         );
 
         // Gate forward arrow (magenta)
-        gizmos.arrow(*pos, *pos + *fwd * 3.0, Color::srgb(1.0, 0.0, 1.0));
+        gizmos.arrow(*pos, *pos + *fwd * 3.0, palette::MAGENTA);
 
         // Lines from gate center to each control point
-        gizmos.line(*pos, approach, Color::srgb(0.5, 0.5, 0.5));
-        gizmos.line(*pos, departure, Color::srgb(0.5, 0.5, 0.5));
+        gizmos.line(*pos, approach, palette::CHAINMAIL);
+        gizmos.line(*pos, departure, palette::CHAINMAIL);
 
         // Gate index: stacked orange dots above gate center
         let label_pos = *pos + Vec3::Y * 1.5;
@@ -118,7 +119,7 @@ pub fn draw_gate_markers(
             gizmos.sphere(
                 Isometry3d::from_translation(label_pos + Vec3::Y * (dot as f32 * 0.3)),
                 0.1,
-                Color::srgb(1.0, 0.6, 0.0),
+                palette::SUNFLOWER,
             );
         }
     }
@@ -150,8 +151,9 @@ pub fn draw_drone_state(
         let hue = (drone.index as f32 / 12.0) * 360.0;
         let drone_color = Color::hsl(hue, 0.8, 0.6);
 
-        // Line from drone to its desired target position (white, thin)
-        gizmos.line(pos, desired.position, Color::srgba(1.0, 1.0, 1.0, 0.4));
+        // Line from drone to its desired target position
+        let Color::Srgba(vanilla) = palette::VANILLA else { unreachable!() };
+        gizmos.line(pos, desired.position, Color::srgba(vanilla.red, vanilla.green, vanilla.blue, 0.4));
 
         // Target position marker (small sphere in drone color)
         gizmos.sphere(
@@ -162,7 +164,7 @@ pub fn draw_drone_state(
 
         // Velocity vector (red arrow, scaled down)
         let vel_end = pos + dynamics.velocity * 0.3;
-        gizmos.arrow(pos, vel_end, Color::srgb(1.0, 0.3, 0.3));
+        gizmos.arrow(pos, vel_end, palette::SALMON);
 
         match phase {
             DronePhase::Racing | DronePhase::VictoryLap => {
@@ -172,13 +174,14 @@ pub fn draw_drone_state(
                     gizmos.sphere(
                         Isometry3d::from_translation(curve_pos),
                         0.2,
-                        Color::srgb(1.0, 0.5, 0.0),
+                        palette::SUNFLOWER,
                     );
-                    gizmos.line(pos, curve_pos, Color::srgba(1.0, 0.5, 0.0, 0.5));
+                    let Color::Srgba(sf) = palette::SUNFLOWER else { unreachable!() };
+                    gizmos.line(pos, curve_pos, Color::srgba(sf.red, sf.green, sf.blue, 0.5));
 
                     let tangent =
                         ai.spline.velocity(ai.spline_t).normalize_or(Vec3::ZERO) * 2.0;
-                    gizmos.arrow(curve_pos, curve_pos + tangent, Color::srgb(1.0, 1.0, 0.0));
+                    gizmos.arrow(curve_pos, curve_pos + tangent, palette::LIMON);
                 }
             }
             DronePhase::Idle | DronePhase::Crashed | DronePhase::Wandering => {}
@@ -200,8 +203,9 @@ pub fn draw_gate_planes(
         return;
     };
 
-    let plane_color = Color::srgba(0.0, 1.0, 1.0, 0.5);
-    let normal_color = Color::srgb(0.0, 1.0, 1.0);
+    let Color::Srgba(cer) = palette::CERULEAN else { unreachable!() };
+    let plane_color = Color::srgba(cer.red, cer.green, cer.blue, 0.5);
+    let normal_color = palette::CERULEAN;
 
     for plane in &gate_planes.0 {
         // Four corners of the gate opening
@@ -255,9 +259,9 @@ pub fn draw_progress_indicators(
         let center_t = i as f32 * POINTS_PER_GATE + 0.5;
         let passed = ai.spline_t >= center_t;
         let color = if passed {
-            Color::srgb(0.1, 1.0, 0.1) // green = passed
+            palette::GREEN
         } else {
-            Color::srgb(1.0, 0.1, 0.1) // red = not yet
+            palette::NEON_RED
         };
 
         let gate_pos = ai.gate_positions[i];
