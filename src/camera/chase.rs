@@ -47,7 +47,7 @@ const LOOK_TARGET_HALF_LIFE: f32 = 0.18;
 const CHASE_BASE_FOV_DEG: f32 = 60.0;
 const CHASE_FOV_INCREASE_DEG: f32 = 10.0;
 const CHASE_FOV_HALF_LIFE: f32 = 0.30;
-const MAX_DRONE_SPEED: f32 = 55.0;
+const MAX_DRONE_SPEED: f32 = 38.0;
 
 // Finish camera: wider establishing shot of the finish gate
 const FINISH_BEHIND: f32 = 25.0;

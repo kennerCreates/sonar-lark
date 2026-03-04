@@ -9,8 +9,8 @@
             gate_order: Some(0),
             gate_forward_flipped: false,
             camera: Some((
-                offset: (0.0, 2.0, -5.0),
-                rotation: (0.0, 0.0, 0.0, 1.0),
+                offset: (-18.505693, 7.3077974, 26.40494),
+                rotation: (0.0, -0.53729963, 0.0, 0.84339154),
                 is_primary: true,
                 label: None,
             )),
@@ -58,7 +58,12 @@
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(4),
             gate_forward_flipped: false,
-            camera: None,
+            camera: Some((
+                offset: (-33.15306, 9.489111, 4.163769),
+                rotation: (0.0, 0.6755902, 0.0, -0.7372775),
+                is_primary: false,
+                label: None,
+            )),
         ),
         (
             obstacle_id: ("gate_loop"),
@@ -68,8 +73,8 @@
             gate_order: Some(6),
             gate_forward_flipped: false,
             camera: Some((
-                offset: (0.0, 2.0, -5.0),
-                rotation: (0.0, 0.0, 0.0, 1.0),
+                offset: (-4.0520096, 7.7522693, -25.475021),
+                rotation: (-0.0112452945, 0.99377126, -0.060830783, -0.09269267),
                 is_primary: true,
                 label: None,
             )),

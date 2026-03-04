@@ -271,15 +271,15 @@ macro_rules! tuning_params {
 }
 
 tuning_params! {
-    safe_lateral_accel,         "Lateral Accel",    2.0,  5.0,   100.0, 50.0;
+    safe_lateral_accel,         "Lateral Accel",    2.0,  5.0,   100.0, 32.0;
     curvature_look_ahead_scale, "Curv Look Scale",  2.0,  5.0,   80.0,  30.0;
     min_look_ahead_fraction,    "Min Look Frac",    0.05, 0.1,   1.0,   0.33;
-    min_curvature_speed,        "Min Curv Speed",   1.0,  2.0,   40.0,  14.0;
+    min_curvature_speed,        "Min Curv Speed",   1.0,  2.0,   40.0,  10.0;
     min_advance_speed_fraction, "Min Advance",      0.05, 0.05,  1.0,   0.25;
     speed_curvature_range,      "Speed Curv Range", 0.25, 0.25,  5.0,   1.25;
     look_ahead_t,               "Look Ahead T",     0.05, 0.05,  1.0,   0.3;
-    max_speed,                  "Max Speed",        1.0,  10.0,  100.0, 55.0;
-    max_tilt_angle,             "Max Tilt Angle",   0.05, 0.5,   1.57,  1.45;
+    max_speed,                  "Max Speed",        1.0,  10.0,  100.0, 38.0;
+    max_tilt_angle,             "Max Tilt Angle",   0.05, 0.5,   1.57,  1.1;
     battery_sag_factor,         "Battery Sag",      0.05, 0.0,   0.4,   0.15;
     dirty_air_strength,         "Dirty Air Str",    1.0,  0.0,   20.0,  0.0;
     avoidance_radius,           "Avoid Radius",     1.0,  2.0,   15.0,  8.0;
