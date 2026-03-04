@@ -9,6 +9,7 @@ use crate::editor::gizmos::{
 };
 
 use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedFilter, TransformMode};
+use crate::editor::undo::{CourseEditorAction, UndoStack};
 
 use super::RotateWidgetState;
 
@@ -87,6 +88,7 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
     interaction_query: Query<&Interaction>,
     child_of_query: Query<&ChildOf>,
     parent_gt_query: Query<&GlobalTransform>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     if transform_state.mode != TransformMode::Rotate {
         widget.active = false;
@@ -143,6 +145,17 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
                 }
             }
         } else {
+            // Drag ended — push undo if transform changed
+            if let Some(entity) = selection.entity
+                && let Ok((current_transform, _)) = placed_query.get(entity)
+                && *current_transform != widget.entity_start_transform
+            {
+                undo_stack.push(CourseEditorAction::TransformChange {
+                    entity,
+                    before: widget.entity_start_transform,
+                    after: *current_transform,
+                });
+            }
             widget.active = false;
         }
     } else {
@@ -168,6 +181,7 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
             widget.active_axis = current_axis;
             widget.drag_start_angle = d.y.atan2(d.x);
             widget.start_yaw_quat = yaw_quat;
+            widget.entity_start_transform = *transform;
             // Store the world-space rotation at drag start
             let (_, world_rot, _) = global_transform.to_scale_rotation_translation();
             widget.entity_start_rotation = world_rot;

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::editor::course_editor::{EditorSelection, PlacedCamera, PlacedObstacle};
+use crate::editor::undo::{CourseEditorAction, UndoStack};
 use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
@@ -76,6 +77,7 @@ pub fn handle_camera_placement(
     camera_child_query: Query<&ChildOf, With<PlacedCamera>>,
     camera_meshes: Option<Res<CameraEditorMeshes>>,
     library: Res<ObstacleLibrary>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -116,6 +118,13 @@ pub fn handle_camera_placement(
             offset,
             rotation,
         );
+        undo_stack.push(CourseEditorAction::SpawnCamera {
+            camera_entity: cam_entity,
+            parent_gate: gate_entity,
+            offset,
+            rotation,
+            is_primary: false,
+        });
         selection.entity = Some(cam_entity);
         selection.palette_id = None;
     }
@@ -125,7 +134,9 @@ pub fn handle_remove_camera(
     mut commands: Commands,
     mut selection: ResMut<EditorSelection>,
     query: Query<&Interaction, (Changed<Interaction>, With<RemoveCameraButton>)>,
-    camera_query: Query<(), With<PlacedCamera>>,
+    camera_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
+    child_of_query: Query<&ChildOf, With<PlacedCamera>>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -134,10 +145,22 @@ pub fn handle_remove_camera(
         let Some(entity) = selection.entity else {
             continue;
         };
-        if camera_query.get(entity).is_err() {
+        let Ok((cam, cam_transform)) = camera_query.get(entity) else {
             warn!("Selected entity is not a camera");
             continue;
+        };
+
+        // Find parent gate for undo
+        if let Ok(child_of) = child_of_query.get(entity) {
+            undo_stack.push(CourseEditorAction::DeleteCamera {
+                old_entity: entity,
+                parent_gate: child_of.parent(),
+                offset: cam_transform.translation,
+                rotation: cam_transform.rotation,
+                is_primary: cam.is_primary,
+            });
         }
+
         commands.entity(entity).despawn();
         selection.entity = None;
     }

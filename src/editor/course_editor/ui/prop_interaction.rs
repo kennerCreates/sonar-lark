@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::course::data::PropKind;
 use crate::editor::course_editor::{EditorSelection, PlacedProp};
+use crate::editor::undo::{CourseEditorAction, UndoStack};
 use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 
@@ -15,6 +16,7 @@ pub fn handle_prop_palette_selection(
     mut meshes: ResMut<Assets<Mesh>>,
     mut cel_materials: ResMut<Assets<CelMaterial>>,
     light_dir: Res<CelLightDir>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -57,6 +59,13 @@ pub fn handle_prop_palette_selection(
             ))
             .id();
 
+        undo_stack.push(CourseEditorAction::SpawnProp {
+            entity,
+            kind: btn.0,
+            transform,
+            color_override: None,
+        });
+
         selection.entity = Some(entity);
         selection.palette_id = None;
     }
@@ -83,6 +92,7 @@ pub fn handle_prop_color_cycle(
     query: Query<&Interaction, (Changed<Interaction>, With<PropColorButton>)>,
     selection: Res<EditorSelection>,
     mut prop_query: Query<&mut PlacedProp>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -95,6 +105,7 @@ pub fn handle_prop_color_cycle(
             continue;
         };
 
+        let before = prop.color_override;
         // Find current index in the cycle
         let current_idx = COLOR_CYCLE
             .iter()
@@ -102,6 +113,12 @@ pub fn handle_prop_color_cycle(
             .unwrap_or(0);
         let next_idx = (current_idx + 1) % COLOR_CYCLE.len();
         prop.color_override = COLOR_CYCLE[next_idx].1;
+
+        undo_stack.push(CourseEditorAction::PropColorChange {
+            entity,
+            before,
+            after: prop.color_override,
+        });
     }
 }
 

@@ -15,15 +15,23 @@ pub(super) use scale_gizmo::{draw_scale_gizmo, handle_scale_gizmo};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum MoveDragMode {
     XzPlane,
-    YAxis,
+    SingleAxis(Axis),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum MoveHoverPart {
+    Arrow(Axis),
+    PlaneSquare,
 }
 
 #[derive(Resource, Default)]
 pub(super) struct MoveWidgetState {
     pub(super) active_drag: Option<MoveDragMode>,
-    pub(super) hovered: bool,
+    pub(super) hovered_part: Option<MoveHoverPart>,
     pub(crate) drag_anchor: Vec3,
     pub(crate) entity_start_pos: Vec3,
+    /// Full transform at drag start (for undo).
+    pub(crate) entity_start_transform: Transform,
 }
 
 #[derive(Resource, Default)]
@@ -34,6 +42,8 @@ pub(super) struct RotateWidgetState {
     pub(crate) drag_start_angle: f32,
     pub(crate) entity_start_rotation: Quat,
     pub(crate) start_yaw_quat: Quat,
+    /// Full transform at drag start (for undo).
+    pub(crate) entity_start_transform: Transform,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -49,6 +59,8 @@ pub(super) struct ScaleWidgetState {
     pub(super) hovered_center: bool,
     pub(crate) drag_start_t: f32,
     pub(crate) entity_start_scale: Vec3,
+    /// Full transform at drag start (for undo).
+    pub(crate) entity_start_transform: Transform,
 }
 
 // --- Constants ---

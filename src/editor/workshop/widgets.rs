@@ -9,8 +9,10 @@ use crate::editor::gizmos::{
     RING_HIT_THRESHOLD, RING_RADIUS, RING_SAMPLES, ROTATION_STEP_DEG,
 };
 
+use crate::editor::undo::{UndoStack, WorkshopAction, WorkshopSnapshot};
+
 use super::{
-    EditTarget, MoveDragMode, MoveWidgetState, PreviewObstacle, ResizeWidgetState,
+    EditTarget, MoveDragMode, MoveHoverPart, MoveWidgetState, PreviewObstacle, ResizeWidgetState,
     RotateWidgetState, TransformMode, WorkshopState, ARROW_LENGTH, HANDLE_HIT_THRESHOLD,
     HANDLE_SIZE,
 };
@@ -44,7 +46,7 @@ pub(super) fn handle_transform_mode_keys(
     if let Some(mode) = new_mode {
         state.transform_mode = mode;
         move_widget.active_drag = None;
-        move_widget.hovered = false;
+        move_widget.hovered_part = None;
         rotate_widget.active = false;
         rotate_widget.hovered = false;
         resize_widget.active_handle = None;
@@ -91,7 +93,6 @@ pub(super) fn draw_move_arrows(
     state: Res<WorkshopState>,
     widget: Res<MoveWidgetState>,
     preview_query: Query<&Transform, With<PreviewObstacle>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     if state.transform_mode != TransformMode::Move {
         return;
@@ -100,65 +101,56 @@ pub(super) fn draw_move_arrows(
         return;
     };
 
-    let shift_held =
-        keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
+    // Per-axis arrows (R/G/B)
+    for axis in [Axis::X, Axis::Y, Axis::Z] {
+        let is_active = matches!(widget.active_drag, Some(MoveDragMode::SingleAxis(a)) if a == axis);
+        let is_hovered = matches!(widget.hovered_part, Some(MoveHoverPart::Arrow(a)) if a == axis);
+        let color = axis.color(is_hovered, is_active);
+        gizmos.arrow(origin, origin + axis.direction() * ARROW_LENGTH, color);
+    }
 
-    // XZ-plane arrows + square indicator
-    let xz_active = matches!(widget.active_drag, Some(MoveDragMode::XzPlane));
-    let xz_brightness = if xz_active {
+    // Plane indicator square between X and Z
+    let sq_active = matches!(widget.active_drag, Some(MoveDragMode::XzPlane));
+    let sq_hovered = matches!(widget.hovered_part, Some(MoveHoverPart::PlaneSquare));
+    let sq_brightness = if sq_active {
         1.0
-    } else if !shift_held && widget.hovered {
+    } else if sq_hovered {
         0.8
     } else {
         0.5
     };
-    let xz_color = Color::srgb(xz_brightness, xz_brightness, 0.0);
-    gizmos.arrow(origin, origin + Vec3::X * ARROW_LENGTH, xz_color);
-    gizmos.arrow(origin, origin + Vec3::Z * ARROW_LENGTH, xz_color);
-    // Small square between X and Z to indicate plane movement
+    let sq_color = Color::srgb(sq_brightness, sq_brightness, 0.0);
     let sq = ARROW_LENGTH * PLANE_INDICATOR_FRAC;
     gizmos.line(
         origin + Vec3::X * sq,
         origin + Vec3::X * sq + Vec3::Z * sq,
-        xz_color,
+        sq_color,
     );
     gizmos.line(
         origin + Vec3::Z * sq,
         origin + Vec3::X * sq + Vec3::Z * sq,
-        xz_color,
+        sq_color,
     );
-
-    // Y-axis arrow (Shift mode)
-    let y_active = matches!(widget.active_drag, Some(MoveDragMode::YAxis));
-    let y_brightness = if y_active {
-        1.0
-    } else if shift_held && widget.hovered {
-        0.8
-    } else {
-        0.5
-    };
-    let y_color = Color::srgb(0.0, y_brightness, 0.0);
-    gizmos.arrow(origin, origin + Vec3::Y * ARROW_LENGTH, y_color);
 }
 
 pub(super) fn handle_move_widget(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     mut preview_query: Query<&mut Transform, With<PreviewObstacle>>,
     mut state: ResMut<WorkshopState>,
     mut widget: ResMut<MoveWidgetState>,
     interaction_query: Query<&Interaction>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     if state.transform_mode != TransformMode::Move {
         widget.active_drag = None;
-        widget.hovered = false;
+        widget.hovered_part = None;
         return;
     }
     let Some(preview_entity) = state.preview_entity else {
         widget.active_drag = None;
-        widget.hovered = false;
+        widget.hovered_part = None;
         return;
     };
     let Ok(window) = windows.single() else {
@@ -180,7 +172,7 @@ pub(super) fn handle_move_widget(
         EditTarget::Trigger => {
             if !state.has_trigger {
                 widget.active_drag = None;
-                widget.hovered = false;
+                widget.hovered_part = None;
                 return;
             }
             preview_transform.translation + state.trigger_offset
@@ -188,7 +180,7 @@ pub(super) fn handle_move_widget(
         EditTarget::Collision => {
             if !state.has_collision {
                 widget.active_drag = None;
-                widget.hovered = false;
+                widget.hovered_part = None;
                 return;
             }
             preview_transform.translation + state.collision_offset
@@ -196,7 +188,7 @@ pub(super) fn handle_move_widget(
         EditTarget::Camera => {
             if !state.has_camera {
                 widget.active_drag = None;
-                widget.hovered = false;
+                widget.hovered_part = None;
                 return;
             }
             preview_transform.translation + state.camera_offset
@@ -223,10 +215,11 @@ pub(super) fn handle_move_widget(
                         widget.start_offset + Vec3::new(delta.x, 0.0, delta.z)
                     })
                 }
-                MoveDragMode::YAxis => {
-                    let t = closest_point_on_axis(ray, widget.start_offset, Vec3::Y);
-                    let delta = t - widget.drag_anchor.y;
-                    Some(widget.start_offset + Vec3::Y * delta)
+                MoveDragMode::SingleAxis(axis) => {
+                    let axis_dir = axis.direction();
+                    let t = closest_point_on_axis(ray, widget.start_offset, axis_dir);
+                    let anchor_t = widget.drag_anchor.dot(axis_dir);
+                    Some(widget.start_offset + axis_dir * (t - anchor_t))
                 }
             };
             if let Some(offset) = new_offset {
@@ -247,33 +240,68 @@ pub(super) fn handle_move_widget(
                 }
             }
         } else {
+            // Drag ended — push undo
+            if let Some(before) = widget.snapshot_before.take() {
+                let after = WorkshopSnapshot::capture(&state);
+                undo_stack.push(WorkshopAction::StateChange { before, after });
+            }
             widget.active_drag = None;
         }
     } else {
-        // Hover detection: check screen distance to all three arrows
-        let arrow_ends = [
-            origin + Vec3::X * ARROW_LENGTH,
-            origin + Vec3::Y * ARROW_LENGTH,
-            origin + Vec3::Z * ARROW_LENGTH,
+        // Hover detection: find closest arrow or plane square
+        let arrows = [
+            (Axis::X, origin + Vec3::X * ARROW_LENGTH),
+            (Axis::Y, origin + Vec3::Y * ARROW_LENGTH),
+            (Axis::Z, origin + Vec3::Z * ARROW_LENGTH),
         ];
-        let mut near = false;
-        for end in arrow_ends {
+
+        let mut best_part: Option<MoveHoverPart> = None;
+        let mut best_dist = ARROW_HIT_THRESHOLD;
+
+        for (axis, end) in &arrows {
             let Ok(ss) = camera.world_to_viewport(camera_gt, origin) else {
                 continue;
             };
-            let Ok(se) = camera.world_to_viewport(camera_gt, end) else {
+            let Ok(se) = camera.world_to_viewport(camera_gt, *end) else {
                 continue;
             };
-            if point_to_segment_distance(cursor_pos, ss, se) < ARROW_HIT_THRESHOLD {
-                near = true;
-                break;
+            let dist = point_to_segment_distance(cursor_pos, ss, se);
+            if dist < best_dist {
+                best_dist = dist;
+                best_part = Some(MoveHoverPart::Arrow(*axis));
             }
         }
-        widget.hovered = near;
 
-        if !mouse_over_ui && mouse_buttons.just_pressed(MouseButton::Left) && near {
-            let shift_held = keyboard.pressed(KeyCode::ShiftLeft)
-                || keyboard.pressed(KeyCode::ShiftRight);
+        // Check plane indicator square (two edges between X and Z)
+        let sq = ARROW_LENGTH * PLANE_INDICATOR_FRAC;
+        let sq_edges = [
+            (origin + Vec3::X * sq, origin + Vec3::X * sq + Vec3::Z * sq),
+            (origin + Vec3::Z * sq, origin + Vec3::X * sq + Vec3::Z * sq),
+        ];
+        for (a, b) in &sq_edges {
+            let Ok(sa) = camera.world_to_viewport(camera_gt, *a) else {
+                continue;
+            };
+            let Ok(sb) = camera.world_to_viewport(camera_gt, *b) else {
+                continue;
+            };
+            let dist = point_to_segment_distance(cursor_pos, sa, sb);
+            if dist < best_dist {
+                best_dist = dist;
+                best_part = Some(MoveHoverPart::PlaneSquare);
+            }
+        }
+
+        widget.hovered_part = best_part;
+
+        if !mouse_over_ui
+            && mouse_buttons.just_pressed(MouseButton::Left)
+            && let Some(part) = widget.hovered_part
+        {
+            let mode = match part {
+                MoveHoverPart::PlaneSquare => MoveDragMode::XzPlane,
+                MoveHoverPart::Arrow(axis) => MoveDragMode::SingleAxis(axis),
+            };
 
             // Capture the current offset for this edit target
             let current_offset = match state.edit_target {
@@ -283,13 +311,8 @@ pub(super) fn handle_move_widget(
                 EditTarget::Camera => state.camera_offset,
             };
 
-            let mode = if shift_held {
-                MoveDragMode::YAxis
-            } else {
-                MoveDragMode::XzPlane
-            };
-
             widget.start_offset = current_offset;
+            widget.snapshot_before = Some(WorkshopSnapshot::capture(&state));
             match mode {
                 MoveDragMode::XzPlane => {
                     if let Some(hit) = ray_intersect_plane(ray, origin, Vec3::Y) {
@@ -297,9 +320,10 @@ pub(super) fn handle_move_widget(
                         widget.active_drag = Some(mode);
                     }
                 }
-                MoveDragMode::YAxis => {
-                    let t = closest_point_on_axis(ray, origin, Vec3::Y);
-                    widget.drag_anchor = Vec3::new(0.0, t, 0.0);
+                MoveDragMode::SingleAxis(axis) => {
+                    let axis_dir = axis.direction();
+                    let t = closest_point_on_axis(ray, origin, axis_dir);
+                    widget.drag_anchor = axis_dir * t;
                     widget.active_drag = Some(mode);
                 }
             }
@@ -386,6 +410,7 @@ pub(super) fn handle_rotate_gizmo(
     mut widget: ResMut<RotateWidgetState>,
     preview_query: Query<&Transform, With<PreviewObstacle>>,
     interaction_query: Query<&Interaction>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     if state.transform_mode != TransformMode::Rotate {
         widget.active = false;
@@ -431,6 +456,11 @@ pub(super) fn handle_rotate_gizmo(
                 }
             }
         } else {
+            // Drag ended — push undo
+            if let Some(before) = widget.snapshot_before.take() {
+                let after = WorkshopSnapshot::capture(&state);
+                undo_stack.push(WorkshopAction::StateChange { before, after });
+            }
             widget.active = false;
         }
     } else {
@@ -459,6 +489,7 @@ pub(super) fn handle_rotate_gizmo(
             widget.active_axis = current_axis;
             widget.drag_start_angle = d.y.atan2(d.x);
             widget.entity_start_rotation = current_rotation;
+            widget.snapshot_before = Some(WorkshopSnapshot::capture(&state));
         }
     }
 }
@@ -547,6 +578,7 @@ pub(super) fn handle_resize_widget(
     move_widget: Res<MoveWidgetState>,
     preview_query: Query<&Transform, With<PreviewObstacle>>,
     interaction_query: Query<&Interaction>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     if state.transform_mode != TransformMode::Resize {
         resize.hovered_handle = None;
@@ -599,6 +631,11 @@ pub(super) fn handle_resize_widget(
                 Axis::Z => target_he.z = new_extent,
             }
         } else {
+            // Drag ended — push undo
+            if let Some(before) = resize.snapshot_before.take() {
+                let after = WorkshopSnapshot::capture(&state);
+                undo_stack.push(WorkshopAction::StateChange { before, after });
+            }
             resize.active_handle = None;
         }
     } else {
@@ -642,6 +679,7 @@ pub(super) fn handle_resize_widget(
             && mouse_buttons.just_pressed(MouseButton::Left)
             && let Some((axis, sign)) = best
         {
+            resize.snapshot_before = Some(WorkshopSnapshot::capture(&state));
             resize.active_handle = Some((axis, sign));
         }
     }

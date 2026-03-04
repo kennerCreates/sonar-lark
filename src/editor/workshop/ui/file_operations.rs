@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::editor::undo::{UndoStack, WorkshopAction};
 use crate::obstacle::definition::{CameraPlacement, CollisionVolumeConfig, ObstacleDef, ObstacleId, TriggerVolumeConfig};
 use crate::obstacle::library::{save_obstacle_library, ObstacleLibrary};
 use crate::palette;
@@ -92,6 +93,7 @@ pub fn handle_new_button(
     mut state: ResMut<WorkshopState>,
     query: Query<&Interaction, (Changed<Interaction>, With<NewButton>)>,
     preview_query: Query<Entity, With<PreviewObstacle>>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -109,6 +111,7 @@ pub fn handle_new_button(
             nodes_loaded,
             ..default()
         };
+        undo_stack.clear();
     }
 }
 

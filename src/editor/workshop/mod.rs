@@ -10,12 +10,14 @@ use bevy::{
     prelude::*,
 };
 
+use crate::editor::undo::{UndoStack, WorkshopAction, WorkshopSnapshot};
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
 use crate::palette;
 use crate::states::DevMenuPage;
 
 use super::gizmos::{Axis, Sign};
+use super::undo::ctrl_held;
 
 #[derive(Clone)]
 pub struct CollisionVolumeData {
@@ -142,15 +144,22 @@ struct TriggerGizmoGroup;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum MoveDragMode {
     XzPlane,
-    YAxis,
+    SingleAxis(Axis),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum MoveHoverPart {
+    Arrow(Axis),
+    PlaneSquare,
 }
 
 #[derive(Resource, Default)]
 struct MoveWidgetState {
     active_drag: Option<MoveDragMode>,
-    hovered: bool,
+    hovered_part: Option<MoveHoverPart>,
     drag_anchor: Vec3,
     start_offset: Vec3,
+    snapshot_before: Option<WorkshopSnapshot>,
 }
 
 #[derive(Resource, Default)]
@@ -160,12 +169,14 @@ struct RotateWidgetState {
     active_axis: Axis,
     drag_start_angle: f32,
     entity_start_rotation: Quat,
+    snapshot_before: Option<WorkshopSnapshot>,
 }
 
 #[derive(Resource, Default)]
 struct ResizeWidgetState {
     active_handle: Option<(Axis, Sign)>,
     hovered_handle: Option<(Axis, Sign)>,
+    snapshot_before: Option<WorkshopSnapshot>,
 }
 
 const ARROW_LENGTH: f32 = 3.75;
@@ -240,7 +251,11 @@ impl Plugin for WorkshopPlugin {
         )
         .add_systems(
             Update,
-            detect_glb_reload.run_if(in_state(DevMenuPage::ObstacleWorkshop)),
+            (
+                detect_glb_reload,
+                handle_workshop_undo_input,
+            )
+                .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
         )
         .add_systems(OnExit(DevMenuPage::ObstacleWorkshop), (cleanup_workshop, preview::cleanup_camera_view));
     }
@@ -268,6 +283,7 @@ fn setup_workshop(
     commands.insert_resource(MoveWidgetState::default());
     commands.insert_resource(RotateWidgetState::default());
     commands.insert_resource(ResizeWidgetState::default());
+    commands.insert_resource(UndoStack::<WorkshopAction>::default());
 
     // Gizmos on layer 1 so only the main camera (layers 0+1) sees them,
     // not the camera view render-to-texture camera (layer 0 only).
@@ -290,6 +306,7 @@ fn cleanup_workshop(
     commands.remove_resource::<MoveWidgetState>();
     commands.remove_resource::<RotateWidgetState>();
     commands.remove_resource::<ResizeWidgetState>();
+    commands.remove_resource::<UndoStack<WorkshopAction>>();
     for entity in &preview_query {
         commands.entity(entity).despawn();
     }
@@ -348,6 +365,39 @@ fn populate_node_list(
     });
 
     info!("Found {} named nodes in obstacles.glb", nodes.len());
+}
+
+fn handle_workshop_undo_input(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut state: ResMut<WorkshopState>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
+) {
+    if state.editing_name {
+        return;
+    }
+    if !ctrl_held(&keyboard) {
+        return;
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyZ)
+        && let Some(WorkshopAction::StateChange { before, .. }) = undo_stack.pop_undo()
+    {
+        let after = WorkshopSnapshot::capture(&state);
+        before.restore_to(&mut state);
+        undo_stack.push_redo(WorkshopAction::StateChange {
+            before: before.clone(),
+            after,
+        });
+    } else if keyboard.just_pressed(KeyCode::KeyY)
+        && let Some(WorkshopAction::StateChange { after, .. }) = undo_stack.pop_redo()
+    {
+        let before = WorkshopSnapshot::capture(&state);
+        after.restore_to(&mut state);
+        undo_stack.push_undo_only(WorkshopAction::StateChange {
+            before,
+            after: after.clone(),
+        });
+    }
 }
 
 /// Detects when the obstacles glTF is hot-reloaded and resets workshop state

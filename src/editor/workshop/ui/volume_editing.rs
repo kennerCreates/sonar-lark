@@ -1,6 +1,7 @@
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 
+use crate::editor::undo::{UndoStack, WorkshopAction, WorkshopSnapshot};
 use crate::palette;
 use crate::ui_theme;
 
@@ -10,10 +11,14 @@ use crate::editor::workshop::{CollisionVolumeData, EditTarget, WorkshopState};
 pub fn handle_camera_toggle(
     mut state: ResMut<WorkshopState>,
     query: Query<&Interaction, (Changed<Interaction>, With<HasCameraToggle>)>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            let before = WorkshopSnapshot::capture(&state);
             state.has_camera = !state.has_camera;
+            let after = WorkshopSnapshot::capture(&state);
+            undo_stack.push(WorkshopAction::StateChange { before, after });
         }
     }
 }
@@ -21,10 +26,14 @@ pub fn handle_camera_toggle(
 pub fn handle_trigger_toggle(
     mut state: ResMut<WorkshopState>,
     query: Query<&Interaction, (Changed<Interaction>, With<HasTriggerToggle>)>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            let before = WorkshopSnapshot::capture(&state);
             state.has_trigger = !state.has_trigger;
+            let after = WorkshopSnapshot::capture(&state);
+            undo_stack.push(WorkshopAction::StateChange { before, after });
         }
     }
 }
@@ -32,9 +41,11 @@ pub fn handle_trigger_toggle(
 pub fn handle_collision_toggle(
     mut state: ResMut<WorkshopState>,
     query: Query<&Interaction, (Changed<Interaction>, With<HasCollisionToggle>)>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
+            let before = WorkshopSnapshot::capture(&state);
             state.has_collision = !state.has_collision;
             if state.has_collision && state.collision_volumes.is_empty() {
                 let vol = CollisionVolumeData::default();
@@ -48,6 +59,8 @@ pub fn handle_collision_toggle(
                 state.collision_volumes.clear();
                 state.active_collision_idx = 0;
             }
+            let after = WorkshopSnapshot::capture(&state);
+            undo_stack.push(WorkshopAction::StateChange { before, after });
         }
     }
 }
@@ -216,6 +229,7 @@ pub fn update_display_values(
 pub fn handle_add_collision_shape(
     mut state: ResMut<WorkshopState>,
     query: Query<&Interaction, (Changed<Interaction>, With<AddCollisionShapeButton>)>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -224,33 +238,39 @@ pub fn handle_add_collision_shape(
         if !state.has_collision {
             continue;
         }
-        // Save current working copy before adding
+        let before = WorkshopSnapshot::capture(&state);
         state.sync_active_to_vec();
         let new_vol = CollisionVolumeData::default();
         state.collision_volumes.push(new_vol);
         state.active_collision_idx = state.collision_volumes.len() - 1;
         state.load_active_from_vec();
         state.edit_target = EditTarget::Collision;
+        let after = WorkshopSnapshot::capture(&state);
+        undo_stack.push(WorkshopAction::StateChange { before, after });
     }
 }
 
 pub fn handle_remove_collision_shape(
     mut state: ResMut<WorkshopState>,
     query: Query<&Interaction, (Changed<Interaction>, With<RemoveCollisionShapeButton>)>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
         if state.collision_volumes.len() <= 1 {
-            continue; // Keep at least one shape while collision is enabled
+            continue;
         }
+        let before = WorkshopSnapshot::capture(&state);
         let idx = state.active_collision_idx;
         state.collision_volumes.remove(idx);
         if state.active_collision_idx >= state.collision_volumes.len() {
             state.active_collision_idx = state.collision_volumes.len() - 1;
         }
         state.load_active_from_vec();
+        let after = WorkshopSnapshot::capture(&state);
+        undo_stack.push(WorkshopAction::StateChange { before, after });
     }
 }
 

@@ -2,6 +2,7 @@ pub mod workshop;
 pub mod course_editor;
 pub(crate) mod gizmos;
 pub mod types;
+pub mod undo;
 
 pub use types::EditorTab;
 

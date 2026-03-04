@@ -3,6 +3,7 @@ pub mod ui;
 mod overlays;
 mod preview;
 mod transform_gizmos;
+mod undo_redo;
 
 use bevy::{
     asset::AssetEvent,
@@ -20,6 +21,7 @@ use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
 use crate::editor::types::EditorTab;
 use crate::states::{EditorMode, PendingEditorCourse};
 
+use crate::editor::undo::{CourseEditorAction, UndoStack};
 use transform_gizmos::{MoveWidgetState, RotateWidgetState, ScaleWidgetState};
 
 // --- Transform mode ---
@@ -146,6 +148,12 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_load_button,
                     ui::handle_new_course_button,
                     ui::handle_gate_order_toggle,
+                )
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
+                (
                     ui::handle_clear_gate_orders_button,
                     ui::handle_name_field_focus,
                     ui::handle_name_text_input,
@@ -202,6 +210,11 @@ impl Plugin for CourseEditorPlugin {
                     transform_gizmos::handle_scale_gizmo,
                 )
                     .before(handle_placement_and_selection)
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
+                undo_redo::handle_course_undo_input
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
             .add_systems(
@@ -271,6 +284,7 @@ fn setup_course_editor(
     commands.insert_resource(MoveWidgetState::default());
     commands.insert_resource(RotateWidgetState::default());
     commands.insert_resource(ScaleWidgetState::default());
+    commands.insert_resource(UndoStack::<CourseEditorAction>::default());
 
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = -1.0;
@@ -289,6 +303,7 @@ fn cleanup_course_editor(
     commands.remove_resource::<MoveWidgetState>();
     commands.remove_resource::<RotateWidgetState>();
     commands.remove_resource::<ScaleWidgetState>();
+    commands.remove_resource::<UndoStack<CourseEditorAction>>();
     commands.remove_resource::<PendingEditorCourse>();
     commands.remove_resource::<PendingGlbReload>();
     commands.remove_resource::<ui::PendingCourseDelete>();
@@ -324,7 +339,7 @@ fn handle_placement_and_selection(
 ) {
     // Don't process clicks when a gizmo is hovered or being dragged
     if move_widget.active_drag.is_some()
-        || move_widget.hovered
+        || move_widget.hovered_part.is_some()
         || rotate_widget.active
         || rotate_widget.hovered
         || scale_widget.active_drag.is_some()
@@ -394,6 +409,12 @@ fn handle_delete_key(
     mut selection: ResMut<EditorSelection>,
     course_state: Res<EditorCourse>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
+    obstacle_query: Query<&PlacedObstacle>,
+    prop_query: Query<&PlacedProp, Without<PlacedObstacle>>,
+    camera_query: Query<&PlacedCamera, (Without<PlacedObstacle>, Without<PlacedProp>)>,
+    transform_query: Query<&Transform, PlacedFilter>,
+    camera_child_query: Query<(Entity, &ChildOf, &PlacedCamera, &Transform)>,
 ) {
     if course_state.editing_name {
         return;
@@ -402,6 +423,16 @@ fn handle_delete_key(
     if keyboard.just_pressed(KeyCode::Delete)
         && let Some(entity) = selection.entity.take()
     {
+        if let Some(action) = undo_redo::snapshot_for_delete(
+            entity,
+            &obstacle_query,
+            &prop_query,
+            &camera_query,
+            &transform_query,
+            &camera_child_query,
+        ) {
+            undo_stack.push(action);
+        }
         commands.entity(entity).despawn();
     }
 }
@@ -431,7 +462,7 @@ fn handle_transform_mode_keys(
     if let Some(mode) = new_mode {
         transform_state.mode = mode;
         move_widget.active_drag = None;
-        move_widget.hovered = false;
+        move_widget.hovered_part = None;
         rotate_widget.active = false;
         rotate_widget.hovered = false;
         scale_widget.active_drag = None;
@@ -445,6 +476,7 @@ fn handle_flip_gate_key(
     course_state: Res<EditorCourse>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut placed_query: Query<&mut PlacedObstacle>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     if course_state.editing_name {
         return;
@@ -461,6 +493,7 @@ fn handle_flip_gate_key(
     if placed.gate_order.is_none() {
         return;
     }
+    undo_stack.push(CourseEditorAction::FlipGate { entity });
     placed.gate_forward_flipped = !placed.gate_forward_flipped;
     info!(
         "Gate direction flipped (now {})",
@@ -516,6 +549,7 @@ fn snapshot_and_despawn_on_glb_reload(
     camera_child_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
     child_of_query: Query<(Entity, &ChildOf), With<PlacedCamera>>,
     placed_all: Query<Entity, PlacedFilter>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     let Some(handle) = gltf_handle else { return };
     let Some(course_state) = course_state else { return };
@@ -541,6 +575,7 @@ fn snapshot_and_despawn_on_glb_reload(
         commands.entity(entity).despawn();
     }
 
+    undo_stack.clear();
     commands.insert_resource(PendingGlbReload { course_data });
     info!("obstacles.glb reloaded — refreshing course editor");
 }

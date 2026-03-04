@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::editor::undo::{UndoStack, WorkshopAction};
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::ui_theme;
@@ -12,6 +13,7 @@ pub fn handle_node_selection(
     mut state: ResMut<WorkshopState>,
     query: Query<(&Interaction, &NodeButton), Changed<Interaction>>,
     preview_query: Query<Entity, With<PreviewObstacle>>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     for (interaction, node_btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -27,6 +29,7 @@ pub fn handle_node_selection(
             commands.entity(entity).despawn();
         }
         state.preview_entity = None;
+        undo_stack.clear();
     }
 }
 
@@ -36,6 +39,7 @@ pub fn handle_library_selection(
     query: Query<(&Interaction, &LibraryButton), Changed<Interaction>>,
     library: Res<ObstacleLibrary>,
     preview_query: Query<Entity, With<PreviewObstacle>>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
 ) {
     for (interaction, lib_btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -85,6 +89,7 @@ pub fn handle_library_selection(
             commands.entity(entity).despawn();
         }
         state.preview_entity = None;
+        undo_stack.clear();
     }
 }
 

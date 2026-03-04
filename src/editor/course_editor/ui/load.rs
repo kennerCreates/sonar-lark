@@ -5,6 +5,7 @@ use crate::course::loader::load_course_from_file;
 use crate::editor::course_editor::{
     self, EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
 };
+use crate::editor::undo::{CourseEditorAction, UndoStack};
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::rendering::{CelLightDir, CelMaterial};
@@ -174,13 +175,12 @@ pub fn handle_load_button(
     library: Res<ObstacleLibrary>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
-    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
-    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
+    (node_assets, mesh_assets): (Res<Assets<bevy::gltf::GltfNode>>, Res<Assets<bevy::gltf::GltfMesh>>),
     mut cel_materials: ResMut<Assets<CelMaterial>>,
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
     prop_meshes: Option<Res<PropEditorMeshes>>,
-    camera_meshes: Option<Res<CameraEditorMeshes>>,
+    (camera_meshes, mut undo_stack): (Option<Res<CameraEditorMeshes>>, ResMut<UndoStack<CourseEditorAction>>),
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -220,6 +220,7 @@ pub fn handle_load_button(
             camera_meshes.as_deref(),
         );
 
+        undo_stack.clear();
         commands.insert_resource(LastEditedCourse {
             path: btn.0.clone(),
         });
@@ -242,13 +243,12 @@ pub fn auto_load_pending_course(
     library: Res<ObstacleLibrary>,
     gltf_handle: Res<ObstaclesGltfHandle>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
-    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
-    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
+    (node_assets, mesh_assets): (Res<Assets<bevy::gltf::GltfNode>>, Res<Assets<bevy::gltf::GltfMesh>>),
     mut cel_materials: ResMut<Assets<CelMaterial>>,
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
     prop_meshes: Option<Res<PropEditorMeshes>>,
-    camera_meshes: Option<Res<CameraEditorMeshes>>,
+    (camera_meshes, mut undo_stack): (Option<Res<CameraEditorMeshes>>, ResMut<UndoStack<CourseEditorAction>>),
 ) {
 
     let path = std::path::Path::new(&pending.path);
@@ -280,6 +280,7 @@ pub fn auto_load_pending_course(
         camera_meshes.as_deref(),
     );
 
+    undo_stack.clear();
     commands.insert_resource(LastEditedCourse {
         path: pending.path.clone(),
     });

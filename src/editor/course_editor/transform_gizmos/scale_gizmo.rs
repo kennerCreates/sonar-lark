@@ -8,6 +8,7 @@ use crate::editor::gizmos::{
 use crate::editor::course_editor::{
     EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, TransformMode,
 };
+use crate::editor::undo::{CourseEditorAction, UndoStack};
 
 use super::{
     ScaleDragMode, ScaleWidgetState, SCALE_CUBE_SIZE, SCALE_HANDLE_LENGTH, SCALE_HIT_THRESHOLD,
@@ -86,6 +87,7 @@ pub(in crate::editor::course_editor) fn handle_scale_gizmo(
     mut placed_query: Query<&mut Transform, PlacedFilter>,
     interaction_query: Query<&Interaction>,
     camera_check: Query<(), With<PlacedCamera>>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     if transform_state.mode != TransformMode::Scale {
         widget.active_drag = None;
@@ -153,6 +155,17 @@ pub(in crate::editor::course_editor) fn handle_scale_gizmo(
                 }
             }
         } else {
+            // Drag ended — push undo if transform changed
+            if let Some(entity) = selection.entity
+                && let Ok(current_transform) = placed_query.get(entity)
+                && *current_transform != widget.entity_start_transform
+            {
+                undo_stack.push(CourseEditorAction::TransformChange {
+                    entity,
+                    before: widget.entity_start_transform,
+                    after: *current_transform,
+                });
+            }
             widget.active_drag = None;
         }
     } else {
@@ -188,6 +201,7 @@ pub(in crate::editor::course_editor) fn handle_scale_gizmo(
                 widget.active_drag = Some(ScaleDragMode::PerAxis(axis));
                 widget.drag_start_t = closest_point_on_axis(ray, origin, axis_dir);
                 widget.entity_start_scale = transform.scale;
+                widget.entity_start_transform = *transform;
             }
         } else {
             // Uniform hover: check distance to center
@@ -206,6 +220,7 @@ pub(in crate::editor::course_editor) fn handle_scale_gizmo(
                 widget.active_drag = Some(ScaleDragMode::Uniform);
                 widget.drag_start_t = closest_point_on_axis(ray, origin, cam_right);
                 widget.entity_start_scale = transform.scale;
+                widget.entity_start_transform = *transform;
             }
         }
     }

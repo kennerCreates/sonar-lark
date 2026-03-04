@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::editor::EditorTab;
 use crate::editor::course_editor::{EditorSelection, EditorTransform, EditorUI, PlacedObstacle};
+use crate::editor::undo::{CameraSnapshot, CourseEditorAction, UndoStack};
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::rendering::{CelLightDir, CelMaterial};
@@ -25,6 +26,7 @@ pub fn handle_palette_selection(
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
     camera_meshes: Option<Res<CameraEditorMeshes>>,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -76,6 +78,7 @@ pub fn handle_palette_selection(
             });
 
             // Auto-spawn a primary camera on the first gate (gate_order == 0)
+            let mut camera_snapshot = None;
             if gate_order == Some(0)
                 && let Some(ref cam_meshes) = camera_meshes
             {
@@ -92,7 +95,22 @@ pub fn handle_palette_selection(
                     cam_offset,
                     cam_rotation,
                 );
+                camera_snapshot = Some(CameraSnapshot {
+                    offset: cam_offset,
+                    rotation: cam_rotation,
+                    is_primary: true,
+                    label: None,
+                });
             }
+
+            undo_stack.push(CourseEditorAction::SpawnObstacle {
+                entity,
+                obstacle_id: btn.0.clone(),
+                transform,
+                gate_order,
+                gate_forward_flipped: false,
+                camera: camera_snapshot,
+            });
 
             selection.entity = Some(entity);
             selection.palette_id = None;

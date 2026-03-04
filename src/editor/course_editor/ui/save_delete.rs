@@ -5,6 +5,7 @@ use crate::course::loader::{delete_course, save_course};
 use crate::editor::course_editor::{
     self, EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
 };
+use crate::editor::undo::{CourseEditorAction, UndoStack};
 use crate::palette;
 use crate::states::{AppState, LastEditedCourse};
 use crate::ui_theme;
@@ -35,6 +36,7 @@ pub fn handle_new_course_button(
         Entity,
         Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
     >,
+    mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -51,6 +53,7 @@ pub fn handle_new_course_button(
             &mut transform_state,
         );
 
+        undo_stack.clear();
         commands.remove_resource::<LastEditedCourse>();
         info!("Cleared editor for new course");
     }

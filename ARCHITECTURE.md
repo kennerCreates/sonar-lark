@@ -59,13 +59,14 @@ src/
 │   │       ├── mod.rs   Re-exports
 │   │       ├── build.rs UI hierarchy construction, marker components, constants
 │   │       └── systems.rs Interaction handlers, text input, display updates
+│   ├── undo.rs         Generic UndoStack<A>, CourseEditorAction, WorkshopAction, WorkshopSnapshot
 │   └── course_editor/   Place obstacles and props, set gate order
 │       ├── mod.rs       CourseEditorPlugin, PlacementState, PlacedObstacle, PlacedProp, PlacedCamera, EditorTab, placement/selection
 │       ├── overlays.rs  Visualization gizmos (trigger volumes, gate sequence, spline preview, prop gizmos, camera frustums)
 │       ├── preview.rs   Camera PiP preview (render-to-texture, PreviewCamera, sync system)
 │       ├── transform_gizmos/ Move/rotate/scale widget systems
 │       │   ├── mod.rs       Widget resource types, constants, sample_ring_screen_dist()
-│       │   ├── move_gizmo.rs  draw_move_gizmo(), handle_move_gizmo()
+│       │   ├── move_gizmo.rs  Axis-constrained move gizmo (per-axis arrows + XZ plane square)
 │       │   ├── rotate_gizmo.rs rotation_axis_from_modifiers(), angle_in_plane(), draw/handle + tests
 │       │   └── scale_gizmo.rs draw_scale_gizmo(), handle_scale_gizmo()
 │       └── ui/          Course editor UI
