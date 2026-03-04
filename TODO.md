@@ -32,7 +32,7 @@ Complete. Pilot avatars using hand-drawn Inkscape SVG fragments assembled at run
 - [ ] Bundle `spawn_obstacle` params into `SpawnObstacleContext` system param — currently 16 params, causing 15-16 param bloat in `load_course_into_editor`, `handle_load_button`, `auto_load_pending_course`. Collapse the 8 gltf/material handles into one struct. (`obstacle/spawning.rs`, `editor/course_editor/ui/load.rs`)
 - [ ] Unify `PlacedFilter` usage — `type PlacedFilter` exists at `course_editor/mod.rs:94` but is inlined 5 more times in `save_delete.rs` and `load.rs`. Make `pub` and use everywhere. Critical before post-MVP "multiple obstacle types beyond gates" or terrain.
 - [ ] Rename `EditorTab` in portrait editor to `PortraitEditorTab` — name collision with `editor/types.rs::EditorTab`. No runtime issue but confuses codebase search.
-- [ ] Remove dead code: `catchphrases()` (`personality.rs:125`), `clear_complementary_for()` (`portrait_config.rs:210`), `MouthStyle::index()` (`slot_enums.rs:111`), `ObstacleMarker::id` field (`obstacle/spawning.rs:9`). Re-enable or remove disconnected `FireworkSounds` (`fireworks.rs:459`).
+- [ ] Remove dead code: `catchphrases()` (`personality.rs:125`), `clear_complementary_for()` (`portrait_config.rs:210`), `MouthStyle::index()` (`slot_enums.rs:111`), `ObstacleMarker::id` field (`obstacle/spawning.rs:9`).
 - [ ] Delete redundant single-line re-export files: `menu/discover.rs`, `editor/course_editor/ui/discover.rs`. Import from `crate::course::discovery` directly.
 - [ ] Replace glob re-exports (`pub use submod::*`) with named re-exports in `workshop/ui/mod.rs` and `portrait_editor/mod.rs`.
 - [ ] Deduplicate `PANEL_BG` — `dev_dashboard.rs:7` redefines the identical value from `ui_theme::PANEL_BG`. Import instead.

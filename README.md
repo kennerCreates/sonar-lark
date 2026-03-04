@@ -80,42 +80,12 @@ Menu  ──►  Editor  ──►  Race  ──►  Results
 
 ## Development Milestones
 
-### Foundation
-- **Skeleton** — State machine, common systems, main.rs wiring
-- **Data Layer** — Obstacle and course data with RON serialization
-- **Unit Tests** — 22 tests covering obstacle library, course data, and menu discovery
-
-### Editor
-- **Obstacle Workshop** — Scene browser, trigger gizmo, save/load/delete
-- **Course Editor** — Click-to-place, drag, height adjust, gate ordering, save/load
-- **Course Props** — Firework emitter props, tabbed editor UI, confetti/shell effects
-- **Course Cameras** — Editor-placed cameras with frustum gizmos and PiP preview
-- **Editor Gizmo Rework** — Entity-local axes, move/rotate/scale modes, modifier keys, snapping
-
-### Flight & Racing
-- **Drone Physics** — 12 drones, thrust-through-body model, 3-stage cascaded PID, AI waypoint tracking
-- **Drone Realism** — Motor lag, dirty air, prop wash, battery sag, per-drone variation
-- **Drone Models** — Blender-exported visual models replacing placeholders
-- **Obstacle Collision** — Swept OBB detection, gate opening exemption, crash effects
-- **Race System** — Gate validation, timing, countdown, completion detection, crash/DNF
-- **Post-Race Wandering** — Ambient wandering with Fibonacci-hashed waypoints after results
-- **Choreographed Racing** — Physics-based AI replaced by scripted spline playback during races: race script generator, per-segment pacing, curvature-based banking, acrobatic maneuvers (Split-S, power loops), scripted crashes (obstacle + drone-on-drone), visual noise (attitude jitter, dirty air wobble, micro-drift), drama pass for close finishes and mid-pack clustering, pre-race convergence sequence
-
-### Presentation
-- **Rendering Overhaul** — Cel-shaded materials, halftone gradients, procedural TRON skybox
-- **Results & Cameras** — Results screen, chase/FPV/spectator cameras, full gameplay loop
-- **Sound Effects** — Ambient drone loops, crash/start/end audio, firework sounds
-- **Visual Interpolation** — Lerp/slerp between physics ticks for smooth 60fps rendering
-- **Victory Effects** — Confetti fans and staggered shell bursts from firework emitter props
-
-### Pilots & Portraits
-- **Procedural Pilots** — 8 personality traits, skill profiles, gamertag generation, persistent roster
-- **Procedural Portraits** — SVG fragment assembly with 7 layers, color replacement, per-pilot caching
-- **Dev Menu & Portrait Editor** — Dev mode, palette editor with color pickers and live preview
-
-### Code Health
-- **Code Health I** — File splitting, async poll replacement, UI unit tests, spline optimization
-- **Code Health II** — UI theme consolidation, cross-module decoupling, course discovery unification
+- **Foundation** — State machine, RON data layer, unit tests
+- **Editor** — Obstacle Workshop, Course Editor with gizmos (move/rotate/scale), course props, editor-placed cameras with PiP preview
+- **Flight & Racing** — Choreographed spline-based racing (replacing earlier physics-driven AI), swept OBB collision, race system with countdown/timing/crashes, pre/post-race wandering
+- **Presentation** — Cel-shaded rendering, chase/FPV/spectator cameras, sound effects, visual interpolation, victory effects
+- **Pilots & Portraits** — Procedural pilots with personality traits and skill profiles, SVG portrait assembly, dev menu with palette editor
+- **Code Health** — File splitting, UI theme consolidation, cross-module decoupling
 
 ## Architecture
 
