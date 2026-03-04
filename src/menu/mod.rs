@@ -14,11 +14,12 @@ impl Plugin for MenuPlugin {
             .add_systems(
                 Update,
                 (
+                    ui::handle_start_game_button,
+                    ui::handle_dev_mode_button,
                     ui::handle_course_selection,
                     ui::update_course_highlights,
                     ui::handle_editor_button,
                     ui::handle_race_button,
-                    ui::handle_dev_button,
                 )
                     .run_if(in_state(AppState::Menu)),
             );

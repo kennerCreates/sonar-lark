@@ -21,6 +21,18 @@ pub struct AvailableCourses {
 }
 
 #[derive(Component)]
+pub(crate) struct StartGameButton;
+
+#[derive(Component)]
+pub(crate) struct DevModeButton;
+
+#[derive(Component)]
+pub(crate) struct LandingRoot;
+
+#[derive(Component)]
+pub(crate) struct GameMenuRoot;
+
+#[derive(Component)]
 pub(crate) struct EditorButton;
 
 #[derive(Component)]
@@ -35,10 +47,88 @@ pub(crate) struct RaceButtonText;
 #[derive(Component)]
 pub(crate) struct HintText;
 
-#[derive(Component)]
-pub(crate) struct DevButton;
-
 pub fn setup_menu(mut commands: Commands) {
+    // Landing screen: title + two buttons
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: Val::Px(30.0),
+                ..default()
+            },
+            DespawnOnExit(AppState::Menu),
+            LandingRoot,
+        ))
+        .with_children(|parent| {
+            // Title
+            parent.spawn((
+                Text::new("SONAR LARK"),
+                TextFont {
+                    font_size: 64.0,
+                    ..default()
+                },
+                TextColor(palette::VANILLA),
+            ));
+
+            // Subtitle
+            parent.spawn((
+                Text::new("Drone Racing Simulator"),
+                TextFont {
+                    font_size: 24.0,
+                    ..default()
+                },
+                TextColor(palette::SIDEWALK),
+            ));
+
+            // Button column
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    row_gap: Val::Px(16.0),
+                    margin: UiRect::top(Val::Px(20.0)),
+                    ..default()
+                })
+                .with_children(|col| {
+                    ui_theme::spawn_menu_button(col, "Start Game", StartGameButton, 260.0);
+                    ui_theme::spawn_menu_button(col, "Dev Mode", DevModeButton, 260.0);
+                });
+        });
+}
+
+pub fn handle_start_game_button(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<StartGameButton>)>,
+    landing_query: Query<Entity, With<LandingRoot>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            // Despawn landing screen
+            for entity in &landing_query {
+                commands.entity(entity).despawn();
+            }
+            // Spawn game menu
+            spawn_game_menu(&mut commands);
+        }
+    }
+}
+
+pub fn handle_dev_mode_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<DevModeButton>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(AppState::DevMenu);
+        }
+    }
+}
+
+fn spawn_game_menu(commands: &mut Commands) {
     let courses = discover_courses();
     let available = AvailableCourses {
         courses,
@@ -57,6 +147,7 @@ pub fn setup_menu(mut commands: Commands) {
                 ..default()
             },
             DespawnOnExit(AppState::Menu),
+            GameMenuRoot,
         ))
         .with_children(|parent| {
             // Title
@@ -71,7 +162,7 @@ pub fn setup_menu(mut commands: Commands) {
 
             // Subtitle
             parent.spawn((
-                Text::new("Drone Racing Simulator"),
+                Text::new("Drone Racing Tycoon"),
                 TextFont {
                     font_size: 24.0,
                     ..default()
@@ -174,8 +265,6 @@ pub fn setup_menu(mut commands: Commands) {
                             RaceButtonText,
                         ));
                     });
-
-                    ui_theme::spawn_menu_button(row, "Dev", DevButton, 200.0);
                 });
 
             parent.spawn((
@@ -194,12 +283,13 @@ pub fn setup_menu(mut commands: Commands) {
 
 
 pub fn handle_course_selection(
-    mut available: ResMut<AvailableCourses>,
+    available: Option<ResMut<AvailableCourses>>,
     mut course_query: Query<
         (&Interaction, &CourseItem, &mut BackgroundColor, &mut BorderColor),
         Changed<Interaction>,
     >,
 ) {
+    let Some(mut available) = available else { return };
     for (interaction, course_item, mut bg, mut border) in &mut course_query {
         match *interaction {
             Interaction::Pressed => {
@@ -222,11 +312,12 @@ pub fn handle_course_selection(
 }
 
 pub fn update_course_highlights(
-    available: Res<AvailableCourses>,
+    available: Option<Res<AvailableCourses>>,
     mut course_query: Query<(&CourseItem, &mut BackgroundColor, &mut BorderColor)>,
     mut race_text_query: Query<&mut TextColor, (With<RaceButtonText>, Without<HintText>)>,
     mut hint_query: Query<(&mut Text, &mut TextColor), (With<HintText>, Without<RaceButtonText>)>,
 ) {
+    let Some(available) = available else { return };
     if !available.is_changed() {
         return;
     }
@@ -282,8 +373,9 @@ pub fn handle_editor_button(
     query: Query<&Interaction, (Changed<Interaction>, With<EditorButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
     last_edited: Option<Res<LastEditedCourse>>,
-    available: Res<AvailableCourses>,
+    available: Option<Res<AvailableCourses>>,
 ) {
+    let Some(available) = available else { return };
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             if let Some(course) = available
@@ -305,10 +397,11 @@ pub fn handle_editor_button(
 
 pub fn handle_race_button(
     query: Query<&Interaction, (Changed<Interaction>, With<RaceButton>)>,
-    available: Res<AvailableCourses>,
+    available: Option<Res<AvailableCourses>>,
     mut commands: Commands,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
+    let Some(available) = available else { return };
     for interaction in &query {
         if *interaction == Interaction::Pressed
             && let Some(idx) = available.selected_index
@@ -323,16 +416,6 @@ pub fn handle_race_button(
     }
 }
 
-pub fn handle_dev_button(
-    query: Query<&Interaction, (Changed<Interaction>, With<DevButton>)>,
-    mut next_state: ResMut<NextState<AppState>>,
-) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            next_state.set(AppState::DevMenu);
-        }
-    }
-}
 
 pub fn cleanup_menu(mut commands: Commands) {
     commands.remove_resource::<AvailableCourses>();
