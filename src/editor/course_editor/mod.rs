@@ -5,6 +5,7 @@ mod preview;
 mod transform_gizmos;
 
 use bevy::{
+    asset::AssetEvent,
     gizmos::config::{DefaultGizmoConfigGroup, GizmoConfigStore},
     picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings},
     prelude::*,
@@ -12,7 +13,7 @@ use bevy::{
 
 use crate::camera::orbit::MainCamera;
 
-use crate::course::data::PropKind;
+use crate::course::data::{CourseData, PropKind};
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
@@ -66,6 +67,13 @@ impl Default for EditorCourse {
 #[derive(Resource, Default)]
 pub struct EditorUI {
     pub active_tab: EditorTab,
+}
+
+/// Inserted when the obstacles glTF is hot-reloaded. Holds a snapshot of placed
+/// obstacles so they can be respawned once the new asset data is available.
+#[derive(Resource)]
+struct PendingGlbReload {
+    course_data: CourseData,
 }
 
 // --- Components ---
@@ -218,6 +226,18 @@ impl Plugin for CourseEditorPlugin {
                 preview::sync_preview_camera.run_if(in_state(EditorMode::CourseEditor)),
             )
             .add_systems(
+                Update,
+                snapshot_and_despawn_on_glb_reload
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
+                respawn_after_glb_reload
+                    .run_if(in_state(EditorMode::CourseEditor))
+                    .run_if(resource_exists::<PendingGlbReload>)
+                    .run_if(obstacles_gltf_ready),
+            )
+            .add_systems(
                 OnExit(EditorMode::CourseEditor),
                 (cleanup_course_editor, preview::cleanup_camera_preview),
             );
@@ -270,6 +290,7 @@ fn cleanup_course_editor(
     commands.remove_resource::<RotateWidgetState>();
     commands.remove_resource::<ScaleWidgetState>();
     commands.remove_resource::<PendingEditorCourse>();
+    commands.remove_resource::<PendingGlbReload>();
     commands.remove_resource::<ui::PendingCourseDelete>();
     commands.remove_resource::<ui::PropEditorMeshes>();
     commands.remove_resource::<ui::CameraEditorMeshes>();
@@ -478,4 +499,89 @@ fn find_placed_ancestor_from_ray(
         }
     }
     None
+}
+
+// --- GLB hot-reload ---
+
+/// Detects when the obstacles glTF is modified, snapshots all placed entities,
+/// despawns them, and stores the snapshot for respawning once the new asset is ready.
+#[allow(clippy::too_many_arguments)]
+fn snapshot_and_despawn_on_glb_reload(
+    mut commands: Commands,
+    mut events: MessageReader<AssetEvent<bevy::gltf::Gltf>>,
+    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
+    course_state: Option<Res<EditorCourse>>,
+    placed_query: Query<(Entity, &PlacedObstacle, &Transform)>,
+    prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
+    camera_child_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
+    child_of_query: Query<(Entity, &ChildOf), With<PlacedCamera>>,
+    placed_all: Query<Entity, PlacedFilter>,
+) {
+    let Some(handle) = gltf_handle else { return };
+    let Some(course_state) = course_state else { return };
+    if !events.read().any(|e| matches!(e, AssetEvent::Modified { id } if *id == handle.0.id())) {
+        return;
+    }
+
+    let obstacles_with_cameras = placed_query.iter().map(|(entity, placed, transform)| {
+        let camera = child_of_query
+            .iter()
+            .find(|(_, child_of)| child_of.parent() == entity)
+            .and_then(|(cam_entity, _)| camera_child_query.get(cam_entity).ok());
+        (placed, transform, camera)
+    });
+
+    let course_data = ui::build_course_data(
+        course_state.name.clone(),
+        obstacles_with_cameras,
+        prop_query.iter(),
+    );
+
+    for entity in &placed_all {
+        commands.entity(entity).despawn();
+    }
+
+    commands.insert_resource(PendingGlbReload { course_data });
+    info!("obstacles.glb reloaded — refreshing course editor");
+}
+
+/// Respawns all placed entities from the snapshot once the new glTF data is ready.
+#[allow(clippy::too_many_arguments)]
+fn respawn_after_glb_reload(
+    mut commands: Commands,
+    pending: Res<PendingGlbReload>,
+    mut selection: ResMut<EditorSelection>,
+    mut course_state: ResMut<EditorCourse>,
+    mut transform_state: ResMut<EditorTransform>,
+    placed_query: Query<Entity, PlacedFilter>,
+    library: Res<ObstacleLibrary>,
+    gltf_handle: Res<ObstaclesGltfHandle>,
+    gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
+    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
+    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
+    mut cel_materials: ResMut<Assets<crate::rendering::CelMaterial>>,
+    std_materials: Res<Assets<StandardMaterial>>,
+    light_dir: Res<crate::rendering::CelLightDir>,
+    prop_meshes: Option<Res<ui::PropEditorMeshes>>,
+    camera_meshes: Option<Res<ui::CameraEditorMeshes>>,
+) {
+    ui::load_course_into_editor(
+        &mut commands,
+        &mut selection,
+        &mut course_state,
+        &mut transform_state,
+        &placed_query,
+        &library,
+        &gltf_handle,
+        &gltf_assets,
+        &node_assets,
+        &mesh_assets,
+        &mut cel_materials,
+        &std_materials,
+        light_dir.0,
+        &pending.course_data,
+        prop_meshes.as_deref(),
+        camera_meshes.as_deref(),
+    );
+    commands.remove_resource::<PendingGlbReload>();
 }

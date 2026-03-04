@@ -4,6 +4,7 @@ pub mod ui;
 mod widgets;
 
 use bevy::{
+    asset::AssetEvent,
     gizmos::config::{DefaultGizmoConfigGroup, GizmoConfigStore},
     prelude::*,
 };
@@ -226,6 +227,10 @@ impl Plugin for WorkshopPlugin {
             )
                 .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
         )
+        .add_systems(
+            Update,
+            detect_glb_reload.run_if(in_state(DevMenuPage::ObstacleWorkshop)),
+        )
         .add_systems(OnExit(DevMenuPage::ObstacleWorkshop), cleanup_workshop);
     }
 }
@@ -318,4 +323,25 @@ fn populate_node_list(
     });
 
     info!("Found {} named nodes in obstacles.glb", nodes.len());
+}
+
+/// Detects when the obstacles glTF is hot-reloaded and resets workshop state
+/// so that `populate_node_list` and `spawn_placeholder_preview` re-trigger.
+fn detect_glb_reload(
+    mut commands: Commands,
+    mut events: MessageReader<AssetEvent<bevy::gltf::Gltf>>,
+    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
+    mut state: ResMut<WorkshopState>,
+    preview_query: Query<Entity, With<PreviewObstacle>>,
+) {
+    let Some(handle) = gltf_handle else { return };
+    if !events.read().any(|e| matches!(e, AssetEvent::Modified { id } if *id == handle.0.id())) {
+        return;
+    }
+    for entity in &preview_query {
+        commands.entity(entity).despawn();
+    }
+    state.preview_entity = None;
+    state.nodes_loaded = false;
+    info!("obstacles.glb reloaded — refreshing workshop preview");
 }

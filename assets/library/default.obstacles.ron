@@ -1,21 +1,76 @@
 [
     (
+        id: ("gate_loop"),
+        glb_node_name: "gate_loop",
+        trigger_volume: Some((
+            offset: (0.72912645, 11.759434, -0.19355547),
+            half_extents: (5.024712, 2.6387913, 2.9330819),
+            forward: (0.0, 0.0, -1.0),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+        )),
+        is_gate: true,
+        model_offset: (0.0, 0.0, 0.0),
+        model_rotation: (0.0, 0.0, 0.0, 1.0),
+        collision_volumes: [
+            (
+                offset: (-0.22063684, 12.443077, -0.279891),
+                half_extents: (7.2104497, 5.1430354, 1.5),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+            ),
+            (
+                offset: (-0.43714607, 3.6588812, -0.0769043),
+                half_extents: (1.6151066, 3.680043, 1.4189907),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+            ),
+        ],
+    ),
+    (
+        id: ("gate_air"),
+        glb_node_name: "gate_air",
+        trigger_volume: Some((
+            offset: (-0.70611095, 15.847187, 0.66191065),
+            half_extents: (2.8640785, 2.97975, 3.054034),
+            forward: (0.0, 0.0, -1.0),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+        )),
+        is_gate: true,
+        model_offset: (0.0, 1.0886803, 0.0),
+        model_rotation: (0.0, 0.0, 0.0, 1.0),
+        collision_volumes: [
+            (
+                offset: (-1.1014323, 16.317728, -0.04422474),
+                half_extents: (5.5022383, 5.126374, 1.0225697),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+            ),
+        ],
+    ),
+    (
         id: ("gate_ground"),
         glb_node_name: "gate_ground",
         trigger_volume: Some((
-            offset: (-1.7948599, 5.245564, 0.59887743),
+            offset: (-1.8804522, 5.245564, 0.6815002),
             half_extents: (6.5755672, 5.0597453, 2.2667458),
             forward: (0.0, 0.0, -1.0),
             rotation: (0.0, 0.0, -0.087155744, 0.9961947),
         )),
         is_gate: true,
-        model_offset: (8.635478, 0.0, 0.28681183),
+        model_offset: (8.549886, 0.0, 0.3694346),
         model_rotation: (0.0, 0.0, 0.0, 1.0),
         collision_volumes: [
             (
-                offset: (7.212179, 5.5700407, 1.1378155),
+                offset: (7.138693, 5.5700407, 0.8755405),
                 half_extents: (1.8410523, 6.0479016, 1.5),
                 rotation: (0.0, 0.0, 0.08715574, 0.9961947),
+            ),
+            (
+                offset: (-10.455388, 6.7117276, -0.0973804),
+                half_extents: (1.5201194, 7.168557, 1.5),
+                rotation: (0.0, 0.0, -0.1305262, 0.9914449),
+            ),
+            (
+                offset: (-0.9234581, 11.934969, -0.1997335),
+                half_extents: (8.355094, 1.4467454, 1.5),
+                rotation: (0.0, 0.0, -0.08715574, 0.9961947),
             ),
         ],
     ),

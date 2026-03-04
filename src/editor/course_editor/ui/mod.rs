@@ -12,7 +12,9 @@ mod types;
 
 pub use discover::discover_existing_courses;
 pub use left_panel::build_course_editor_ui;
+pub(crate) use data::build_course_data;
 pub use load::{auto_load_pending_course, handle_load_button};
+pub(crate) use load::load_course_into_editor;
 pub use save_delete::{
     handle_back_to_menu, handle_cancel_delete, handle_clear_gate_orders_button,
     handle_confirm_delete, handle_delete_button, handle_gate_order_toggle,

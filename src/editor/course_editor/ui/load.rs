@@ -15,7 +15,7 @@ use super::types::{CameraEditorMeshes, ExistingCourseButton, PropEditorMeshes};
 
 /// Shared logic: despawn existing obstacles/props/cameras, load course data, spawn all.
 #[allow(clippy::too_many_arguments)]
-fn load_course_into_editor(
+pub(crate) fn load_course_into_editor(
     commands: &mut Commands,
     selection: &mut EditorSelection,
     course_state: &mut EditorCourse,
