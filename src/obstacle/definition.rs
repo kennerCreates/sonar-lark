@@ -11,6 +11,8 @@ pub struct TriggerVolumeConfig {
     /// Local-space forward direction of the gate (the expected approach direction).
     #[serde(default = "default_forward")]
     pub forward: Vec3,
+    #[serde(default = "default_rotation")]
+    pub rotation: Quat,
 }
 
 fn default_forward() -> Vec3 {
@@ -25,6 +27,8 @@ fn default_rotation() -> Quat {
 pub struct CollisionVolumeConfig {
     pub offset: Vec3,
     pub half_extents: Vec3,
+    #[serde(default = "default_rotation")]
+    pub rotation: Quat,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -38,5 +42,5 @@ pub struct ObstacleDef {
     #[serde(default = "default_rotation")]
     pub model_rotation: Quat,
     #[serde(default)]
-    pub collision_volume: Option<CollisionVolumeConfig>,
+    pub collision_volumes: Vec<CollisionVolumeConfig>,
 }

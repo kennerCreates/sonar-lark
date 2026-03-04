@@ -76,7 +76,7 @@ fn load_course_into_editor(
             def.trigger_volume.as_ref(),
             None,
             instance.gate_forward_flipped,
-            def.collision_volume.as_ref(),
+            &def.collision_volumes,
         );
 
         if let Some(entity) = spawned {

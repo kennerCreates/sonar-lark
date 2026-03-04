@@ -666,6 +666,68 @@ pub fn snap_to_start_positions(
 }
 
 // ---------------------------------------------------------------------------
+// System: ground_collision_check
+// ---------------------------------------------------------------------------
+
+/// Safety net: crashes any racing drone that touches the ground plane (y <= 0).
+/// Choreographed splines should stay above ground, but this catches edge cases
+/// (e.g. visual noise overshoot, path generation errors near low gates).
+pub fn ground_collision_check(
+    mut commands: Commands,
+    mut progress: Option<ResMut<RaceProgress>>,
+    explosion_meshes: Option<Res<ExplosionMeshes>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    crash_sounds: Option<Res<CrashSounds>>,
+    mut query: Query<(
+        Entity,
+        &Drone,
+        &DroneIdentity,
+        &mut DronePhase,
+        &mut DroneDynamics,
+        &Transform,
+        &mut Visibility,
+    ), With<ChoreographyState>>,
+) {
+    let Some(ref meshes) = explosion_meshes else {
+        return;
+    };
+
+    for (entity, drone, identity, mut phase, mut dynamics, transform, mut visibility) in
+        &mut query
+    {
+        if *phase != DronePhase::Racing {
+            continue;
+        }
+        if transform.translation.y > 0.0 {
+            continue;
+        }
+
+        let crash_velocity = dynamics.velocity;
+        crash_drone(
+            &mut commands,
+            &mut phase,
+            &mut dynamics,
+            &mut visibility,
+            drone.index as usize,
+            transform.translation,
+            crash_velocity,
+            progress.as_deref_mut(),
+            meshes,
+            &mut materials,
+            crash_sounds.as_deref(),
+            identity.color,
+            DnfReason::GroundCollision,
+        );
+        commands.entity(entity).remove::<ChoreographyState>();
+
+        warn!(
+            "Drone {} CRASHED — ground collision at y={:.2}",
+            drone.index, transform.translation.y
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // System: fire_scripted_events
 // ---------------------------------------------------------------------------
 

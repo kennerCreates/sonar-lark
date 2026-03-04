@@ -57,7 +57,7 @@ pub fn handle_palette_selection(
             def.trigger_volume.as_ref(),
             None,
             false,
-            def.collision_volume.as_ref(),
+            &def.collision_volumes,
         );
 
         if let Some(entity) = spawned {

@@ -11,6 +11,7 @@ use bevy::prelude::*;
 
 use crate::course::data::CourseData;
 use crate::obstacle::library::ObstacleLibrary;
+use crate::race::collision_math::clip_opening_to_ground;
 
 pub struct RacePath {
     pub spline: CubicCurve<Vec3>,
@@ -40,10 +41,19 @@ pub(super) fn extract_sorted_gates(
                 let local_fwd = tv.map(|tv| tv.forward).unwrap_or(Vec3::NEG_Z);
                 let world_fwd = inst.rotation
                     * if inst.gate_forward_flipped { -local_fwd } else { local_fwd };
-                let half_extents_2d = tv
-                    .map(|tv| Vec2::new(tv.half_extents.x * inst.scale.x, tv.half_extents.y * inst.scale.y))
-                    .unwrap_or(Vec2::new(3.0, 3.0));
-                (order, inst.translation + fly_through_offset, world_fwd, half_extents_2d)
+                let mut gate_pos = inst.translation + fly_through_offset;
+                let raw_half_width = tv
+                    .map(|tv| tv.half_extents.x * inst.scale.x)
+                    .unwrap_or(3.0);
+                let raw_half_height = tv
+                    .map(|tv| tv.half_extents.y * inst.scale.y)
+                    .unwrap_or(3.0);
+                // Clip the gate opening to exclude below-ground portions
+                let (clipped_center_y, clipped_half_height) =
+                    clip_opening_to_ground(gate_pos.y, raw_half_height);
+                gate_pos.y = clipped_center_y;
+                let half_extents_2d = Vec2::new(raw_half_width, clipped_half_height);
+                (order, gate_pos, world_fwd, half_extents_2d)
             })
         })
         .collect();

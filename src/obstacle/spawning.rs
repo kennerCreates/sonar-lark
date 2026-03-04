@@ -15,10 +15,15 @@ pub struct TriggerVolume {
     pub half_extents: Vec3,
 }
 
-#[derive(Component)]
-pub struct ObstacleCollisionVolume {
+pub struct CollisionVolumeEntry {
     pub offset: Vec3,
     pub half_extents: Vec3,
+    pub rotation: Quat,
+}
+
+#[derive(Component)]
+pub struct ObstacleCollisionVolumes {
+    pub volumes: Vec<CollisionVolumeEntry>,
     pub is_gate: bool,
 }
 
@@ -69,7 +74,7 @@ pub fn spawn_obstacle(
     trigger_config: Option<&TriggerVolumeConfig>,
     gate_index: Option<u32>,
     gate_forward_flipped: bool,
-    collision_config: Option<&CollisionVolumeConfig>,
+    collision_configs: &[CollisionVolumeConfig],
 ) -> Option<Entity> {
     let gltf = gltf_assets.get(&gltf_handle.0)?;
     let node_handle = gltf.named_nodes.get(node_name)?;
@@ -118,15 +123,21 @@ pub fn spawn_obstacle(
         entity_commands.insert(crate::race::gate::GateIndex(order));
         if let Some(trigger) = trigger_config {
             let local_fwd = if gate_forward_flipped { -trigger.forward } else { trigger.forward };
-            let world_fwd = transform.rotation * local_fwd;
+            let world_fwd = transform.rotation * trigger.rotation * local_fwd;
             entity_commands.insert(crate::race::gate::GateForward(world_fwd));
         }
     }
 
-    if let Some(config) = collision_config {
-        entity_commands.insert(ObstacleCollisionVolume {
-            offset: config.offset,
-            half_extents: config.half_extents,
+    if !collision_configs.is_empty() {
+        entity_commands.insert(ObstacleCollisionVolumes {
+            volumes: collision_configs
+                .iter()
+                .map(|c| CollisionVolumeEntry {
+                    offset: c.offset,
+                    half_extents: c.half_extents,
+                    rotation: c.rotation,
+                })
+                .collect(),
             is_gate: trigger_config.is_some(),
         });
     }
@@ -141,7 +152,7 @@ pub fn spawn_obstacle(
 
         if let Some(trigger) = trigger_config {
             children.spawn((
-                Transform::from_translation(trigger.offset),
+                Transform::from_translation(trigger.offset).with_rotation(trigger.rotation),
                 TriggerVolume {
                     half_extents: trigger.half_extents,
                 },

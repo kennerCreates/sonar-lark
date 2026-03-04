@@ -5,7 +5,7 @@ use crate::camera::orbit::MainCamera;
 
 use crate::editor::gizmos::{
     closest_point_on_axis, point_to_segment_distance, ray_intersect_plane,
-    rotated_perpendicular_basis, sample_ring_screen_dist, yaw_quat_from_transform, Axis, Sign,
+    rotated_perpendicular_basis, sample_ring_screen_dist, Axis, Sign,
     RING_HIT_THRESHOLD, RING_RADIUS, RING_SAMPLES, ROTATION_STEP_DEG,
 };
 
@@ -288,7 +288,7 @@ pub(super) fn handle_move_widget(
     }
 }
 
-// --- Rotate Gizmo (Model only, matching Course Editor) ---
+// --- Rotate Gizmo (Trigger / Collision volumes only) ---
 
 fn rotation_axis_from_modifiers(keyboard: &ButtonInput<KeyCode>) -> Axis {
     if keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight) {
@@ -300,6 +300,26 @@ fn rotation_axis_from_modifiers(keyboard: &ButtonInput<KeyCode>) -> Axis {
     }
 }
 
+/// Returns the world-space center and current rotation for the active volume edit target.
+fn volume_rotate_params(
+    state: &WorkshopState,
+    preview_query: &Query<&Transform, With<PreviewObstacle>>,
+) -> Option<(Vec3, Quat)> {
+    let entity = state.preview_entity?;
+    let transform = preview_query.get(entity).ok()?;
+    match state.edit_target {
+        EditTarget::Trigger if state.has_trigger => Some((
+            transform.translation + state.trigger_offset,
+            state.trigger_rotation,
+        )),
+        EditTarget::Collision if state.has_collision => Some((
+            transform.translation + state.collision_offset,
+            state.collision_rotation,
+        )),
+        _ => None,
+    }
+}
+
 pub(super) fn draw_rotate_gizmo(
     mut gizmos: Gizmos,
     state: Res<WorkshopState>,
@@ -307,18 +327,12 @@ pub(super) fn draw_rotate_gizmo(
     preview_query: Query<&Transform, With<PreviewObstacle>>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    if state.transform_mode != TransformMode::Rotate || state.edit_target != EditTarget::Model {
+    if state.transform_mode != TransformMode::Rotate {
         return;
     }
-    let Some(entity) = state.preview_entity else {
+    let Some((pos, current_rotation)) = volume_rotate_params(&state, &preview_query) else {
         return;
     };
-    let Ok(transform) = preview_query.get(entity) else {
-        return;
-    };
-
-    let pos = transform.translation;
-    let yaw_quat = yaw_quat_from_transform(transform);
 
     let display_axis = if widget.active {
         widget.active_axis
@@ -329,6 +343,7 @@ pub(super) fn draw_rotate_gizmo(
     let is_hovered = !widget.active && widget.hovered;
     let color = display_axis.color(is_hovered, widget.active);
 
+    let yaw_quat = Quat::from_rotation_y(current_rotation.to_euler(EulerRot::YXZ).0);
     let face_quat = yaw_quat
         * match display_axis {
             Axis::X => Quat::from_rotation_arc(Vec3::Z, Vec3::X),
@@ -346,28 +361,23 @@ pub(super) fn handle_rotate_gizmo(
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     mut state: ResMut<WorkshopState>,
     mut widget: ResMut<RotateWidgetState>,
-    mut preview_query: Query<&mut Transform, With<PreviewObstacle>>,
+    preview_query: Query<&Transform, With<PreviewObstacle>>,
     interaction_query: Query<&Interaction>,
 ) {
-    if state.transform_mode != TransformMode::Rotate || state.edit_target != EditTarget::Model {
+    if state.transform_mode != TransformMode::Rotate {
         widget.active = false;
         widget.hovered = false;
         return;
     }
-    let Some(entity) = state.preview_entity else {
+    let Some((pos, current_rotation)) = volume_rotate_params(&state, &preview_query) else {
         widget.active = false;
         widget.hovered = false;
-        return;
-    };
-    let Ok(mut transform) = preview_query.get_mut(entity) else {
         return;
     };
 
     let Ok(window) = windows.single() else { return };
     let Some(cursor_pos) = window.cursor_position() else { return };
     let Ok((camera, camera_gt)) = camera_query.single() else { return };
-    let pos = transform.translation;
-    let yaw_quat = yaw_quat_from_transform(&transform);
     let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
 
     if widget.active {
@@ -376,7 +386,6 @@ pub(super) fn handle_rotate_gizmo(
                 let d = cursor_pos - center_screen;
                 let current_angle = d.y.atan2(d.x);
                 let mut raw_delta = current_angle - widget.drag_start_angle;
-                // Normalize to [-PI, PI] to handle wrapping at ±180°.
                 raw_delta = (raw_delta + PI).rem_euclid(TAU) - PI;
 
                 let axis_dir = widget.active_axis.direction();
@@ -391,14 +400,18 @@ pub(super) fn handle_rotate_gizmo(
                 let new_rotation = Quat::from_axis_angle(axis_dir, snapped_delta)
                     * widget.entity_start_rotation;
 
-                transform.rotation = new_rotation;
-                state.model_rotation = new_rotation;
+                match state.edit_target {
+                    EditTarget::Trigger => state.trigger_rotation = new_rotation,
+                    EditTarget::Collision => state.collision_rotation = new_rotation,
+                    EditTarget::Model => {}
+                }
             }
         } else {
             widget.active = false;
         }
     } else {
         let current_axis = rotation_axis_from_modifiers(&keyboard);
+        let yaw_quat = Quat::from_rotation_y(current_rotation.to_euler(EulerRot::YXZ).0);
         let (ref1, ref2) = rotated_perpendicular_basis(current_axis, yaw_quat);
         let min_dist = sample_ring_screen_dist(
             camera,
@@ -421,28 +434,30 @@ pub(super) fn handle_rotate_gizmo(
             widget.active = true;
             widget.active_axis = current_axis;
             widget.drag_start_angle = d.y.atan2(d.x);
-            widget.entity_start_rotation = transform.rotation;
+            widget.entity_start_rotation = current_rotation;
         }
     }
 }
 
 // --- Resize Handles for Trigger / Collision Volume ---
 
-/// Returns the world-space center and half-extents for the active volume edit target.
+/// Returns the world-space center, half-extents, and rotation for the active volume edit target.
 fn volume_box_params(
     state: &WorkshopState,
     preview_query: &Query<&Transform, With<PreviewObstacle>>,
-) -> Option<(Vec3, Vec3)> {
+) -> Option<(Vec3, Vec3, Quat)> {
     let entity = state.preview_entity?;
     let transform = preview_query.get(entity).ok()?;
     match state.edit_target {
         EditTarget::Trigger if state.has_trigger => Some((
             transform.translation + state.trigger_offset,
             state.trigger_half_extents,
+            state.trigger_rotation,
         )),
         EditTarget::Collision if state.has_collision => Some((
             transform.translation + state.collision_offset,
             state.collision_half_extents,
+            state.collision_rotation,
         )),
         _ => None,
     }
@@ -460,28 +475,28 @@ pub(super) fn draw_resize_handles(
     if !matches!(state.edit_target, EditTarget::Trigger | EditTarget::Collision) {
         return;
     }
-    let Some((center, he)) = volume_box_params(&state, &preview_query) else {
+    let Some((center, he, rotation)) = volume_box_params(&state, &preview_query) else {
         return;
     };
 
     for axis in [Axis::X, Axis::Y, Axis::Z] {
         for sign in [Sign::Positive, Sign::Negative] {
-            let dir = axis.direction()
+            let local_dir = axis.direction()
                 * match sign {
                     Sign::Positive => 1.0,
                     Sign::Negative => -1.0,
                 };
+            let world_dir = rotation * local_dir;
             let extent = match axis {
                 Axis::X => he.x,
                 Axis::Y => he.y,
                 Axis::Z => he.z,
             };
-            let pos = center + dir * extent;
+            let pos = center + world_dir * extent;
 
             let is_hovered = resize.hovered_handle == Some((axis, sign));
             let is_active = resize.active_handle == Some((axis, sign));
             let base = axis.color(is_hovered, is_active);
-            // Lighten the color for resize handles to distinguish from move arrows
             let color = if is_active || is_hovered {
                 base
             } else {
@@ -520,7 +535,7 @@ pub(super) fn handle_resize_widget(
         return;
     }
 
-    let Some((center, he)) = volume_box_params(&state, &preview_query) else {
+    let Some((center, he, rotation)) = volume_box_params(&state, &preview_query) else {
         resize.hovered_handle = None;
         resize.active_handle = None;
         return;
@@ -543,13 +558,12 @@ pub(super) fn handle_resize_widget(
 
     if let Some((active_axis, active_sign)) = resize.active_handle {
         if mouse_buttons.pressed(MouseButton::Left) {
-            let axis_dir = active_axis.direction();
+            let world_axis_dir = rotation * active_axis.direction();
             let sign_f = match active_sign {
                 Sign::Positive => 1.0,
                 Sign::Negative => -1.0,
             };
-            // Project cursor ray onto the axis to get new extent
-            let t = closest_point_on_axis(ray, center, axis_dir);
+            let t = closest_point_on_axis(ray, center, world_axis_dir);
             let new_extent = (t * sign_f).max(0.1);
             let target_he = match state.edit_target {
                 EditTarget::Collision => &mut state.collision_half_extents,
@@ -575,17 +589,18 @@ pub(super) fn handle_resize_widget(
 
         for axis in [Axis::X, Axis::Y, Axis::Z] {
             for sign in [Sign::Positive, Sign::Negative] {
-                let dir = axis.direction()
+                let local_dir = axis.direction()
                     * match sign {
                         Sign::Positive => 1.0,
                         Sign::Negative => -1.0,
                     };
+                let world_dir = rotation * local_dir;
                 let extent = match axis {
                     Axis::X => he.x,
                     Axis::Y => he.y,
                     Axis::Z => he.z,
                 };
-                let handle_pos = center + dir * extent;
+                let handle_pos = center + world_dir * extent;
                 let Ok(screen_pos) = camera.world_to_viewport(camera_gt, handle_pos) else {
                     continue;
                 };

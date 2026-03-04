@@ -77,6 +77,7 @@ mod tests {
                     offset: Vec3::new(0.0, 1.0, 0.0),
                     half_extents: Vec3::new(2.0, 2.0, 0.5),
                     forward: Vec3::NEG_Z,
+                    rotation: Quat::IDENTITY,
                 })
             } else {
                 None
@@ -84,7 +85,7 @@ mod tests {
             is_gate: gate,
             model_offset: Vec3::ZERO,
             model_rotation: Quat::IDENTITY,
-            collision_volume: None,
+            collision_volumes: vec![],
         }
     }
 

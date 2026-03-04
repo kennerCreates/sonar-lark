@@ -9,6 +9,7 @@ pub enum DnfReason {
     MissedGate(u32),
     ObstacleCollision,
     DroneCollision,
+    GroundCollision,
 }
 
 #[derive(Clone, Debug)]

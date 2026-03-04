@@ -5,9 +5,9 @@ use rand::Rng;
 use crate::drone::components::{Drone, DroneDynamics, DroneIdentity, DronePhase};
 use crate::drone::explosion::{self, CrashSounds, ExplosionMeshes};
 use crate::drone::interpolation::PreviousTranslation;
-use crate::obstacle::spawning::{ObstacleCollisionVolume, TriggerVolume};
+use crate::obstacle::spawning::{ObstacleCollisionVolumes, TriggerVolume};
 use crate::states::AppState;
-use super::collision_math::{segment_obb_intersection, point_in_gate_opening};
+use super::collision_math::{clip_opening_to_ground, segment_obb_intersection, point_in_gate_opening};
 use super::progress::{DnfReason, RaceProgress};
 
 // ---------------------------------------------------------------------------
@@ -40,7 +40,7 @@ pub struct ObstacleCollisionCache(pub Vec<ObstacleObb>);
 /// the resource. Follows the same polling pattern as `build_gate_planes`.
 pub fn build_obstacle_collision_cache(
     mut commands: Commands,
-    obstacle_query: Query<(Entity, &ObstacleCollisionVolume, &GlobalTransform)>,
+    obstacle_query: Query<(Entity, &ObstacleCollisionVolumes, &GlobalTransform)>,
     trigger_query: Query<(&TriggerVolume, &GlobalTransform, &ChildOf)>,
 ) {
     if obstacle_query.is_empty() {
@@ -49,24 +49,11 @@ pub fn build_obstacle_collision_cache(
 
     let mut obbs = Vec::new();
 
-    for (entity, collision_vol, global_transform) in &obstacle_query {
+    for (entity, collision_vols, global_transform) in &obstacle_query {
         let (scale, rotation, translation) = global_transform.to_scale_rotation_translation();
 
-        // World-space center: apply instance transform to the local offset
-        let center = translation + rotation * (collision_vol.offset * scale);
-
-        // World-space axes from the rotation matrix
-        let axes = [
-            rotation * Vec3::X,
-            rotation * Vec3::Y,
-            rotation * Vec3::Z,
-        ];
-
-        // Half-extents scaled by instance scale
-        let half_extents = collision_vol.half_extents * scale;
-
-        // For gates, find the child TriggerVolume to build the gate opening
-        let gate_opening = if collision_vol.is_gate {
+        // For gates, find the child TriggerVolume to build the gate opening (shared by all OBBs)
+        let gate_opening = if collision_vols.is_gate {
             let mut opening = None;
 
             for (trigger, trigger_global, child_of) in &trigger_query {
@@ -75,21 +62,24 @@ pub fn build_obstacle_collision_cache(
                 }
 
                 let trigger_center = trigger_global.translation();
-
-                // Extract axes from parent rotation (trigger child has no rotation)
-                let right = rotation * Vec3::X;
-                let up = rotation * Vec3::Y;
+                // Use the trigger's world rotation (includes parent + local rotation)
+                let trigger_rotation = trigger_global.to_scale_rotation_translation().1;
+                let right = trigger_rotation * Vec3::X;
+                let up = trigger_rotation * Vec3::Y;
 
                 let half_width = trigger.half_extents.x * scale.x;
-                let half_height = trigger.half_extents.y * scale.y;
+                let raw_half_height = trigger.half_extents.y * scale.y;
 
-                // Also need the gate forward for directionality (already stored as component)
+                // Clip gate opening to exclude below-ground portions
+                let (clipped_center_y, clipped_half_height) =
+                    clip_opening_to_ground(trigger_center.y, raw_half_height);
+
                 opening = Some(GateOpening {
-                    center: trigger_center,
+                    center: Vec3::new(trigger_center.x, clipped_center_y, trigger_center.z),
                     right,
                     up,
                     half_width,
-                    half_height,
+                    half_height: clipped_half_height,
                 });
                 break; // Only one trigger volume per gate
             }
@@ -99,12 +89,30 @@ pub fn build_obstacle_collision_cache(
             None
         };
 
-        obbs.push(ObstacleObb {
-            center,
-            axes,
-            half_extents,
-            gate_opening,
-        });
+        // Produce one OBB per collision volume entry, each with its own rotation
+        for vol in &collision_vols.volumes {
+            let vol_rotation = rotation * vol.rotation;
+            let axes = [
+                vol_rotation * Vec3::X,
+                vol_rotation * Vec3::Y,
+                vol_rotation * Vec3::Z,
+            ];
+            let center = translation + rotation * (vol.offset * scale);
+            let half_extents = vol.half_extents * scale;
+
+            obbs.push(ObstacleObb {
+                center,
+                axes,
+                half_extents,
+                gate_opening: gate_opening.as_ref().map(|o| GateOpening {
+                    center: o.center,
+                    right: o.right,
+                    up: o.up,
+                    half_width: o.half_width,
+                    half_height: o.half_height,
+                }),
+            });
+        }
     }
 
     if !obbs.is_empty() {

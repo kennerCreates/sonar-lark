@@ -213,11 +213,12 @@ mod tests {
                 offset: Vec3::new(0.0, 5.0, 0.0),
                 half_extents: Vec3::new(3.0, 3.0, 0.5),
                 forward: Vec3::NEG_Z,
+                rotation: Quat::IDENTITY,
             }),
             is_gate: true,
             model_offset: Vec3::ZERO,
             model_rotation: Quat::IDENTITY,
-            collision_volume: None,
+            collision_volumes: vec![],
         });
         lib
     }

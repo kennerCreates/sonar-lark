@@ -7,6 +7,7 @@ use crate::drone::interpolation::PreviousTranslation;
 use crate::obstacle::spawning::TriggerVolume;
 
 use super::collision::crash_drone;
+use super::collision_math::clip_opening_to_ground;
 
 use super::progress::{DnfReason, RaceProgress};
 use super::timing::RaceClock;
@@ -98,24 +99,29 @@ pub fn build_gate_planes(
             // approach side and d_curr <= 0 on the departure side.
             let normal = -(gate_forward.0.normalize_or(Vec3::NEG_Z));
 
-            // Extract axes from the parent gate's rotation (trigger child has no rotation)
-            let gate_rotation = gate_global.to_scale_rotation_translation().1;
-            let right = gate_rotation * Vec3::X;
-            let up = gate_rotation * Vec3::Y;
+            // Extract axes from the trigger's world rotation (includes parent + local rotation)
+            let trigger_rotation = trigger_global.to_scale_rotation_translation().1;
+            let right = trigger_rotation * Vec3::X;
+            let up = trigger_rotation * Vec3::Y;
 
             // Scale half-extents by parent scale
             let gate_scale = gate_global.to_scale_rotation_translation().0;
             let half_width = trigger.half_extents.x * gate_scale.x;
-            let half_height = trigger.half_extents.y * gate_scale.y;
+            let raw_half_height = trigger.half_extents.y * gate_scale.y;
+
+            // Clip gate opening to exclude below-ground portions
+            let (clipped_center_y, clipped_half_height) =
+                clip_opening_to_ground(center.y, raw_half_height);
+            let clipped_center = Vec3::new(center.x, clipped_center_y, center.z);
 
             planes.push(GatePlane {
                 gate_index: gate_index.0,
-                center,
+                center: clipped_center,
                 normal,
                 right,
                 up,
                 half_width,
-                half_height,
+                half_height: clipped_half_height,
             });
             break; // Only one trigger volume per gate
         }

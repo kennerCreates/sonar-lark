@@ -53,6 +53,24 @@ pub fn segment_obb_intersection(
     Some(p0 + t_min * dir)
 }
 
+/// Clips a vertical gate opening to stay above the ground plane (y=0).
+/// Returns adjusted `(center_y, half_height)` that excludes below-ground portions.
+/// If the opening is entirely underground, returns `(0.0, 0.0)`.
+pub fn clip_opening_to_ground(center_y: f32, half_height: f32) -> (f32, f32) {
+    let top = center_y + half_height;
+    if top <= 0.0 {
+        return (0.0, 0.0);
+    }
+    let bottom = center_y - half_height;
+    if bottom >= 0.0 {
+        return (center_y, half_height);
+    }
+    // Partially underground: clamp bottom to 0, keep top unchanged
+    let new_half_height = top / 2.0;
+    let new_center_y = new_half_height;
+    (new_center_y, new_half_height)
+}
+
 /// Returns true if `point` is within the gate opening (infinite depth tube).
 /// Projects the offset onto the opening's right and up axes; ignores the
 /// depth axis entirely so any approach angle works.
@@ -62,4 +80,68 @@ pub fn point_in_gate_opening(point: Vec3, opening: &GateOpening) -> bool {
     let x = offset.dot(opening.right).abs();
     let y = offset.dot(opening.up).abs();
     x < opening.half_width && y < opening.half_height
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- clip_opening_to_ground ---
+
+    #[test]
+    fn clip_fully_above_ground() {
+        // Center at y=5, half_height=3 → bottom=2, top=8 — no clipping
+        let (cy, hh) = clip_opening_to_ground(5.0, 3.0);
+        assert_eq!(cy, 5.0);
+        assert_eq!(hh, 3.0);
+    }
+
+    #[test]
+    fn clip_bottom_at_ground() {
+        // Center at y=3, half_height=3 → bottom=0, top=6 — no clipping needed
+        let (cy, hh) = clip_opening_to_ground(3.0, 3.0);
+        assert_eq!(cy, 3.0);
+        assert_eq!(hh, 3.0);
+    }
+
+    #[test]
+    fn clip_partially_underground() {
+        // Center at y=2, half_height=3 → bottom=-1, top=5
+        // Clipped: bottom=0, top=5 → center=2.5, half_height=2.5
+        let (cy, hh) = clip_opening_to_ground(2.0, 3.0);
+        assert!((cy - 2.5).abs() < 1e-6);
+        assert!((hh - 2.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn clip_center_at_ground() {
+        // Center at y=0, half_height=4 → bottom=-4, top=4
+        // Clipped: bottom=0, top=4 → center=2, half_height=2
+        let (cy, hh) = clip_opening_to_ground(0.0, 4.0);
+        assert!((cy - 2.0).abs() < 1e-6);
+        assert!((hh - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn clip_fully_underground() {
+        // Center at y=-5, half_height=2 → top=-3 — entirely underground
+        let (cy, hh) = clip_opening_to_ground(-5.0, 2.0);
+        assert_eq!(cy, 0.0);
+        assert_eq!(hh, 0.0);
+    }
+
+    #[test]
+    fn clip_top_at_ground() {
+        // Center at y=-2, half_height=2 → top=0 — just touching ground
+        let (cy, hh) = clip_opening_to_ground(-2.0, 2.0);
+        assert_eq!(cy, 0.0);
+        assert_eq!(hh, 0.0);
+    }
+
+    #[test]
+    fn clip_zero_height() {
+        let (cy, hh) = clip_opening_to_ground(5.0, 0.0);
+        assert_eq!(cy, 5.0);
+        assert_eq!(hh, 0.0);
+    }
 }

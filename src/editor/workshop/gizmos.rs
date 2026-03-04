@@ -25,7 +25,11 @@ pub(super) fn draw_trigger_gizmo(
 
     let center = preview_pos + state.trigger_offset;
     let size = state.trigger_half_extents * 2.0;
-    let transform = Transform::from_translation(center).with_scale(size);
+    let transform = Transform {
+        translation: center,
+        rotation: state.trigger_rotation,
+        scale: size,
+    };
 
     gizmos.cube(transform, color);
 }
@@ -45,13 +49,30 @@ pub(super) fn draw_collision_gizmo(
         .map(|t| t.translation)
         .unwrap_or(Vec3::ZERO);
 
-    let color = Color::srgb(1.0, 0.4, 0.1);
+    // Draw non-active shapes in a dim color
+    for (i, vol) in state.collision_volumes.iter().enumerate() {
+        if i == state.active_collision_idx {
+            continue;
+        }
+        let center = preview_pos + vol.offset;
+        let size = vol.half_extents * 2.0;
+        let transform = Transform {
+            translation: center,
+            rotation: vol.rotation,
+            scale: size,
+        };
+        gizmos.cube(transform, Color::srgb(0.5, 0.25, 0.05));
+    }
 
+    // Draw the active shape in bright orange (uses working-copy fields)
     let center = preview_pos + state.collision_offset;
     let size = state.collision_half_extents * 2.0;
-    let transform = Transform::from_translation(center).with_scale(size);
-
-    gizmos.cube(transform, color);
+    let transform = Transform {
+        translation: center,
+        rotation: state.collision_rotation,
+        scale: size,
+    };
+    gizmos.cube(transform, Color::srgb(1.0, 0.4, 0.1));
 }
 
 // --- Ground Center Gizmo ---

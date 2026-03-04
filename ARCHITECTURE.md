@@ -44,7 +44,7 @@ src/
 ├── obstacle/            Obstacle data layer
 │   ├── definition.rs    ObstacleId, ObstacleDef, TriggerVolumeConfig, CollisionVolumeConfig
 │   ├── library.rs       ObstacleLibrary resource, RON load/save
-│   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume/ObstacleCollisionVolume components
+│   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume/ObstacleCollisionVolumes (compound) components
 ├── course/              Course data layer
 │   ├── data.rs          CourseData, ObstacleInstance, PropKind, PropInstance, CameraInstance
 │   ├── discovery.rs     CourseEntry, discover_courses(), discover_courses_in() + tests
@@ -129,7 +129,7 @@ src/
 │   ├── script.rs        RaceScript, DroneScript, RaceEventLog, generate_race_script() — predetermined race outcomes
 │   ├── gate.rs          GateIndex, GateForward, GatePlanes (built at race start, used by script generator)
 │   ├── collision.rs     ObstacleCollisionCache, crash_drone helper
-│   ├── collision_math.rs segment_obb_intersection(), point_in_gate_opening() — pure geometry
+│   ├── collision_math.rs segment_obb_intersection(), point_in_gate_opening(), clip_opening_to_ground() — pure geometry
 │   ├── progress.rs      RaceProgress, per-drone state tracking, DnfReason
 │   ├── timing.rs        RaceClock
 │   ├── lifecycle.rs     Countdown, convergence, script generation, finish detection

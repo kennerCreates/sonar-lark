@@ -84,6 +84,7 @@ impl Plugin for DronePlugin {
                     choreography::advance_choreography,
                     choreography::compute_choreographed_rotation,
                     choreography::apply_visual_noise,
+                    choreography::ground_collision_check,
                     choreography::fire_scripted_events,
                 )
                     .chain()

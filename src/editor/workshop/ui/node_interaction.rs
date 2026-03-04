@@ -5,7 +5,7 @@ use crate::obstacle::library::ObstacleLibrary;
 use crate::ui_theme;
 
 use super::build::*;
-use crate::editor::workshop::{PreviewObstacle, WorkshopState};
+use crate::editor::workshop::{CollisionVolumeData, PreviewObstacle, WorkshopState};
 
 pub fn handle_node_selection(
     mut commands: Commands,
@@ -57,12 +57,20 @@ pub fn handle_library_selection(
         if let Some(trigger) = &def.trigger_volume {
             state.trigger_offset = trigger.offset - def.model_offset;
             state.trigger_half_extents = trigger.half_extents;
+            state.trigger_rotation = trigger.rotation;
         }
-        state.has_collision = def.collision_volume.is_some();
-        if let Some(collision) = &def.collision_volume {
-            state.collision_offset = collision.offset - def.model_offset;
-            state.collision_half_extents = collision.half_extents;
-        }
+        state.has_collision = !def.collision_volumes.is_empty();
+        state.collision_volumes = def
+            .collision_volumes
+            .iter()
+            .map(|c| CollisionVolumeData {
+                offset: c.offset - def.model_offset,
+                half_extents: c.half_extents,
+                rotation: c.rotation,
+            })
+            .collect();
+        state.active_collision_idx = 0;
+        state.load_active_from_vec();
 
         for entity in &preview_query {
             commands.entity(entity).despawn();

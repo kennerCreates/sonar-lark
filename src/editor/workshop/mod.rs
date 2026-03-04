@@ -15,6 +15,23 @@ use crate::states::DevMenuPage;
 
 use super::gizmos::{Axis, Sign};
 
+#[derive(Clone)]
+pub struct CollisionVolumeData {
+    pub offset: Vec3,
+    pub half_extents: Vec3,
+    pub rotation: Quat,
+}
+
+impl Default for CollisionVolumeData {
+    fn default() -> Self {
+        Self {
+            offset: Vec3::ZERO,
+            half_extents: Vec3::new(3.0, 3.0, 1.5),
+            rotation: Quat::IDENTITY,
+        }
+    }
+}
+
 #[derive(Resource)]
 pub struct WorkshopState {
     pub obstacle_name: String,
@@ -23,9 +40,16 @@ pub struct WorkshopState {
     pub has_trigger: bool,
     pub trigger_offset: Vec3,
     pub trigger_half_extents: Vec3,
+    pub trigger_rotation: Quat,
     pub has_collision: bool,
+    /// Working copy of the active collision volume (drives widgets/gizmos).
     pub collision_offset: Vec3,
     pub collision_half_extents: Vec3,
+    pub collision_rotation: Quat,
+    /// All collision volumes for this obstacle.
+    pub collision_volumes: Vec<CollisionVolumeData>,
+    /// Index of the currently-edited volume in `collision_volumes`.
+    pub active_collision_idx: usize,
     pub preview_entity: Option<Entity>,
     pub available_nodes: Vec<String>,
     pub nodes_loaded: bool,
@@ -45,9 +69,13 @@ impl Default for WorkshopState {
             has_trigger: true,
             trigger_offset: Vec3::new(0.0, 1.0, 0.0),
             trigger_half_extents: Vec3::new(2.0, 2.0, 0.5),
+            trigger_rotation: Quat::IDENTITY,
             has_collision: false,
             collision_offset: Vec3::ZERO,
             collision_half_extents: Vec3::new(3.0, 3.0, 1.5),
+            collision_rotation: Quat::IDENTITY,
+            collision_volumes: Vec::new(),
+            active_collision_idx: 0,
             preview_entity: None,
             available_nodes: Vec::new(),
             nodes_loaded: false,
@@ -56,6 +84,26 @@ impl Default for WorkshopState {
             model_offset: Vec3::ZERO,
             model_rotation: Quat::IDENTITY,
             transform_mode: TransformMode::default(),
+        }
+    }
+}
+
+impl WorkshopState {
+    /// Save the working-copy fields back into the volumes vec at the active index.
+    pub fn sync_active_to_vec(&mut self) {
+        if let Some(vol) = self.collision_volumes.get_mut(self.active_collision_idx) {
+            vol.offset = self.collision_offset;
+            vol.half_extents = self.collision_half_extents;
+            vol.rotation = self.collision_rotation;
+        }
+    }
+
+    /// Load the volume at `active_collision_idx` into the working-copy fields.
+    pub fn load_active_from_vec(&mut self) {
+        if let Some(vol) = self.collision_volumes.get(self.active_collision_idx) {
+            self.collision_offset = vol.offset;
+            self.collision_half_extents = vol.half_extents;
+            self.collision_rotation = vol.rotation;
         }
     }
 }
@@ -139,6 +187,10 @@ impl Plugin for WorkshopPlugin {
                 ui::handle_library_selection,
                 ui::handle_trigger_toggle,
                 ui::handle_collision_toggle,
+                ui::handle_add_collision_shape,
+                ui::handle_remove_collision_shape,
+                ui::handle_prev_collision_shape,
+                ui::handle_next_collision_shape,
                 ui::handle_save_button,
                 ui::handle_new_button,
                 ui::handle_delete_button,

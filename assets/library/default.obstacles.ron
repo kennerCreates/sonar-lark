@@ -3,16 +3,20 @@
         id: ("gate_ground"),
         glb_node_name: "gate_ground",
         trigger_volume: Some((
-            offset: (-0.30301952, 5.6780343, 0.6813984),
-            half_extents: (6.986324, 4.780797, 0.7959853),
+            offset: (-1.7948599, 5.245564, 0.59887743),
+            half_extents: (6.5755672, 5.0597453, 2.2667458),
             forward: (0.0, 0.0, -1.0),
+            rotation: (0.0, 0.0, -0.087155744, 0.9961947),
         )),
         is_gate: true,
-        model_offset: (9.932265, 0.0, 0.33270836),
+        model_offset: (8.635478, 0.0, 0.28681183),
         model_rotation: (0.0, 0.0, 0.0, 1.0),
-        collision_volume: Some((
-            offset: (-1.298255, 7.0212097, 2.230667),
-            half_extents: (9.721297, 5.9316998, 1.5),
-        )),
+        collision_volumes: [
+            (
+                offset: (7.212179, 5.5700407, 1.1378155),
+                half_extents: (1.8410523, 6.0479016, 1.5),
+                rotation: (0.0, 0.0, 0.08715574, 0.9961947),
+            ),
+        ],
     ),
 ]

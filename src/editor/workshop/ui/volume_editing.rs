@@ -5,7 +5,7 @@ use crate::palette;
 use crate::ui_theme;
 
 use super::build::*;
-use crate::editor::workshop::{EditTarget, WorkshopState};
+use crate::editor::workshop::{CollisionVolumeData, EditTarget, WorkshopState};
 
 pub fn handle_trigger_toggle(
     mut state: ResMut<WorkshopState>,
@@ -25,8 +25,17 @@ pub fn handle_collision_toggle(
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             state.has_collision = !state.has_collision;
-            if state.has_collision && state.collision_half_extents == Vec3::ZERO {
-                state.collision_half_extents = Vec3::new(3.0, 3.0, 1.5);
+            if state.has_collision && state.collision_volumes.is_empty() {
+                let vol = CollisionVolumeData::default();
+                state.collision_offset = vol.offset;
+                state.collision_half_extents = vol.half_extents;
+                state.collision_rotation = vol.rotation;
+                state.collision_volumes.push(vol);
+                state.active_collision_idx = 0;
+            }
+            if !state.has_collision {
+                state.collision_volumes.clear();
+                state.active_collision_idx = 0;
             }
         }
     }
@@ -111,9 +120,10 @@ pub fn handle_name_text_input(
 
 pub fn update_display_values(
     state: Res<WorkshopState>,
-    mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>)>,
-    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>, Without<HasCollisionText>)>,
-    mut collision_text: Query<&mut Text, (With<HasCollisionText>, Without<NameDisplayText>, Without<HasTriggerText>)>,
+    mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>)>,
+    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>, Without<HasCollisionText>, Without<CollisionShapeLabel>)>,
+    mut collision_text: Query<&mut Text, (With<HasCollisionText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<CollisionShapeLabel>)>,
+    mut shape_label: Query<&mut Text, (With<CollisionShapeLabel>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>)>,
     mut bgs: ParamSet<(
         Query<&mut BackgroundColor, With<HasTriggerToggle>>,
         Query<&mut BackgroundColor, With<HasCollisionToggle>>,
@@ -147,6 +157,14 @@ pub fn update_display_values(
     if let Ok(mut text) = collision_text.single_mut() {
         **text = if state.has_collision { "ON" } else { "OFF" }.to_string();
     }
+    if let Ok(mut text) = shape_label.single_mut() {
+        let total = state.collision_volumes.len();
+        if total == 0 {
+            **text = "Shape 0/0".to_string();
+        } else {
+            **text = format!("Shape {}/{}", state.active_collision_idx + 1, total);
+        }
+    }
 
     if let Ok(mut bg) = bgs.p0().single_mut() {
         *bg = BackgroundColor(if state.has_trigger { ui_theme::TOGGLE_ON } else { ui_theme::TOGGLE_OFF });
@@ -163,5 +181,80 @@ pub fn update_display_values(
     }
     if let Ok(mut bg) = bgs.p4().single_mut() {
         *bg = BackgroundColor(if state.edit_target == EditTarget::Collision { RADIO_ACTIVE } else { RADIO_INACTIVE });
+    }
+}
+
+pub fn handle_add_collision_shape(
+    mut state: ResMut<WorkshopState>,
+    query: Query<&Interaction, (Changed<Interaction>, With<AddCollisionShapeButton>)>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        if !state.has_collision {
+            continue;
+        }
+        // Save current working copy before adding
+        state.sync_active_to_vec();
+        let new_vol = CollisionVolumeData::default();
+        state.collision_volumes.push(new_vol);
+        state.active_collision_idx = state.collision_volumes.len() - 1;
+        state.load_active_from_vec();
+        state.edit_target = EditTarget::Collision;
+    }
+}
+
+pub fn handle_remove_collision_shape(
+    mut state: ResMut<WorkshopState>,
+    query: Query<&Interaction, (Changed<Interaction>, With<RemoveCollisionShapeButton>)>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        if state.collision_volumes.len() <= 1 {
+            continue; // Keep at least one shape while collision is enabled
+        }
+        let idx = state.active_collision_idx;
+        state.collision_volumes.remove(idx);
+        if state.active_collision_idx >= state.collision_volumes.len() {
+            state.active_collision_idx = state.collision_volumes.len() - 1;
+        }
+        state.load_active_from_vec();
+    }
+}
+
+pub fn handle_prev_collision_shape(
+    mut state: ResMut<WorkshopState>,
+    query: Query<&Interaction, (Changed<Interaction>, With<PrevCollisionShapeButton>)>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        if state.collision_volumes.len() <= 1 || state.active_collision_idx == 0 {
+            continue;
+        }
+        state.sync_active_to_vec();
+        state.active_collision_idx -= 1;
+        state.load_active_from_vec();
+    }
+}
+
+pub fn handle_next_collision_shape(
+    mut state: ResMut<WorkshopState>,
+    query: Query<&Interaction, (Changed<Interaction>, With<NextCollisionShapeButton>)>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        if state.active_collision_idx + 1 >= state.collision_volumes.len() {
+            continue;
+        }
+        state.sync_active_to_vec();
+        state.active_collision_idx += 1;
+        state.load_active_from_vec();
     }
 }

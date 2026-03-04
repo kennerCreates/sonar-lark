@@ -32,19 +32,31 @@ pub fn handle_save_button(
                 offset: state.model_offset + state.trigger_offset,
                 half_extents: state.trigger_half_extents,
                 forward: Vec3::NEG_Z,
+                rotation: state.trigger_rotation,
             })
         } else {
             None
         };
 
-        let collision_volume = if state.has_collision {
-            Some(CollisionVolumeConfig {
-                // Store offset in ground-anchor space (model-relative + model_offset).
-                offset: state.model_offset + state.collision_offset,
-                half_extents: state.collision_half_extents,
-            })
+        // Sync the active working copy back before saving all volumes
+        let collision_volumes = if state.has_collision {
+            // Build a temporary copy with the active volume synced
+            let mut vols = state.collision_volumes.clone();
+            if let Some(vol) = vols.get_mut(state.active_collision_idx) {
+                vol.offset = state.collision_offset;
+                vol.half_extents = state.collision_half_extents;
+                vol.rotation = state.collision_rotation;
+            }
+            vols.iter()
+                .map(|v| CollisionVolumeConfig {
+                    // Store offset in ground-anchor space (model-relative + model_offset).
+                    offset: state.model_offset + v.offset,
+                    half_extents: v.half_extents,
+                    rotation: v.rotation,
+                })
+                .collect()
         } else {
-            None
+            vec![]
         };
 
         let def = ObstacleDef {
@@ -54,7 +66,7 @@ pub fn handle_save_button(
             is_gate: state.is_gate,
             model_offset: state.model_offset,
             model_rotation: state.model_rotation,
-            collision_volume,
+            collision_volumes,
         };
 
         library.insert(def);

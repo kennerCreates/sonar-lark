@@ -86,7 +86,7 @@ pub fn spawn_course(
             def.trigger_volume.as_ref(),
             instance.gate_order,
             instance.gate_forward_flipped,
-            def.collision_volume.as_ref(),
+            &def.collision_volumes,
         );
 
         if spawned.is_none() {

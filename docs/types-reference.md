@@ -11,8 +11,9 @@ Do not read this file in full — use `grep` to find specific types. This is a l
 | `ObstacleLibrary` | Res | All loaded obstacle definitions |
 | `CourseData` | Res | All obstacle/prop/camera placements for a course |
 | `TriggerVolume` | Comp | AABB hitbox on gate entities |
-| `CollisionVolumeConfig` | Data | Local-space AABB for obstacle collision |
-| `ObstacleCollisionVolume` | Comp | Runtime collision volume on obstacle entities |
+| `CollisionVolumeConfig` | Data | Local-space AABB for obstacle collision (Vec per obstacle) |
+| `CollisionVolumeEntry` | Data | Single collision box within an `ObstacleCollisionVolumes` |
+| `ObstacleCollisionVolumes` | Comp | Runtime collision volumes (compound) on obstacle entities |
 | `ObstacleCollisionCache` | Res | Cached world-space OBBs, built once at race start |
 
 ## Race

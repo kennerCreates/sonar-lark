@@ -61,6 +61,21 @@ pub struct HasTriggerText;
 #[derive(Component)]
 pub struct HasCollisionText;
 
+#[derive(Component)]
+pub struct AddCollisionShapeButton;
+
+#[derive(Component)]
+pub struct RemoveCollisionShapeButton;
+
+#[derive(Component)]
+pub struct PrevCollisionShapeButton;
+
+#[derive(Component)]
+pub struct NextCollisionShapeButton;
+
+#[derive(Component)]
+pub struct CollisionShapeLabel;
+
 pub fn build_workshop_ui(commands: &mut Commands, library: &ObstacleLibrary) {
     commands
         .spawn((
@@ -247,6 +262,9 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             spawn_toggle_row(panel, "Trigger Volume", HasTriggerToggle, HasTriggerText, true);
             spawn_toggle_row(panel, "Collision Volume", HasCollisionToggle, HasCollisionText, false);
 
+            // Collision shape navigation: [<] Shape 1/1 [>] [+] [-]
+            spawn_collision_shape_row(panel);
+
             panel.spawn(Node {
                 flex_grow: 1.0,
                 ..default()
@@ -402,6 +420,68 @@ fn spawn_radio_option(
                 ..default()
             },
             BackgroundColor(bg),
+            BorderColor::all(palette::STEEL),
+        ))
+        .with_children(|btn| {
+            btn.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(palette::VANILLA),
+            ));
+        });
+}
+
+fn spawn_collision_shape_row(parent: &mut ChildSpawnerCommands) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(4.0),
+            ..default()
+        })
+        .with_children(|row| {
+            // Prev button
+            spawn_small_button(row, "<", PrevCollisionShapeButton);
+
+            // "Shape 0/0" label
+            row.spawn((
+                Text::new("Shape 0/0"),
+                TextFont {
+                    font_size: 12.0,
+                    ..default()
+                },
+                TextColor(palette::SAND),
+                CollisionShapeLabel,
+            ));
+
+            // Next button
+            spawn_small_button(row, ">", NextCollisionShapeButton);
+
+            // Add button
+            spawn_small_button(row, "+", AddCollisionShapeButton);
+
+            // Remove button
+            spawn_small_button(row, "-", RemoveCollisionShapeButton);
+        });
+}
+
+fn spawn_small_button(parent: &mut ChildSpawnerCommands, label: &str, marker: impl Component) {
+    parent
+        .spawn((
+            Button,
+            marker,
+            Node {
+                width: Val::Px(24.0),
+                height: Val::Px(24.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(ui_theme::BUTTON_NORMAL),
             BorderColor::all(palette::STEEL),
         ))
         .with_children(|btn| {
