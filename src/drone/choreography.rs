@@ -24,6 +24,9 @@ const SKILL_JITTER_SCALE: f32 = 3.0;
 // ---------------------------------------------------------------------------
 
 const MAX_BANK_ANGLE: f32 = 1.2; // ~69 degrees
+/// Exponential smoothing rate for signed bank angle (1/s).
+/// At 5.0: half-life ~0.14s, eliminates single-frame flips while tracking turns.
+const BANK_SMOOTH_RATE: f32 = 5.0;
 const GROUND_HEIGHT: f32 = 0.3;
 /// Lateral deflection speed (m/s) added on crash for visible veer.
 const CRASH_DEFLECTION_SPEED: f32 = 3.0;
@@ -233,8 +236,12 @@ pub fn advance_choreography(
 
 /// Derives bank angle from spline curvature for Racing drones.
 /// Applies acrobatic rotation keyframes (Phase 5) during acrobatic windows.
+///
+/// Bank angle is exponentially smoothed to prevent instant flips at S-curve
+/// inflection points, producing a cinematic "broadcast TV" banking feel.
 pub fn compute_choreographed_rotation(
     _tuning: Res<AiTuningParams>,
+    time: Res<Time>,
     script: Option<Res<RaceScript>>,
     mut query: Query<(
         &Drone,
@@ -242,11 +249,13 @@ pub fn compute_choreographed_rotation(
         &AIController,
         &DroneDynamics,
         &mut Transform,
+        &mut ChoreographyState,
     )>,
 ) {
     let Some(script) = script else { return };
+    let dt = time.delta_secs();
 
-    for (drone, phase, ai, dynamics, mut transform) in &mut query {
+    for (drone, phase, ai, dynamics, mut transform, mut choreo) in &mut query {
         if *phase != DronePhase::Racing {
             continue;
         }
@@ -273,17 +282,29 @@ pub fn compute_choreographed_rotation(
 
         let speed = dynamics.velocity.length();
         let kappa = centripetal.length() / (vel_len * vel_len);
-        let bank_angle = (speed * speed * kappa / GRAVITY)
+        let raw_bank = (speed * speed * kappa / GRAVITY)
             .atan()
             .clamp(0.0, MAX_BANK_ANGLE);
 
-        // Bank direction: which way the turn curves
+        // Signed bank: positive = left bank
         let left = Vec3::Y.cross(tangent).normalize_or(Vec3::X);
         let bank_sign = centripetal.dot(left).signum();
+        let target_bank = raw_bank * bank_sign;
+
+        // Smooth the signed bank angle to prevent instant flips at inflection points
+        let alpha = (1.0 - (-BANK_SMOOTH_RATE * dt).exp()).min(1.0);
+        choreo.smoothed_bank += (target_bank - choreo.smoothed_bank) * alpha;
+
+        let smooth_angle = choreo.smoothed_bank.abs();
+        let smooth_sign = if choreo.smoothed_bank.abs() > 0.001 {
+            choreo.smoothed_bank.signum()
+        } else {
+            bank_sign
+        };
 
         // Build normal banking rotation
         let banked_up =
-            Quat::from_axis_angle(tangent, -bank_sign * bank_angle) * Vec3::Y;
+            Quat::from_axis_angle(tangent, -smooth_sign * smooth_angle) * Vec3::Y;
 
         let normal_rot = match look_toward(tangent, banked_up) {
             Some(r) => r,
@@ -654,6 +675,7 @@ pub fn snap_to_start_positions(
         commands.entity(entity).insert(ChoreographyState {
             previous_spline_t: 0.0,
             consistency,
+            smoothed_bank: 0.0,
         });
     }
 }

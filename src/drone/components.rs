@@ -58,7 +58,7 @@ impl Default for AttitudePd {
             kd_roll_pitch: 0.20,
             kp_yaw: 3.0,
             kd_yaw: 0.25,
-            max_angular_rate: Vec3::new(20.0, 20.0, 10.0),
+            max_angular_rate: Vec3::new(8.0, 8.0, 6.0),
         }
     }
 }
@@ -195,6 +195,9 @@ pub struct ChoreographyState {
     pub previous_spline_t: f32,
     /// Pilot consistency (0..1), cached at race start for jitter scaling.
     pub consistency: f32,
+    /// Exponentially smoothed signed bank angle (positive = left bank).
+    /// Prevents instant flip at S-curve inflection points.
+    pub smoothed_bank: f32,
 }
 
 /// Ballistic arc state for crashed drones (inserted on crash, removed on ground impact).
