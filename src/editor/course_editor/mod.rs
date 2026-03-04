@@ -133,7 +133,6 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_palette_selection,
                     ui::handle_prop_palette_selection,
                     ui::handle_tab_switch,
-                    ui::handle_back_to_workshop,
                     ui::handle_back_to_menu,
                     ui::handle_save_button,
                     ui::handle_load_button,

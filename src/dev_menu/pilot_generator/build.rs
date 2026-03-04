@@ -5,9 +5,10 @@ use crate::states::DevMenuPage;
 use crate::ui_theme::ThemedButton;
 
 use super::{
-    AcceptButton, DroneColorSwatch, GamertagLabel, GenBackButton, PaletteEditorButton,
-    PersonalityLabel, PilotGeneratorState, PreviewImage, RerollGamertagButton,
-    RerollPersonalityButton, RerollPortraitButton, RosterCountLabel, format_personality,
+    AcceptButton, DroneColorSwatch, GamertagLabel, GenBackButton, ObstacleWorkshopButton,
+    PaletteEditorButton, PersonalityLabel, PilotGeneratorState, PreviewImage,
+    RerollGamertagButton, RerollPersonalityButton, RerollPortraitButton, RosterCountLabel,
+    format_personality,
 };
 
 const PANEL_BG: Color = Color::srgba(0.02, 0.04, 0.08, 0.95);
@@ -58,6 +59,7 @@ pub fn build_ui(
                         ..default()
                     })
                     .with_children(|btns| {
+                        spawn_header_button(btns, "OBSTACLE WORKSHOP", ObstacleWorkshopButton);
                         spawn_header_button(btns, "PALETTE EDITOR", PaletteEditorButton);
                         spawn_header_button(btns, "BACK", GenBackButton);
                     });

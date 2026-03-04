@@ -79,7 +79,6 @@ pub fn handle_button_hover(
                 With<NodeButton>,
                 With<LibraryButton>,
                 With<BackButton>,
-                With<SwitchToCourseEditorButton>,
             )>,
         ),
     >,

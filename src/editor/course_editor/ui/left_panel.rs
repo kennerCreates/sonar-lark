@@ -290,7 +290,6 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
             });
 
             ui_theme::spawn_divider(panel);
-            ui_theme::spawn_panel_button(panel, "Obstacle Workshop", BackToWorkshopButton);
             ui_theme::spawn_panel_button(panel, "Back to Menu", BackToMenuButton);
         });
 }

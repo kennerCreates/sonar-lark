@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::obstacle::definition::{CollisionVolumeConfig, ObstacleDef, ObstacleId, TriggerVolumeConfig};
 use crate::obstacle::library::{save_obstacle_library, ObstacleLibrary};
 use crate::palette;
-use crate::states::{AppState, EditorMode};
+use crate::states::DevMenuPage;
 
 use super::build::*;
 use crate::editor::workshop::{PreviewObstacle, WorkshopState};
@@ -130,22 +130,11 @@ pub fn handle_delete_button(
 
 pub fn handle_back_button(
     query: Query<&Interaction, (Changed<Interaction>, With<BackButton>)>,
-    mut next_state: ResMut<NextState<AppState>>,
+    mut next_state: ResMut<NextState<DevMenuPage>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            next_state.set(AppState::Menu);
-        }
-    }
-}
-
-pub fn handle_switch_to_course_editor(
-    query: Query<&Interaction, (Changed<Interaction>, With<SwitchToCourseEditorButton>)>,
-    mut next_state: ResMut<NextState<EditorMode>>,
-) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            next_state.set(EditorMode::CourseEditor);
+            next_state.set(DevMenuPage::PilotGenerator);
         }
     }
 }

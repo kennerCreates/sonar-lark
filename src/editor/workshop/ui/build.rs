@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
-use crate::states::EditorMode;
+use crate::states::DevMenuPage;
 use crate::ui_theme;
 
 pub(super) const RADIO_ACTIVE: Color = palette::TEAL;
@@ -50,9 +50,6 @@ pub struct DeleteButton;
 pub struct BackButton;
 
 #[derive(Component)]
-pub struct SwitchToCourseEditorButton;
-
-#[derive(Component)]
 pub struct NameFieldButton;
 
 #[derive(Component)]
@@ -74,7 +71,7 @@ pub fn build_workshop_ui(commands: &mut Commands, library: &ObstacleLibrary) {
                 justify_content: JustifyContent::SpaceBetween,
                 ..default()
             },
-            DespawnOnExit(EditorMode::ObstacleWorkshop),
+            DespawnOnExit(DevMenuPage::ObstacleWorkshop),
         ))
         .with_children(|root| {
             build_left_panel(root, library);
@@ -184,8 +181,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 ..default()
             });
 
-            ui_theme::spawn_panel_button(panel, "Back to Menu", BackButton);
-            ui_theme::spawn_panel_button(panel, "Course Editor", SwitchToCourseEditorButton);
+            ui_theme::spawn_panel_button(panel, "Back", BackButton);
         });
 }
 

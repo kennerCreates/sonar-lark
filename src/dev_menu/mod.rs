@@ -5,6 +5,7 @@ pub mod portrait_editor;
 
 use bevy::prelude::*;
 
+use crate::editor::workshop;
 use crate::states::DevMenuPage;
 
 pub struct DevMenuPlugin;
@@ -55,6 +56,9 @@ impl Plugin for DevMenuPlugin {
                 .run_if(in_state(DevMenuPage::PaletteEditor)),
         );
 
+        // ── Obstacle Workshop (ObstacleWorkshop page) ─────────────────
+        app.add_plugins(workshop::WorkshopPlugin);
+
         // ── Pilot Generator (PilotGenerator page — default) ───────────
         app.add_systems(
             OnEnter(DevMenuPage::PilotGenerator),
@@ -69,6 +73,7 @@ impl Plugin for DevMenuPlugin {
             (
                 pilot_generator::handle_back_button,
                 pilot_generator::handle_palette_editor_button,
+                pilot_generator::handle_obstacle_workshop_button,
                 pilot_generator::handle_reroll_portrait_button,
                 pilot_generator::handle_reroll_gamertag_button,
                 pilot_generator::handle_reroll_personality_button,

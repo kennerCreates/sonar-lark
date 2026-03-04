@@ -11,7 +11,7 @@ use bevy::{
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
 use crate::palette;
-use crate::states::EditorMode;
+use crate::states::DevMenuPage;
 
 use super::gizmos::{Axis, Sign};
 
@@ -104,14 +104,14 @@ impl Plugin for WorkshopPlugin {
     fn build(&self, app: &mut App) {
         app.init_gizmo_group::<TriggerGizmoGroup>()
         .add_systems(
-            OnEnter(EditorMode::ObstacleWorkshop),
+            OnEnter(DevMenuPage::ObstacleWorkshop),
             (load_gltf_for_workshop, setup_workshop),
         )
         // Populate node list once glTF is loaded (runs at most once per workshop entry)
         .add_systems(
             Update,
             populate_node_list
-                .run_if(in_state(EditorMode::ObstacleWorkshop))
+                .run_if(in_state(DevMenuPage::ObstacleWorkshop))
                 .run_if(workshop_nodes_pending)
                 .run_if(obstacles_gltf_ready),
         )
@@ -126,9 +126,8 @@ impl Plugin for WorkshopPlugin {
                 ui::handle_new_button,
                 ui::handle_delete_button,
                 ui::handle_back_button,
-                ui::handle_switch_to_course_editor,
             )
-                .run_if(in_state(EditorMode::ObstacleWorkshop)),
+                .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
         )
         .add_systems(
             Update,
@@ -142,7 +141,7 @@ impl Plugin for WorkshopPlugin {
                 gizmos::draw_trigger_gizmo,
                 gizmos::draw_collision_gizmo,
             )
-                .run_if(in_state(EditorMode::ObstacleWorkshop)),
+                .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
         )
         .add_systems(
             Update,
@@ -153,9 +152,9 @@ impl Plugin for WorkshopPlugin {
                 widgets::draw_resize_handles,
                 widgets::handle_resize_widget,
             )
-                .run_if(in_state(EditorMode::ObstacleWorkshop)),
+                .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
         )
-        .add_systems(OnExit(EditorMode::ObstacleWorkshop), cleanup_workshop);
+        .add_systems(OnExit(DevMenuPage::ObstacleWorkshop), cleanup_workshop);
     }
 }
 

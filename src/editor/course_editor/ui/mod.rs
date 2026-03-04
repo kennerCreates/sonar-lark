@@ -14,9 +14,9 @@ pub use discover::discover_existing_courses;
 pub use left_panel::build_course_editor_ui;
 pub use load::{auto_load_pending_course, handle_load_button};
 pub use save_delete::{
-    handle_back_to_menu, handle_back_to_workshop, handle_cancel_delete,
-    handle_clear_gate_orders_button, handle_confirm_delete, handle_delete_button,
-    handle_gate_order_toggle, handle_new_course_button, handle_save_button,
+    handle_back_to_menu, handle_cancel_delete, handle_clear_gate_orders_button,
+    handle_confirm_delete, handle_delete_button, handle_gate_order_toggle,
+    handle_new_course_button, handle_save_button,
 };
 pub use obstacle_interaction::{handle_palette_selection, handle_tab_switch};
 pub use prop_interaction::{

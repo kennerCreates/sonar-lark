@@ -14,9 +14,6 @@ pub struct PaletteButton(pub ObstacleId);
 pub struct ExistingCourseButton(pub String);
 
 #[derive(Component)]
-pub struct BackToWorkshopButton;
-
-#[derive(Component)]
 pub struct BackToMenuButton;
 
 #[derive(Component)]

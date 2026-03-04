@@ -6,6 +6,8 @@ All obstacle models come from a single `assets/models/obstacles.glb`. Individual
 
 ## Workshop Pattern
 
+**Note:** The obstacle workshop has been moved to the dev menu (`DevMenuPage::ObstacleWorkshop`). Source files remain in `src/editor/workshop/` but the plugin is registered by `DevMenuPlugin`. Camera rig is set up/torn down on workshop page enter/exit.
+
 `WorkshopState` created `OnEnter(ObstacleWorkshop)`, removed `OnExit`. `PreviewObstacle` entities manually despawned on exit. Node list populated via `run_if(obstacles_gltf_ready)` + `run_if(workshop_nodes_pending)`; placeholder cube if no glb match. Workshop module split: `mod.rs` (types, lifecycle, plugin), `preview.rs` (preview spawning), `gizmos.rs` (trigger/collision/ground gizmos), `widgets.rs` (move/resize widget drawing and handling).
 
 ## Menu Pattern

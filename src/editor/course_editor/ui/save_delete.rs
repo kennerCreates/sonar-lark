@@ -6,24 +6,13 @@ use crate::editor::course_editor::{
     self, EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
 };
 use crate::palette;
-use crate::states::{AppState, EditorMode, LastEditedCourse};
+use crate::states::{AppState, LastEditedCourse};
 use crate::ui_theme;
 
 use super::discover::discover_existing_courses;
 use super::right_panel::spawn_existing_course_button;
 use super::data::build_course_data;
 use super::types::*;
-
-pub fn handle_back_to_workshop(
-    query: Query<&Interaction, (Changed<Interaction>, With<BackToWorkshopButton>)>,
-    mut next_mode: ResMut<NextState<EditorMode>>,
-) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            next_mode.set(EditorMode::ObstacleWorkshop);
-        }
-    }
-}
 
 pub fn handle_back_to_menu(
     query: Query<&Interaction, (Changed<Interaction>, With<BackToMenuButton>)>,

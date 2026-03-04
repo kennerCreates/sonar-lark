@@ -36,6 +36,9 @@ pub struct GenBackButton;
 pub struct PaletteEditorButton;
 
 #[derive(Component)]
+pub struct ObstacleWorkshopButton;
+
+#[derive(Component)]
 pub struct RerollPortraitButton;
 
 #[derive(Component)]
@@ -184,6 +187,17 @@ pub fn handle_palette_editor_button(
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             next_state.set(DevMenuPage::PaletteEditor);
+        }
+    }
+}
+
+pub fn handle_obstacle_workshop_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<ObstacleWorkshopButton>)>,
+    mut next_state: ResMut<NextState<DevMenuPage>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(DevMenuPage::ObstacleWorkshop);
         }
     }
 }

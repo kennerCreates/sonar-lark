@@ -5,7 +5,7 @@
 This is a **drone racing simulator with a built-in map editor**, built in **Rust** using **Bevy 0.18.0**. See `ARCHITECTURE.md` for the module structure, data flow, and design decisions.
 
 Key facts:
-- **State machine**: `AppState` (Menu → Editor → Race → Results) with `EditorMode` SubStates (ObstacleWorkshop, CourseEditor)
+- **State machine**: `AppState` (Menu → Editor → Race → Results → DevMenu) with `EditorMode` SubStates (CourseEditor) and `DevMenuPage` SubStates (PilotGenerator, PaletteEditor, ObstacleWorkshop)
 - **Choreographed racing**: Race outcomes predetermined by script generator (`race/script.rs`), played back via spline-following (`drone/choreography.rs`). Physics only used for wandering drones. See [`docs/drone-system.md`](docs/drone-system.md), [`docs/race-system.md`](docs/race-system.md).
 - **Physics**: Thrust-through-body quadrotor with 3-stage PID (position→acceleration→attitude), used for pre/post-race wandering. See [`docs/drone-physics.md`](docs/drone-physics.md).
 - **Data**: Obstacle definitions and courses serialized as RON. Single `.glb` for obstacle models, separate `.glb` for drone.
@@ -64,12 +64,20 @@ The performance target is a stable **60fps**. Performance is paramount.
 | [`docs/camera-system.md`](docs/camera-system.md) | Changing camera modes or switching logic |
 | [`docs/rendering.md`](docs/rendering.md) | Changing CelMaterial, skybox, shaders, or light direction |
 | [`docs/types-reference.md`](docs/types-reference.md) | Looking up a specific type — **grep, don't read in full** |
-| [`docs/post-phase-checklist.md`](docs/post-phase-checklist.md) | Completing an implementation phase |
 | [`docs/testing-conventions.md`](docs/testing-conventions.md) | Writing or modifying tests |
 
 ## Post-Phase Checklist
 
-Follow [`docs/post-phase-checklist.md`](docs/post-phase-checklist.md) after completing each implementation phase (build, clippy, tests, manual testing form).
+After completing each implementation phase:
+
+1. **Update documentation**: Review and update `TODO.md`, `ARCHITECTURE.md`, and `CLAUDE.md` with any new types, patterns, or conventions introduced.
+2. **Review warnings**: Run `cargo build` and review all warnings. Fix any that indicate real issues (unused imports, unnecessary mut, etc.). Warnings for types/functions that are planned for upcoming phases in the current sprint are acceptable and should be left alone — do not suppress them with `#[allow(dead_code)]`.
+3. **Run clippy**: Run `cargo clippy -- -D warnings` and fix all lints. Clippy catches idiomatic issues, performance pitfalls, and common mistakes that `rustc` alone misses.
+4. **Run tests**: Run `cargo test` and verify all tests pass. Add tests for new pure-logic functions.
+5. **Manual testing feedback form**: After all automated checks pass, present a structured feedback form for manual testing. The form must include:
+   - A checklist of every manually-testable behavior introduced or changed in the phase (specific actions, expected results).
+   - Edge cases and error scenarios to verify (e.g., invalid input, rapid state transitions, boundary values).
+
 
 ## Testing Conventions
 

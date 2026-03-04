@@ -13,7 +13,6 @@ pub enum AppState {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, SubStates)]
 #[source(AppState = AppState::Editor)]
 pub enum EditorMode {
-    ObstacleWorkshop,
     #[default]
     CourseEditor,
 }
@@ -24,6 +23,7 @@ pub enum DevMenuPage {
     #[default]
     PilotGenerator,
     PaletteEditor,
+    ObstacleWorkshop,
 }
 
 /// Inserted before entering the editor to request auto-loading a specific course.

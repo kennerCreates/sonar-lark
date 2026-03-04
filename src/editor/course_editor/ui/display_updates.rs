@@ -144,7 +144,6 @@ pub fn handle_button_hover(
         (
             Changed<Interaction>,
             Or<(
-                With<BackToWorkshopButton>,
                 With<BackToMenuButton>,
                 With<NewCourseButton>,
                 With<ExistingCourseButton>,

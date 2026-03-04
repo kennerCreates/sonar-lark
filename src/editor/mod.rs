@@ -11,9 +11,6 @@ pub struct EditorPlugin;
 
 impl Plugin for EditorPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            workshop::WorkshopPlugin,
-            course_editor::CourseEditorPlugin,
-        ));
+        app.add_plugins(course_editor::CourseEditorPlugin);
     }
 }

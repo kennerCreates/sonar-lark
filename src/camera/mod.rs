@@ -10,7 +10,7 @@ use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
 
 use crate::rendering::{fog_color, FOG_END, FOG_START};
-use crate::states::{AppState, EditorMode};
+use crate::states::{AppState, DevMenuPage, EditorMode};
 use chase::ChaseState;
 use fpv::FpvFollowState;
 use orbit::MainCamera;
@@ -79,10 +79,6 @@ impl Plugin for CameraPlugin {
             .add_systems(OnExit(AppState::Editor), orbit::teardown_editor_camera)
             // Mode-specific resets
             .add_systems(
-                OnEnter(EditorMode::ObstacleWorkshop),
-                orbit::reset_rig_for_workshop,
-            )
-            .add_systems(
                 OnEnter(EditorMode::CourseEditor),
                 orbit::reset_rig_for_course_editor,
             )
@@ -91,10 +87,19 @@ impl Plugin for CameraPlugin {
                 Update,
                 orbit::rts_camera_system.run_if(in_state(EditorMode::CourseEditor)),
             )
+            // Workshop camera (lives under DevMenu)
+            .add_systems(
+                OnEnter(DevMenuPage::ObstacleWorkshop),
+                (orbit::setup_editor_camera, orbit::reset_rig_for_workshop).chain(),
+            )
+            .add_systems(
+                OnExit(DevMenuPage::ObstacleWorkshop),
+                orbit::teardown_editor_camera,
+            )
             .add_systems(
                 Update,
                 orbit::workshop_orbit_camera_system
-                    .run_if(in_state(EditorMode::ObstacleWorkshop)),
+                    .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
             );
     }
 }
