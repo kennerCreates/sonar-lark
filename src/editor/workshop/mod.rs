@@ -181,7 +181,7 @@ impl Plugin for WorkshopPlugin {
         app.init_gizmo_group::<TriggerGizmoGroup>()
         .add_systems(
             OnEnter(DevMenuPage::ObstacleWorkshop),
-            (load_gltf_for_workshop, setup_workshop),
+            (load_gltf_for_workshop, setup_workshop, preview::setup_camera_view),
         )
         // Populate node list once glTF is loaded (runs at most once per workshop entry)
         .add_systems(
@@ -220,6 +220,7 @@ impl Plugin for WorkshopPlugin {
                 ui::handle_button_hover,
                 preview::spawn_placeholder_preview,
                 preview::update_camera_preview,
+                preview::sync_camera_view,
                 gizmos::draw_trigger_gizmo,
                 gizmos::draw_collision_gizmo,
                 gizmos::draw_camera_gizmo,
@@ -244,7 +245,7 @@ impl Plugin for WorkshopPlugin {
             Update,
             detect_glb_reload.run_if(in_state(DevMenuPage::ObstacleWorkshop)),
         )
-        .add_systems(OnExit(DevMenuPage::ObstacleWorkshop), cleanup_workshop);
+        .add_systems(OnExit(DevMenuPage::ObstacleWorkshop), (cleanup_workshop, preview::cleanup_camera_view));
     }
 }
 

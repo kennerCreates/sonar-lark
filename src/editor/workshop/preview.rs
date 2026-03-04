@@ -1,10 +1,34 @@
+use bevy::camera::{ClearColorConfig, RenderTarget};
+use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
+use bevy::render::render_resource::TextureFormat;
+use bevy::camera::visibility::RenderLayers;
 
+use crate::camera::settings::CameraSettings;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
-use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
+use crate::rendering::{CelLightDir, CelMaterial, FOG_END, FOG_START, cel_material_from_color, fog_color};
 
 use super::{CameraPreview, PreviewObstacle, WorkshopState};
+
+// --- Camera View (render-to-texture) ---
+
+const VIEW_WIDTH: u32 = 384;
+const VIEW_HEIGHT: u32 = 216;
+const VIEW_MARGIN: f32 = 12.0;
+const VIEW_BORDER: f32 = 2.0;
+const RIGHT_PANEL_WIDTH: f32 = 280.0;
+
+#[derive(Resource)]
+pub(super) struct CameraViewState {
+    pub camera_entity: Entity,
+}
+
+#[derive(Component)]
+pub(super) struct CameraViewCamera;
+
+#[derive(Component)]
+pub(super) struct CameraViewOverlay;
 
 /// Spawn a preview from a named node in the glTF.
 ///
@@ -127,6 +151,151 @@ pub(super) fn spawn_placeholder_preview(
     state.preview_entity = Some(entity);
 }
 
+pub(super) fn setup_camera_view(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    let image = Image::new_target_texture(
+        VIEW_WIDTH,
+        VIEW_HEIGHT,
+        TextureFormat::Rgba8UnormSrgb,
+        None,
+    );
+    let image_handle = images.add(image);
+
+    let camera_entity = commands
+        .spawn((
+            Camera3d::default(),
+            Camera {
+                order: -1,
+                is_active: false,
+                clear_color: ClearColorConfig::Custom(fog_color()),
+                ..default()
+            },
+            RenderTarget::from(image_handle.clone()),
+            Transform::default(),
+            DistanceFog {
+                color: fog_color(),
+                directional_light_color: Color::NONE,
+                directional_light_exponent: 0.0,
+                falloff: FogFalloff::Linear {
+                    start: FOG_START,
+                    end: FOG_END,
+                },
+            },
+            CameraViewCamera,
+        ))
+        .id();
+
+    commands
+        .spawn((
+            CameraViewOverlay,
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(VIEW_MARGIN + RIGHT_PANEL_WIDTH),
+                bottom: Val::Px(VIEW_MARGIN),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            Visibility::Hidden,
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::all(Val::Px(VIEW_BORDER)),
+                        ..default()
+                    },
+                    BackgroundColor(palette::STEEL),
+                ))
+                .with_children(|border| {
+                    border.spawn((
+                        ImageNode::new(image_handle.clone()),
+                        Node {
+                            width: Val::Px(VIEW_WIDTH as f32),
+                            height: Val::Px(VIEW_HEIGHT as f32),
+                            ..default()
+                        },
+                    ));
+                });
+
+            parent.spawn((
+                Text::new("Camera View"),
+                TextFont {
+                    font_size: 12.0,
+                    ..default()
+                },
+                TextColor(palette::SAND),
+                Node {
+                    margin: UiRect::top(Val::Px(4.0)),
+                    ..default()
+                },
+            ));
+        });
+
+    commands.insert_resource(CameraViewState { camera_entity });
+}
+
+pub(super) fn sync_camera_view(
+    state: Res<WorkshopState>,
+    preview_query: Query<&Transform, With<PreviewObstacle>>,
+    mut view_camera: Query<
+        (&mut Camera, &mut Transform, &mut Projection),
+        (With<CameraViewCamera>, Without<PreviewObstacle>),
+    >,
+    mut overlay_vis: Query<&mut Visibility, With<CameraViewOverlay>>,
+    settings: Res<CameraSettings>,
+) {
+    let Ok((mut cam, mut cam_tf, mut projection)) = view_camera.single_mut() else {
+        return;
+    };
+
+    let should_show = state.has_camera && state.preview_entity.is_some();
+
+    if should_show {
+        let preview_pos = state
+            .preview_entity
+            .and_then(|e| preview_query.get(e).ok())
+            .map(|t| t.translation)
+            .unwrap_or(Vec3::ZERO);
+
+        *cam_tf = Transform::from_translation(preview_pos + state.camera_offset)
+            .with_rotation(state.camera_rotation);
+
+        if !cam.is_active {
+            cam.is_active = true;
+        }
+
+        if let Projection::Perspective(ref mut persp) = *projection {
+            persp.fov = settings.fov_degrees.to_radians();
+        }
+
+        if let Ok(mut vis) = overlay_vis.single_mut() {
+            *vis = Visibility::Inherited;
+        }
+    } else {
+        if cam.is_active {
+            cam.is_active = false;
+        }
+
+        if let Ok(mut vis) = overlay_vis.single_mut() {
+            *vis = Visibility::Hidden;
+        }
+    }
+}
+
+pub(super) fn cleanup_camera_view(
+    mut commands: Commands,
+    view_state: Option<Res<CameraViewState>>,
+    overlay_query: Query<Entity, With<CameraViewOverlay>>,
+) {
+    if let Some(vs) = view_state {
+        commands.entity(vs.camera_entity).despawn();
+    }
+    commands.remove_resource::<CameraViewState>();
+    for entity in &overlay_query {
+        commands.entity(entity).despawn();
+    }
+}
+
 /// Spawns, updates, or despawns the camera preview mesh based on workshop state.
 pub(super) fn update_camera_preview(
     mut commands: Commands,
@@ -170,6 +339,7 @@ pub(super) fn update_camera_preview(
             target,
             Visibility::default(),
             CameraPreview,
+            RenderLayers::layer(1),
         ));
     }
 }

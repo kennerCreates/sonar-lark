@@ -8,6 +8,7 @@ pub mod switching;
 
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
+use bevy::camera::visibility::RenderLayers;
 
 use crate::rendering::{fog_color, FOG_END, FOG_START};
 use crate::states::{AppState, DevMenuPage, EditorMode};
@@ -147,5 +148,7 @@ fn spawn_camera(mut commands: Commands) {
                 end: FOG_END,
             },
         },
+        // Layer 0 = normal scene, layer 1 = editor-only gizmo meshes (e.g. camera preview cuboid)
+        RenderLayers::from_layers(&[0, 1]),
     ));
 }
