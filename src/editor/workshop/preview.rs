@@ -2,14 +2,13 @@ use bevy::camera::{ClearColorConfig, RenderTarget};
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
 use bevy::render::render_resource::TextureFormat;
-use bevy::camera::visibility::RenderLayers;
 
 use crate::camera::settings::CameraSettings;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, FOG_END, FOG_START, cel_material_from_color, fog_color};
 
-use super::{CameraPreview, PreviewObstacle, WorkshopState};
+use super::{PreviewObstacle, WorkshopState};
 
 // --- Camera View (render-to-texture) ---
 
@@ -296,50 +295,3 @@ pub(super) fn cleanup_camera_view(
     }
 }
 
-/// Spawns, updates, or despawns the camera preview mesh based on workshop state.
-pub(super) fn update_camera_preview(
-    mut commands: Commands,
-    state: Res<WorkshopState>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut cel_materials: ResMut<Assets<CelMaterial>>,
-    light_dir: Res<CelLightDir>,
-    preview_query: Query<&Transform, With<PreviewObstacle>>,
-    mut camera_preview: Query<
-        (Entity, &mut Transform),
-        (With<CameraPreview>, Without<PreviewObstacle>),
-    >,
-) {
-    let should_exist = state.has_camera && state.preview_entity.is_some();
-
-    if !should_exist {
-        for (entity, _) in &camera_preview {
-            commands.entity(entity).despawn();
-        }
-        return;
-    }
-
-    let preview_pos = state
-        .preview_entity
-        .and_then(|e| preview_query.get(e).ok())
-        .map(|t| t.translation)
-        .unwrap_or(Vec3::ZERO);
-
-    let target = Transform::from_translation(preview_pos + state.camera_offset)
-        .with_rotation(state.camera_rotation);
-
-    if let Some((_, mut transform)) = camera_preview.iter_mut().next() {
-        *transform = target;
-    } else {
-        commands.spawn((
-            Mesh3d(meshes.add(Cuboid::new(0.3, 0.3, 0.5))),
-            MeshMaterial3d(cel_materials.add(cel_material_from_color(
-                palette::SKY,
-                light_dir.0,
-            ))),
-            target,
-            Visibility::default(),
-            CameraPreview,
-            RenderLayers::layer(1),
-        ));
-    }
-}

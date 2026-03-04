@@ -5,6 +5,7 @@ mod widgets;
 
 use bevy::{
     asset::AssetEvent,
+    camera::visibility::RenderLayers,
     gizmos::config::{DefaultGizmoConfigGroup, GizmoConfigStore},
     prelude::*,
 };
@@ -135,9 +136,6 @@ pub enum TransformMode {
 #[derive(Component)]
 pub struct PreviewObstacle;
 
-#[derive(Component)]
-pub struct CameraPreview;
-
 #[derive(Default, Reflect, GizmoConfigGroup)]
 struct TriggerGizmoGroup;
 
@@ -219,7 +217,6 @@ impl Plugin for WorkshopPlugin {
                 ui::update_display_values,
                 ui::handle_button_hover,
                 preview::spawn_placeholder_preview,
-                preview::update_camera_preview,
                 preview::sync_camera_view,
                 gizmos::draw_trigger_gizmo,
                 gizmos::draw_collision_gizmo,
@@ -272,14 +269,21 @@ fn setup_workshop(
     commands.insert_resource(RotateWidgetState::default());
     commands.insert_resource(ResizeWidgetState::default());
 
+    // Gizmos on layer 1 so only the main camera (layers 0+1) sees them,
+    // not the camera view render-to-texture camera (layer 0 only).
+    let gizmo_layers = RenderLayers::layer(1);
+
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = -1.0;
+    config.render_layers = gizmo_layers.clone();
+
+    let (trigger_config, _) = config_store.config_mut::<TriggerGizmoGroup>();
+    trigger_config.render_layers = gizmo_layers;
 }
 
 fn cleanup_workshop(
     mut commands: Commands,
     preview_query: Query<Entity, With<PreviewObstacle>>,
-    camera_preview_query: Query<Entity, With<CameraPreview>>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
     commands.remove_resource::<WorkshopState>();
@@ -289,12 +293,15 @@ fn cleanup_workshop(
     for entity in &preview_query {
         commands.entity(entity).despawn();
     }
-    for entity in &camera_preview_query {
-        commands.entity(entity).despawn();
-    }
+
+    let default_layers = RenderLayers::default();
 
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = 0.0;
+    config.render_layers = default_layers.clone();
+
+    let (trigger_config, _) = config_store.config_mut::<TriggerGizmoGroup>();
+    trigger_config.render_layers = default_layers;
 }
 
 /// Run condition: true when `WorkshopState` exists but nodes haven't been loaded yet.
