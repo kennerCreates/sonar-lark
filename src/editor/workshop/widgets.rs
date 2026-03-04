@@ -1,17 +1,63 @@
 use bevy::prelude::*;
+use std::f32::consts::{PI, TAU};
 
 use crate::camera::orbit::MainCamera;
 
-use crate::editor::gizmos::{closest_point_on_axis, point_to_segment_distance, Axis, Sign};
-
-use super::{
-    EditTarget, MoveWidgetState, PreviewObstacle, ResizeWidgetState, WorkshopState,
-    ARROW_HIT_THRESHOLD, ARROW_LENGTH, HANDLE_HIT_THRESHOLD, HANDLE_SIZE,
+use crate::editor::gizmos::{
+    closest_point_on_axis, point_to_segment_distance, ray_intersect_plane,
+    rotated_perpendicular_basis, sample_ring_screen_dist, yaw_quat_from_transform, Axis, Sign,
+    RING_HIT_THRESHOLD, RING_RADIUS, RING_SAMPLES, ROTATION_STEP_DEG,
 };
 
-// --- Move Widget (3D Axis Arrows) ---
+use super::{
+    EditTarget, MoveDragMode, MoveWidgetState, PreviewObstacle, ResizeWidgetState,
+    RotateWidgetState, TransformMode, WorkshopState, ARROW_LENGTH, HANDLE_HIT_THRESHOLD,
+    HANDLE_SIZE,
+};
 
-fn move_arrow_origin(state: &WorkshopState, preview_query: &Query<&Transform, With<PreviewObstacle>>) -> Option<Vec3> {
+const ARROW_HIT_THRESHOLD: f32 = 25.0;
+const PLANE_INDICATOR_FRAC: f32 = 0.3;
+
+// --- Transform Mode Keys (1/2/3) ---
+
+pub(super) fn handle_transform_mode_keys(
+    mut state: ResMut<WorkshopState>,
+    mut move_widget: ResMut<MoveWidgetState>,
+    mut rotate_widget: ResMut<RotateWidgetState>,
+    mut resize_widget: ResMut<ResizeWidgetState>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+) {
+    if state.editing_name {
+        return;
+    }
+
+    let new_mode = if keyboard.just_pressed(KeyCode::Digit1) {
+        Some(TransformMode::Move)
+    } else if keyboard.just_pressed(KeyCode::Digit2) {
+        Some(TransformMode::Rotate)
+    } else if keyboard.just_pressed(KeyCode::Digit3) {
+        Some(TransformMode::Resize)
+    } else {
+        None
+    };
+
+    if let Some(mode) = new_mode {
+        state.transform_mode = mode;
+        move_widget.active_drag = None;
+        move_widget.hovered = false;
+        rotate_widget.active = false;
+        rotate_widget.hovered = false;
+        resize_widget.active_handle = None;
+        resize_widget.hovered_handle = None;
+    }
+}
+
+// --- Move Widget (XZ Plane + Shift-Y, matching Course Editor) ---
+
+fn move_arrow_origin(
+    state: &WorkshopState,
+    preview_query: &Query<&Transform, With<PreviewObstacle>>,
+) -> Option<Vec3> {
     let entity = state.preview_entity?;
     let transform = preview_query.get(entity).ok()?;
     match state.edit_target {
@@ -38,23 +84,59 @@ pub(super) fn draw_move_arrows(
     state: Res<WorkshopState>,
     widget: Res<MoveWidgetState>,
     preview_query: Query<&Transform, With<PreviewObstacle>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
 ) {
+    if state.transform_mode != TransformMode::Move {
+        return;
+    }
     let Some(origin) = move_arrow_origin(&state, &preview_query) else {
         return;
     };
 
-    for axis in [Axis::X, Axis::Y, Axis::Z] {
-        let is_hovered = widget.hovered_axis == Some(axis);
-        let is_active = widget.active_axis == Some(axis);
-        let color = axis.color(is_hovered, is_active);
+    let shift_held =
+        keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
-        let end = origin + axis.direction() * ARROW_LENGTH;
-        gizmos.arrow(origin, end, color);
-    }
+    // XZ-plane arrows + square indicator
+    let xz_active = matches!(widget.active_drag, Some(MoveDragMode::XzPlane));
+    let xz_brightness = if xz_active {
+        1.0
+    } else if !shift_held && widget.hovered {
+        0.8
+    } else {
+        0.5
+    };
+    let xz_color = Color::srgb(xz_brightness, xz_brightness, 0.0);
+    gizmos.arrow(origin, origin + Vec3::X * ARROW_LENGTH, xz_color);
+    gizmos.arrow(origin, origin + Vec3::Z * ARROW_LENGTH, xz_color);
+    // Small square between X and Z to indicate plane movement
+    let sq = ARROW_LENGTH * PLANE_INDICATOR_FRAC;
+    gizmos.line(
+        origin + Vec3::X * sq,
+        origin + Vec3::X * sq + Vec3::Z * sq,
+        xz_color,
+    );
+    gizmos.line(
+        origin + Vec3::Z * sq,
+        origin + Vec3::X * sq + Vec3::Z * sq,
+        xz_color,
+    );
+
+    // Y-axis arrow (Shift mode)
+    let y_active = matches!(widget.active_drag, Some(MoveDragMode::YAxis));
+    let y_brightness = if y_active {
+        1.0
+    } else if shift_held && widget.hovered {
+        0.8
+    } else {
+        0.5
+    };
+    let y_color = Color::srgb(0.0, y_brightness, 0.0);
+    gizmos.arrow(origin, origin + Vec3::Y * ARROW_LENGTH, y_color);
 }
 
 pub(super) fn handle_move_widget(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     mut preview_query: Query<&mut Transform, With<PreviewObstacle>>,
@@ -62,9 +144,14 @@ pub(super) fn handle_move_widget(
     mut widget: ResMut<MoveWidgetState>,
     interaction_query: Query<&Interaction>,
 ) {
+    if state.transform_mode != TransformMode::Move {
+        widget.active_drag = None;
+        widget.hovered = false;
+        return;
+    }
     let Some(preview_entity) = state.preview_entity else {
-        widget.hovered_axis = None;
-        widget.active_axis = None;
+        widget.active_drag = None;
+        widget.hovered = false;
         return;
     };
     let Ok(window) = windows.single() else {
@@ -85,16 +172,16 @@ pub(super) fn handle_move_widget(
         EditTarget::Model => preview_transform.translation,
         EditTarget::Trigger => {
             if !state.has_trigger {
-                widget.hovered_axis = None;
-                widget.active_axis = None;
+                widget.active_drag = None;
+                widget.hovered = false;
                 return;
             }
             preview_transform.translation + state.trigger_offset
         }
         EditTarget::Collision => {
             if !state.has_collision {
-                widget.hovered_axis = None;
-                widget.active_axis = None;
+                widget.active_drag = None;
+                widget.hovered = false;
                 return;
             }
             preview_transform.translation + state.collision_offset
@@ -107,59 +194,234 @@ pub(super) fn handle_move_widget(
         return;
     };
 
-    if let Some(active_axis) = widget.active_axis {
+    if let Some(drag_mode) = widget.active_drag {
         if mouse_buttons.pressed(MouseButton::Left) {
-            let axis_dir = active_axis.direction();
-            let t = closest_point_on_axis(ray, origin, axis_dir);
-            let delta = t - widget.drag_offset;
-
-            match state.edit_target {
-                EditTarget::Model => {
-                    let new_pos = origin + axis_dir * delta;
-                    preview_transform.translation = new_pos;
-                    state.model_offset = new_pos;
+            let new_offset = match drag_mode {
+                MoveDragMode::XzPlane => {
+                    ray_intersect_plane(
+                        ray,
+                        Vec3::new(0.0, widget.start_offset.y, 0.0),
+                        Vec3::Y,
+                    )
+                    .map(|hit| {
+                        let delta = hit - widget.drag_anchor;
+                        widget.start_offset + Vec3::new(delta.x, 0.0, delta.z)
+                    })
                 }
-                EditTarget::Trigger => {
-                    state.trigger_offset += axis_dir * delta;
+                MoveDragMode::YAxis => {
+                    let t = closest_point_on_axis(ray, widget.start_offset, Vec3::Y);
+                    let delta = t - widget.drag_anchor.y;
+                    Some(widget.start_offset + Vec3::Y * delta)
                 }
-                EditTarget::Collision => {
-                    state.collision_offset += axis_dir * delta;
+            };
+            if let Some(offset) = new_offset {
+                match state.edit_target {
+                    EditTarget::Model => {
+                        preview_transform.translation = offset;
+                        state.model_offset = offset;
+                    }
+                    EditTarget::Trigger => {
+                        state.trigger_offset = offset;
+                    }
+                    EditTarget::Collision => {
+                        state.collision_offset = offset;
+                    }
                 }
             }
         } else {
-            widget.active_axis = None;
+            widget.active_drag = None;
         }
     } else {
-        let mut best_axis: Option<Axis> = None;
-        let mut best_dist = ARROW_HIT_THRESHOLD;
-
-        for axis in [Axis::X, Axis::Y, Axis::Z] {
-            let end = origin + axis.direction() * ARROW_LENGTH;
-
-            let Ok(screen_start) = camera.world_to_viewport(camera_gt, origin) else {
+        // Hover detection: check screen distance to all three arrows
+        let arrow_ends = [
+            origin + Vec3::X * ARROW_LENGTH,
+            origin + Vec3::Y * ARROW_LENGTH,
+            origin + Vec3::Z * ARROW_LENGTH,
+        ];
+        let mut near = false;
+        for end in arrow_ends {
+            let Ok(ss) = camera.world_to_viewport(camera_gt, origin) else {
                 continue;
             };
-            let Ok(screen_end) = camera.world_to_viewport(camera_gt, end) else {
+            let Ok(se) = camera.world_to_viewport(camera_gt, end) else {
                 continue;
             };
-
-            let dist = point_to_segment_distance(cursor_pos, screen_start, screen_end);
-            if dist < best_dist {
-                best_dist = dist;
-                best_axis = Some(axis);
+            if point_to_segment_distance(cursor_pos, ss, se) < ARROW_HIT_THRESHOLD {
+                near = true;
+                break;
             }
         }
+        widget.hovered = near;
 
-        widget.hovered_axis = best_axis;
+        if !mouse_over_ui && mouse_buttons.just_pressed(MouseButton::Left) && near {
+            let shift_held = keyboard.pressed(KeyCode::ShiftLeft)
+                || keyboard.pressed(KeyCode::ShiftRight);
+
+            // Capture the current offset for this edit target
+            let current_offset = match state.edit_target {
+                EditTarget::Model => preview_transform.translation,
+                EditTarget::Trigger => state.trigger_offset,
+                EditTarget::Collision => state.collision_offset,
+            };
+
+            let mode = if shift_held {
+                MoveDragMode::YAxis
+            } else {
+                MoveDragMode::XzPlane
+            };
+
+            widget.start_offset = current_offset;
+            match mode {
+                MoveDragMode::XzPlane => {
+                    if let Some(hit) = ray_intersect_plane(ray, origin, Vec3::Y) {
+                        widget.drag_anchor = hit;
+                        widget.active_drag = Some(mode);
+                    }
+                }
+                MoveDragMode::YAxis => {
+                    let t = closest_point_on_axis(ray, origin, Vec3::Y);
+                    widget.drag_anchor = Vec3::new(0.0, t, 0.0);
+                    widget.active_drag = Some(mode);
+                }
+            }
+        }
+    }
+}
+
+// --- Rotate Gizmo (Model only, matching Course Editor) ---
+
+fn rotation_axis_from_modifiers(keyboard: &ButtonInput<KeyCode>) -> Axis {
+    if keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight) {
+        Axis::X
+    } else if keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight) {
+        Axis::Z
+    } else {
+        Axis::Y
+    }
+}
+
+pub(super) fn draw_rotate_gizmo(
+    mut gizmos: Gizmos,
+    state: Res<WorkshopState>,
+    widget: Res<RotateWidgetState>,
+    preview_query: Query<&Transform, With<PreviewObstacle>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+) {
+    if state.transform_mode != TransformMode::Rotate || state.edit_target != EditTarget::Model {
+        return;
+    }
+    let Some(entity) = state.preview_entity else {
+        return;
+    };
+    let Ok(transform) = preview_query.get(entity) else {
+        return;
+    };
+
+    let pos = transform.translation;
+    let yaw_quat = yaw_quat_from_transform(transform);
+
+    let display_axis = if widget.active {
+        widget.active_axis
+    } else {
+        rotation_axis_from_modifiers(&keyboard)
+    };
+
+    let is_hovered = !widget.active && widget.hovered;
+    let color = display_axis.color(is_hovered, widget.active);
+
+    let face_quat = yaw_quat
+        * match display_axis {
+            Axis::X => Quat::from_rotation_arc(Vec3::Z, Vec3::X),
+            Axis::Y => Quat::from_rotation_arc(Vec3::Z, Vec3::Y),
+            Axis::Z => Quat::IDENTITY,
+        };
+    let iso = Isometry3d::new(pos, face_quat);
+    gizmos.circle(iso, RING_RADIUS, color);
+}
+
+pub(super) fn handle_rotate_gizmo(
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    windows: Query<&Window>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+    mut state: ResMut<WorkshopState>,
+    mut widget: ResMut<RotateWidgetState>,
+    mut preview_query: Query<&mut Transform, With<PreviewObstacle>>,
+    interaction_query: Query<&Interaction>,
+) {
+    if state.transform_mode != TransformMode::Rotate || state.edit_target != EditTarget::Model {
+        widget.active = false;
+        widget.hovered = false;
+        return;
+    }
+    let Some(entity) = state.preview_entity else {
+        widget.active = false;
+        widget.hovered = false;
+        return;
+    };
+    let Ok(mut transform) = preview_query.get_mut(entity) else {
+        return;
+    };
+
+    let Ok(window) = windows.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else { return };
+    let Ok((camera, camera_gt)) = camera_query.single() else { return };
+    let pos = transform.translation;
+    let yaw_quat = yaw_quat_from_transform(&transform);
+    let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
+
+    if widget.active {
+        if mouse_buttons.pressed(MouseButton::Left) {
+            if let Ok(center_screen) = camera.world_to_viewport(camera_gt, pos) {
+                let d = cursor_pos - center_screen;
+                let current_angle = d.y.atan2(d.x);
+                let mut raw_delta = current_angle - widget.drag_start_angle;
+                // Normalize to [-PI, PI] to handle wrapping at ±180°.
+                raw_delta = (raw_delta + PI).rem_euclid(TAU) - PI;
+
+                let axis_dir = widget.active_axis.direction();
+                let cam_forward = camera_gt.forward().as_vec3();
+                if cam_forward.dot(axis_dir) < 0.0 {
+                    raw_delta = -raw_delta;
+                }
+
+                let step = ROTATION_STEP_DEG.to_radians();
+                let snapped_delta = (raw_delta / step).round() * step;
+
+                let new_rotation = Quat::from_axis_angle(axis_dir, snapped_delta)
+                    * widget.entity_start_rotation;
+
+                transform.rotation = new_rotation;
+                state.model_rotation = new_rotation;
+            }
+        } else {
+            widget.active = false;
+        }
+    } else {
+        let current_axis = rotation_axis_from_modifiers(&keyboard);
+        let (ref1, ref2) = rotated_perpendicular_basis(current_axis, yaw_quat);
+        let min_dist = sample_ring_screen_dist(
+            camera,
+            camera_gt,
+            cursor_pos,
+            pos,
+            ref1,
+            ref2,
+            RING_RADIUS,
+            RING_SAMPLES,
+        );
+        widget.hovered = min_dist < RING_HIT_THRESHOLD;
 
         if !mouse_over_ui
             && mouse_buttons.just_pressed(MouseButton::Left)
-            && let Some(axis) = best_axis
+            && widget.hovered
+            && let Ok(center_screen) = camera.world_to_viewport(camera_gt, pos)
         {
-            let axis_dir = axis.direction();
-            let t = closest_point_on_axis(ray, origin, axis_dir);
-            widget.active_axis = Some(axis);
-            widget.drag_offset = t;
+            let d = cursor_pos - center_screen;
+            widget.active = true;
+            widget.active_axis = current_axis;
+            widget.drag_start_angle = d.y.atan2(d.x);
+            widget.entity_start_rotation = transform.rotation;
         }
     }
 }
@@ -174,12 +436,14 @@ fn volume_box_params(
     let entity = state.preview_entity?;
     let transform = preview_query.get(entity).ok()?;
     match state.edit_target {
-        EditTarget::Trigger if state.has_trigger => {
-            Some((transform.translation + state.trigger_offset, state.trigger_half_extents))
-        }
-        EditTarget::Collision if state.has_collision => {
-            Some((transform.translation + state.collision_offset, state.collision_half_extents))
-        }
+        EditTarget::Trigger if state.has_trigger => Some((
+            transform.translation + state.trigger_offset,
+            state.trigger_half_extents,
+        )),
+        EditTarget::Collision if state.has_collision => Some((
+            transform.translation + state.collision_offset,
+            state.collision_half_extents,
+        )),
         _ => None,
     }
 }
@@ -190,6 +454,9 @@ pub(super) fn draw_resize_handles(
     resize: Res<ResizeWidgetState>,
     preview_query: Query<&Transform, With<PreviewObstacle>>,
 ) {
+    if state.transform_mode != TransformMode::Resize {
+        return;
+    }
     if !matches!(state.edit_target, EditTarget::Trigger | EditTarget::Collision) {
         return;
     }
@@ -199,10 +466,11 @@ pub(super) fn draw_resize_handles(
 
     for axis in [Axis::X, Axis::Y, Axis::Z] {
         for sign in [Sign::Positive, Sign::Negative] {
-            let dir = axis.direction() * match sign {
-                Sign::Positive => 1.0,
-                Sign::Negative => -1.0,
-            };
+            let dir = axis.direction()
+                * match sign {
+                    Sign::Positive => 1.0,
+                    Sign::Negative => -1.0,
+                };
             let extent = match axis {
                 Axis::X => he.x,
                 Axis::Y => he.y,
@@ -224,7 +492,8 @@ pub(super) fn draw_resize_handles(
                 }
             };
 
-            let transform = Transform::from_translation(pos).with_scale(Vec3::splat(HANDLE_SIZE * 2.0));
+            let transform =
+                Transform::from_translation(pos).with_scale(Vec3::splat(HANDLE_SIZE * 2.0));
             gizmos.cube(transform, color);
         }
     }
@@ -240,6 +509,11 @@ pub(super) fn handle_resize_widget(
     preview_query: Query<&Transform, With<PreviewObstacle>>,
     interaction_query: Query<&Interaction>,
 ) {
+    if state.transform_mode != TransformMode::Resize {
+        resize.hovered_handle = None;
+        resize.active_handle = None;
+        return;
+    }
     if !matches!(state.edit_target, EditTarget::Trigger | EditTarget::Collision) {
         resize.hovered_handle = None;
         resize.active_handle = None;
@@ -252,10 +526,18 @@ pub(super) fn handle_resize_widget(
         return;
     };
 
-    let Ok(window) = windows.single() else { return };
-    let Some(cursor_pos) = window.cursor_position() else { return };
-    let Ok((camera, camera_gt)) = camera_query.single() else { return };
-    let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else { return };
+    let Ok(window) = windows.single() else {
+        return;
+    };
+    let Some(cursor_pos) = window.cursor_position() else {
+        return;
+    };
+    let Ok((camera, camera_gt)) = camera_query.single() else {
+        return;
+    };
+    let Ok(ray) = camera.viewport_to_world(camera_gt, cursor_pos) else {
+        return;
+    };
 
     let mouse_over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
 
@@ -283,7 +565,7 @@ pub(super) fn handle_resize_widget(
         }
     } else {
         // Don't process resize hover/click if move widget is active
-        if move_widget.active_axis.is_some() {
+        if move_widget.active_drag.is_some() {
             resize.hovered_handle = None;
             return;
         }
@@ -293,10 +575,11 @@ pub(super) fn handle_resize_widget(
 
         for axis in [Axis::X, Axis::Y, Axis::Z] {
             for sign in [Sign::Positive, Sign::Negative] {
-                let dir = axis.direction() * match sign {
-                    Sign::Positive => 1.0,
-                    Sign::Negative => -1.0,
-                };
+                let dir = axis.direction()
+                    * match sign {
+                        Sign::Positive => 1.0,
+                        Sign::Negative => -1.0,
+                    };
                 let extent = match axis {
                     Axis::X => he.x,
                     Axis::Y => he.y,

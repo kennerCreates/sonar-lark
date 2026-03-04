@@ -82,6 +82,7 @@ pub fn spawn_course(
             &def.glb_node_name,
             transform,
             def.model_offset,
+            def.model_rotation,
             def.trigger_volume.as_ref(),
             instance.gate_order,
             instance.gate_forward_flipped,

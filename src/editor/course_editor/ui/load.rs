@@ -72,6 +72,7 @@ fn load_course_into_editor(
             &def.glb_node_name,
             transform,
             def.model_offset,
+            def.model_rotation,
             def.trigger_volume.as_ref(),
             None,
             instance.gate_forward_flipped,

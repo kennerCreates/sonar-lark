@@ -6,7 +6,10 @@ use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 
 use super::{PreviewObstacle, WorkshopState};
 
-/// Spawn a preview from a named node in the glTF, positioned at `model_offset`.
+/// Spawn a preview from a named node in the glTF.
+///
+/// Parent entity gets `model_offset` as translation and `model_rotation` as rotation.
+/// Child meshes get the node's Blender-authored rotation and scale.
 pub fn spawn_preview(
     commands: &mut Commands,
     gltf_assets: &Assets<bevy::gltf::Gltf>,
@@ -18,6 +21,7 @@ pub fn spawn_preview(
     gltf_handle: &ObstaclesGltfHandle,
     node_name: &str,
     model_offset: Vec3,
+    model_rotation: Quat,
 ) -> Option<Entity> {
     let gltf = gltf_assets.get(&gltf_handle.0)?;
     let node_handle = gltf.named_nodes.get(node_name)?;
@@ -25,8 +29,13 @@ pub fn spawn_preview(
     let gltf_mesh_handle = node.mesh.as_ref()?;
     let gltf_mesh = mesh_assets.get(gltf_mesh_handle)?;
 
-    let mut transform = node.transform;
-    transform.translation = model_offset;
+    let parent_transform =
+        Transform::from_translation(model_offset).with_rotation(model_rotation);
+    let child_transform = Transform {
+        rotation: node.transform.rotation,
+        scale: node.transform.scale,
+        ..default()
+    };
 
     // Pre-collect materials before spawning to avoid borrow conflicts
     let primitives: Vec<(Handle<Mesh>, MeshMaterial3d<CelMaterial>)> = gltf_mesh
@@ -45,7 +54,7 @@ pub fn spawn_preview(
 
     let parent = commands
         .spawn((
-            transform,
+            parent_transform,
             Visibility::default(),
             PreviewObstacle,
         ))
@@ -56,7 +65,7 @@ pub fn spawn_preview(
             .spawn((
                 Mesh3d(mesh),
                 material,
-                Transform::default(),
+                child_transform,
             ))
             .set_parent_in_place(parent);
     }
@@ -81,6 +90,7 @@ pub(super) fn spawn_placeholder_preview(
     }
 
     let offset = state.model_offset;
+    let rotation = state.model_rotation;
 
     // Try to spawn from glTF first
     if let Some(handle) = &gltf_handle
@@ -95,6 +105,7 @@ pub(super) fn spawn_placeholder_preview(
             handle,
             &state.node_name,
             offset,
+            rotation,
         )
     {
         state.preview_entity = Some(entity);
@@ -109,7 +120,7 @@ pub(super) fn spawn_placeholder_preview(
                 palette::CHAINMAIL,
                 light_dir.0,
             ))),
-            Transform::from_translation(offset),
+            Transform::from_translation(offset).with_rotation(rotation),
             PreviewObstacle,
         ))
         .id();

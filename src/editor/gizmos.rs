@@ -123,6 +123,39 @@ pub(crate) fn rotated_perpendicular_basis(axis: Axis, yaw_quat: Quat) -> (Vec3, 
     (yaw_quat * a, yaw_quat * b)
 }
 
+// --- Rotation ring constants ---
+
+pub(crate) const RING_RADIUS: f32 = 3.0;
+pub(crate) const RING_SAMPLES: usize = 32;
+pub(crate) const RING_HIT_THRESHOLD: f32 = 15.0;
+pub(crate) const ROTATION_STEP_DEG: f32 = 5.0;
+
+/// Minimum screen-space distance from the cursor to the sampled ring.
+pub(crate) fn sample_ring_screen_dist(
+    camera: &Camera,
+    camera_gt: &GlobalTransform,
+    cursor_pos: Vec2,
+    center: Vec3,
+    ref1: Vec3,
+    ref2: Vec3,
+    radius: f32,
+    n: usize,
+) -> f32 {
+    use std::f32::consts::TAU;
+    let mut min_dist = f32::MAX;
+    for i in 0..n {
+        let angle = i as f32 * TAU / n as f32;
+        let world_pt = center + (ref1 * angle.cos() + ref2 * angle.sin()) * radius;
+        if let Ok(screen_pt) = camera.world_to_viewport(camera_gt, world_pt) {
+            let d = (cursor_pos - screen_pt).length();
+            if d < min_dist {
+                min_dist = d;
+            }
+        }
+    }
+    min_dist
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

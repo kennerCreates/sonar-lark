@@ -65,6 +65,7 @@ pub fn spawn_obstacle(
     node_name: &str,
     transform: Transform,
     model_offset: Vec3,
+    model_rotation: Quat,
     trigger_config: Option<&TriggerVolumeConfig>,
     gate_index: Option<u32>,
     gate_forward_flipped: bool,
@@ -80,7 +81,7 @@ pub fn spawn_obstacle(
     // cel_materials is &mut and cannot be borrowed inside the closure alongside entity_commands.
     let mesh_transform = Transform {
         translation: model_offset,
-        rotation: node.transform.rotation,
+        rotation: model_rotation * node.transform.rotation,
         scale: node.transform.scale,
     };
     let override_mat = gate_color(obstacle_id)

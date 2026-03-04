@@ -4,15 +4,13 @@ use crate::camera::orbit::MainCamera;
 use std::f32::consts::{PI, TAU};
 
 use crate::editor::gizmos::{
-    rotated_perpendicular_basis, yaw_quat_from_transform, Axis,
+    rotated_perpendicular_basis, sample_ring_screen_dist, yaw_quat_from_transform, Axis,
+    RING_HIT_THRESHOLD, RING_RADIUS, RING_SAMPLES, ROTATION_STEP_DEG,
 };
 
 use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedFilter, TransformMode};
 
-use super::{
-    sample_ring_screen_dist, RotateWidgetState, RING_HIT_THRESHOLD, RING_RADIUS, RING_SAMPLES,
-    ROTATION_STEP_DEG,
-};
+use super::RotateWidgetState;
 
 fn rotation_axis_from_modifiers(keyboard: &ButtonInput<KeyCode>) -> Axis {
     if keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight) {
@@ -120,7 +118,7 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
                 // Normalize to [-PI, PI] to handle wrapping at ±180°.
                 raw_delta = (raw_delta + PI).rem_euclid(TAU) - PI;
 
-                let axis_dir = widget.active_axis.rotated_direction(yaw_quat);
+                let axis_dir = widget.active_axis.rotated_direction(widget.start_yaw_quat);
                 let cam_forward = camera_gt.forward().as_vec3();
                 if cam_forward.dot(axis_dir) < 0.0 {
                     raw_delta = -raw_delta;
@@ -169,6 +167,7 @@ pub(in crate::editor::course_editor) fn handle_rotate_gizmo(
             widget.active = true;
             widget.active_axis = current_axis;
             widget.drag_start_angle = d.y.atan2(d.x);
+            widget.start_yaw_quat = yaw_quat;
             // Store the world-space rotation at drag start
             let (_, world_rot, _) = global_transform.to_scale_rotation_translation();
             widget.entity_start_rotation = world_rot;

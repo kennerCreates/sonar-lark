@@ -52,6 +52,7 @@ pub fn handle_library_selection(
         state.is_gate = def.is_gate;
         state.has_trigger = def.trigger_volume.is_some();
         state.model_offset = def.model_offset;
+        state.model_rotation = def.model_rotation;
         // Stored offset is in ground-anchor space; convert to model-relative for editing.
         if let Some(trigger) = &def.trigger_volume {
             state.trigger_offset = trigger.offset - def.model_offset;

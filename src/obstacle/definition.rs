@@ -17,6 +17,10 @@ fn default_forward() -> Vec3 {
     Vec3::NEG_Z
 }
 
+fn default_rotation() -> Quat {
+    Quat::IDENTITY
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollisionVolumeConfig {
     pub offset: Vec3,
@@ -31,6 +35,8 @@ pub struct ObstacleDef {
     pub is_gate: bool,
     #[serde(default)]
     pub model_offset: Vec3,
+    #[serde(default = "default_rotation")]
+    pub model_rotation: Quat,
     #[serde(default)]
     pub collision_volume: Option<CollisionVolumeConfig>,
 }

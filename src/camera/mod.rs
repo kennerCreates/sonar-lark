@@ -98,7 +98,7 @@ impl Plugin for CameraPlugin {
             )
             .add_systems(
                 Update,
-                orbit::workshop_orbit_camera_system
+                orbit::rts_camera_system
                     .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
             );
     }

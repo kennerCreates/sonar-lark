@@ -1,47 +1,18 @@
 [
     (
-        id: ("gate_loop"),
-        glb_node_name: "gate_loop",
-        trigger_volume: Some((
-            offset: (0.40586996, 11.697282, 0.053014994),
-            half_extents: (6.2807226, 3.9215417, 0.94731396),
-            forward: (0.0, 0.0, -1.0),
-        )),
-        is_gate: true,
-        model_offset: (-0.071406126, 0.0, 0.02642262),
-        collision_volume: Some((
-            offset: (0.4, 8.0, 0.05),
-            half_extents: (7.5, 8.0, 1.5),
-        )),
-    ),
-    (
         id: ("gate_ground"),
         glb_node_name: "gate_ground",
         trigger_volume: Some((
-            offset: (1.246052, 5.82578, 0.0),
-            half_extents: (8.800932, 5.9190426, 1.5),
+            offset: (-0.30301952, 5.6780343, 0.6813984),
+            half_extents: (6.986324, 4.780797, 0.7959853),
             forward: (0.0, 0.0, -1.0),
         )),
         is_gate: true,
-        model_offset: (11.731935, 0.0, 0.0),
+        model_offset: (9.932265, 0.0, 0.33270836),
+        model_rotation: (0.0, 0.0, 0.0, 1.0),
         collision_volume: Some((
-            offset: (1.25, 6.5, 0.0),
-            half_extents: (10.5, 6.5, 1.5),
-        )),
-    ),
-    (
-        id: ("gate_best"),
-        glb_node_name: "gate_air",
-        trigger_volume: Some((
-            offset: (-0.79640806, 14.091407, 0.0),
-            half_extents: (4.1758404, 4.7085934, 1.5),
-            forward: (0.0, 0.0, -1.0),
-        )),
-        is_gate: true,
-        model_offset: (0.0, 0.0, 0.0),
-        collision_volume: Some((
-            offset: (-0.8, 9.5, 0.0),
-            half_extents: (5.5, 9.5, 1.5),
+            offset: (-1.298255, 7.0212097, 2.230667),
+            half_extents: (9.721297, 5.9316998, 1.5),
         )),
     ),
 ]

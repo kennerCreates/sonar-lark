@@ -53,6 +53,7 @@ pub fn handle_save_button(
             trigger_volume,
             is_gate: state.is_gate,
             model_offset: state.model_offset,
+            model_rotation: state.model_rotation,
             collision_volume,
         };
 

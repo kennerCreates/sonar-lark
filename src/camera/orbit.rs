@@ -134,6 +134,7 @@ pub fn rts_camera_system(
     windows: Query<&Window>,
     settings: Res<CameraSettings>,
     course_state: Option<Res<EditorCourse>>,
+    workshop_state: Option<Res<WorkshopState>>,
     mut rig_query: Query<(&mut Transform, &mut OrbitState), With<CameraRig>>,
     mut camera_query: Query<(&mut Transform, &GlobalTransform), (With<MainCamera>, Without<CameraRig>)>,
 ) {
@@ -146,7 +147,10 @@ pub fn rts_camera_system(
 
     let editing_name = course_state
         .as_ref()
-        .is_some_and(|s| s.editing_name);
+        .is_some_and(|s| s.editing_name)
+        || workshop_state
+            .as_ref()
+            .is_some_and(|s| s.editing_name);
 
     let dt = time.delta_secs();
     let mut orbit_changed = false;
@@ -235,55 +239,6 @@ pub fn rts_camera_system(
             * settings.edge_scroll_speed
             * dt;
         rig_tf.translation += scroll_movement;
-    }
-}
-
-// --- Workshop Orbit Camera ---
-
-pub fn workshop_orbit_camera_system(
-    mouse_buttons: Res<ButtonInput<MouseButton>>,
-    mouse_motion: Res<AccumulatedMouseMotion>,
-    mouse_scroll: Res<AccumulatedMouseScroll>,
-    settings: Res<CameraSettings>,
-    workshop_state: Option<Res<WorkshopState>>,
-    mut rig_query: Query<&mut OrbitState, With<CameraRig>>,
-    mut camera_query: Query<&mut Transform, (With<MainCamera>, Without<CameraRig>)>,
-) {
-    let Ok(mut orbit) = rig_query.single_mut() else {
-        return;
-    };
-    let Ok(mut cam_tf) = camera_query.single_mut() else {
-        return;
-    };
-
-    let mut orbit_changed = false;
-
-    // Middle mouse drag: orbit
-    if mouse_buttons.pressed(MouseButton::Middle) {
-        let delta = mouse_motion.delta;
-        if delta != Vec2::ZERO {
-            orbit.yaw -= delta.x * settings.sensitivity;
-            orbit.pitch = (orbit.pitch - delta.y * settings.sensitivity).clamp(PITCH_MIN, PITCH_MAX);
-            orbit_changed = true;
-        }
-    }
-
-    // Scroll wheel: zoom (skip if editing text field)
-    let editing_name = workshop_state
-        .as_ref()
-        .is_some_and(|s| s.editing_name);
-
-    if !editing_name {
-        let scroll_y = mouse_scroll.delta.y;
-        if scroll_y != 0.0 {
-            orbit.distance = (orbit.distance - scroll_y * settings.zoom_speed)
-                .clamp(settings.zoom_min, settings.zoom_max);
-            orbit_changed = true;
-        }
-    }
-
-    if orbit_changed {
-        *cam_tf = orbit_to_transform(&orbit);
     }
 }
 

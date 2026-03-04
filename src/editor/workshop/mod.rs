@@ -32,6 +32,8 @@ pub struct WorkshopState {
     pub editing_name: bool,
     pub edit_target: EditTarget,
     pub model_offset: Vec3,
+    pub model_rotation: Quat,
+    pub transform_mode: TransformMode,
 }
 
 impl Default for WorkshopState {
@@ -52,6 +54,8 @@ impl Default for WorkshopState {
             editing_name: false,
             edit_target: EditTarget::default(),
             model_offset: Vec3::ZERO,
+            model_rotation: Quat::IDENTITY,
+            transform_mode: TransformMode::default(),
         }
     }
 }
@@ -64,27 +68,41 @@ pub enum EditTarget {
     Collision,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub enum TransformMode {
+    #[default]
+    Move,
+    Rotate,
+    Resize,
+}
+
 #[derive(Component)]
 pub struct PreviewObstacle;
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
 struct TriggerGizmoGroup;
 
-#[derive(Resource)]
-struct MoveWidgetState {
-    active_axis: Option<Axis>,
-    hovered_axis: Option<Axis>,
-    drag_offset: f32,
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum MoveDragMode {
+    XzPlane,
+    YAxis,
 }
 
-impl Default for MoveWidgetState {
-    fn default() -> Self {
-        Self {
-            active_axis: None,
-            hovered_axis: None,
-            drag_offset: 0.0,
-        }
-    }
+#[derive(Resource, Default)]
+struct MoveWidgetState {
+    active_drag: Option<MoveDragMode>,
+    hovered: bool,
+    drag_anchor: Vec3,
+    start_offset: Vec3,
+}
+
+#[derive(Resource, Default)]
+struct RotateWidgetState {
+    active: bool,
+    hovered: bool,
+    active_axis: Axis,
+    drag_start_angle: f32,
+    entity_start_rotation: Quat,
 }
 
 #[derive(Resource, Default)]
@@ -93,8 +111,7 @@ struct ResizeWidgetState {
     hovered_handle: Option<(Axis, Sign)>,
 }
 
-const ARROW_LENGTH: f32 = 2.5;
-const ARROW_HIT_THRESHOLD: f32 = 25.0; // pixels
+const ARROW_LENGTH: f32 = 3.75;
 const HANDLE_SIZE: f32 = 0.2;
 const HANDLE_HIT_THRESHOLD: f32 = 20.0; // pixels
 
@@ -147,8 +164,11 @@ impl Plugin for WorkshopPlugin {
             Update,
             (
                 gizmos::draw_ground_gizmo,
+                widgets::handle_transform_mode_keys,
                 widgets::draw_move_arrows,
                 widgets::handle_move_widget,
+                widgets::draw_rotate_gizmo,
+                widgets::handle_rotate_gizmo,
                 widgets::draw_resize_handles,
                 widgets::handle_resize_widget,
             )
@@ -178,6 +198,7 @@ fn setup_workshop(
     ui::build_workshop_ui(&mut commands, &library);
     commands.insert_resource(state);
     commands.insert_resource(MoveWidgetState::default());
+    commands.insert_resource(RotateWidgetState::default());
     commands.insert_resource(ResizeWidgetState::default());
 
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
@@ -191,6 +212,7 @@ fn cleanup_workshop(
 ) {
     commands.remove_resource::<WorkshopState>();
     commands.remove_resource::<MoveWidgetState>();
+    commands.remove_resource::<RotateWidgetState>();
     commands.remove_resource::<ResizeWidgetState>();
     for entity in &preview_query {
         commands.entity(entity).despawn();

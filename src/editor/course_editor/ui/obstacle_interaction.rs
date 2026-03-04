@@ -53,6 +53,7 @@ pub fn handle_palette_selection(
             &def.glb_node_name,
             transform,
             def.model_offset,
+            def.model_rotation,
             def.trigger_volume.as_ref(),
             None,
             false,
