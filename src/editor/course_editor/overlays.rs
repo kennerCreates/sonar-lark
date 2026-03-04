@@ -6,33 +6,14 @@ use crate::common::POINTS_PER_GATE;
 use crate::drone::components::AiTuningParams;
 use crate::drone::paths::generate_race_path;
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::TriggerVolume;
 use crate::palette;
 
-use super::{EditorSelection, PlacedCamera, PlacedFilter, PlacedObstacle, PlacedProp};
+use super::{PlacedCamera, PlacedObstacle, PlacedProp};
 
 // --- Gizmo group ---
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
 pub(super) struct CourseGizmoGroup;
-
-// --- Trigger volume visualization ---
-
-pub(super) fn draw_trigger_gizmos(
-    mut gizmos: Gizmos<CourseGizmoGroup>,
-    trigger_query: Query<(&TriggerVolume, &GlobalTransform)>,
-) {
-    for (trigger, gt) in &trigger_query {
-        let (parent_scale, parent_rotation, center) = gt.to_scale_rotation_translation();
-        let size = trigger.half_extents * 2.0 * parent_scale;
-        let transform = Transform {
-            translation: center,
-            rotation: parent_rotation,
-            scale: size,
-        };
-        gizmos.cube(transform, Color::srgb(0.2, 1.0, 0.2));
-    }
-}
 
 // --- Gate sequence lines ---
 
@@ -102,25 +83,6 @@ pub(super) fn draw_gate_forward_arrows(
         let world_fwd = transform.rotation * local_fwd;
         gizmos.arrow(center, center + world_fwd * 3.0, Color::srgb(0.0, 1.0, 1.0));
     }
-}
-
-// --- Selection highlight ---
-
-pub(super) fn draw_selection_highlight(
-    mut gizmos: Gizmos<CourseGizmoGroup>,
-    selection: Res<EditorSelection>,
-    placed_query: Query<&GlobalTransform, PlacedFilter>,
-) {
-    let Some(entity) = selection.entity else {
-        return;
-    };
-    let Ok(gt) = placed_query.get(entity) else {
-        return;
-    };
-
-    let center = gt.translation() + Vec3::Y * 1.5;
-    let hl_transform = Transform::from_translation(center).with_scale(Vec3::splat(3.5));
-    gizmos.cube(hl_transform, Color::srgb(1.0, 1.0, 0.0));
 }
 
 // --- Flight spline preview ---
