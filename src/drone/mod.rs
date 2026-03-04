@@ -80,6 +80,7 @@ impl Plugin for DronePlugin {
             .add_systems(
                 FixedUpdate,
                 (
+                    choreography::update_ballistic_arcs,
                     choreography::advance_choreography,
                     choreography::compute_choreographed_rotation,
                     choreography::apply_visual_noise,

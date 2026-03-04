@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use crate::common::POINTS_PER_GATE;
 use crate::drone::ai::{cyclic_curvature, safe_speed_for_curvature};
 use crate::drone::components::{AiTuningParams, DroneConfig};
-use crate::pilot::personality::PersonalityTrait;
+use crate::pilot::personality::{PersonalityTrait, ScriptModifiers};
 use crate::pilot::skill::SkillProfile;
 
 // ---------------------------------------------------------------------------
@@ -140,10 +140,33 @@ const PACK_GAP_THRESHOLD: f32 = 3.0;
 const GATE_PASS_T_SAMPLES: usize = 12;
 
 // ---------------------------------------------------------------------------
+// Shared spline traversal step
+// ---------------------------------------------------------------------------
+
+/// One simulation tick: curvature → speed → dt_spline.
+/// Returns (speed in world-units/s, dt_spline to advance spline_t by).
+#[inline]
+fn spline_step(
+    spline: &CubicCurve<Vec3>,
+    t: f32,
+    cycle_t: f32,
+    pace: f32,
+    tuning: &AiTuningParams,
+) -> (f32, f32) {
+    let curvature = cyclic_curvature(spline, t, cycle_t);
+    let base_speed = safe_speed_for_curvature(curvature, tuning);
+    let speed = base_speed * pace;
+    let tangent = spline.velocity(t.rem_euclid(cycle_t));
+    let tangent_len = tangent.length().max(0.01);
+    let dt_spline = speed * SIMULATION_DT / tangent_len;
+    (speed, dt_spline)
+}
+
+// ---------------------------------------------------------------------------
 // Step 1: Estimate base segment times
 // ---------------------------------------------------------------------------
 
-/// Dry-run spline traversal at curvature-based speeds.
+/// Dry-run spline traversal at curvature-based speeds (pace=1.0).
 /// Returns (per-segment times in seconds, total time).
 fn estimate_segment_times(
     spline: &CubicCurve<Vec3>,
@@ -160,11 +183,7 @@ fn estimate_segment_times(
     let mut seg_time = 0.0f32;
 
     while t < total_spline_t {
-        let curvature = cyclic_curvature(spline, t, cycle_t);
-        let speed = safe_speed_for_curvature(curvature, tuning);
-        let tangent = spline.velocity(t.rem_euclid(cycle_t));
-        let tangent_len = tangent.length().max(0.01);
-        let dt_spline = speed * SIMULATION_DT / tangent_len;
+        let (_speed, dt_spline) = spline_step(spline, t, cycle_t, 1.0, tuning);
 
         t += dt_spline;
         seg_time += SIMULATION_DT;
@@ -263,58 +282,22 @@ fn compute_gate_pass_t(
 }
 
 // ---------------------------------------------------------------------------
-// Personality risk factor
+// Personality modifiers (aggregated from per-trait ScriptModifiers)
 // ---------------------------------------------------------------------------
 
-fn personality_risk_factor(traits: &[PersonalityTrait]) -> f32 {
-    let mut factor = 1.0f32;
+fn aggregate_script_modifiers(traits: &[PersonalityTrait]) -> ScriptModifiers {
+    let mut result = ScriptModifiers {
+        risk_factor: 1.0,
+        straight_line_bonus: 0.0,
+        cornering_bonus: 0.0,
+    };
     for t in traits {
-        factor *= match t {
-            PersonalityTrait::Reckless => 1.5,
-            PersonalityTrait::Aggressive => 1.3,
-            PersonalityTrait::Hotdog => 1.2,
-            PersonalityTrait::Flashy => 1.1,
-            PersonalityTrait::Technical => 0.9,
-            PersonalityTrait::Smooth => 0.85,
-            PersonalityTrait::Methodical => 0.7,
-            PersonalityTrait::Cautious => 0.6,
-        };
+        let m = t.script_modifiers();
+        result.risk_factor *= m.risk_factor;
+        result.straight_line_bonus += m.straight_line_bonus;
+        result.cornering_bonus += m.cornering_bonus;
     }
-    factor
-}
-
-fn personality_straight_line_bonus(traits: &[PersonalityTrait]) -> f32 {
-    let mut bonus = 0.0f32;
-    for t in traits {
-        bonus += match t {
-            PersonalityTrait::Reckless => 0.12,
-            PersonalityTrait::Aggressive => 0.08,
-            PersonalityTrait::Hotdog => 0.05,
-            PersonalityTrait::Flashy => 0.03,
-            PersonalityTrait::Technical => 0.0,
-            PersonalityTrait::Smooth => -0.03,
-            PersonalityTrait::Methodical => -0.07,
-            PersonalityTrait::Cautious => -0.08,
-        };
-    }
-    bonus
-}
-
-fn personality_cornering_bonus(traits: &[PersonalityTrait]) -> f32 {
-    let mut bonus = 0.0f32;
-    for t in traits {
-        bonus += match t {
-            PersonalityTrait::Technical => 0.05,
-            PersonalityTrait::Smooth => 0.03,
-            PersonalityTrait::Methodical => 0.02,
-            PersonalityTrait::Cautious => 0.01,
-            PersonalityTrait::Flashy => -0.02,
-            PersonalityTrait::Aggressive => -0.03,
-            PersonalityTrait::Hotdog => -0.04,
-            PersonalityTrait::Reckless => -0.06,
-        };
-    }
-    bonus
+    result
 }
 
 /// True if the drone is eligible for acrobatics based on personality.
@@ -376,15 +359,8 @@ fn simulate_race(
 
             let seg_idx = ((spline_ts[d] / POINTS_PER_GATE).floor() as usize)
                 .min(gate_count as usize - 1);
-            let curvature =
-                cyclic_curvature(drones[d].spline, spline_ts[d], cycle_t);
-            let base_speed = safe_speed_for_curvature(curvature, tuning);
-            let speed = base_speed * segment_paces[d][seg_idx];
-            let tangent = drones[d]
-                .spline
-                .velocity(spline_ts[d].rem_euclid(cycle_t));
-            let tangent_len = tangent.length().max(0.01);
-            let dt_spline = speed * SIMULATION_DT / tangent_len;
+            let (_speed, dt_spline) =
+                spline_step(drones[d].spline, spline_ts[d], cycle_t, segment_paces[d][seg_idx], tuning);
 
             let old_t = spline_ts[d];
             spline_ts[d] += dt_spline;
@@ -543,8 +519,8 @@ pub fn generate_race_script(
             .filter(|&&t| t == TurnTightness::Tight)
             .count();
         let drone_difficulty = tight_count as f32 / gate_count as f32;
-        let risk = personality_risk_factor(&drones[d_idx].traits);
-        let crash_prob = (1.0 - drones[d_idx].skill.level) * drone_difficulty * risk;
+        let mods = aggregate_script_modifiers(&drones[d_idx].traits);
+        let crash_prob = (1.0 - drones[d_idx].skill.level) * drone_difficulty * mods.risk_factor;
 
         let roll = det_f32(race_seed, d_idx as u32, 2000);
         if roll < crash_prob {
@@ -615,14 +591,15 @@ pub fn generate_race_script(
         let config = drones[d_idx].config;
 
         // Derived attributes
+        let mods = aggregate_script_modifiers(&drones[d_idx].traits);
         let s_speed = (skill.level * 0.4 + skill.speed * 0.6).clamp(0.0, 1.0);
         let straight_line_factor =
-            1.0 + (s_speed - 0.5) * 0.15 + personality_straight_line_bonus(&drones[d_idx].traits);
+            1.0 + (s_speed - 0.5) * 0.15 + mods.straight_line_bonus;
 
         let s_corner = (skill.level * 0.4 + skill.cornering * 0.6).clamp(0.0, 1.0);
         let cornering_efficiency = config.cornering_aggression
             * (0.85 + s_corner * 0.30)
-            + personality_cornering_bonus(&drones[d_idx].traits);
+            + mods.cornering_bonus;
 
         let base_pace = if target_finish_times[d_idx] > 0.001 {
             estimated_times[d_idx] / target_finish_times[d_idx]
@@ -681,10 +658,61 @@ pub fn generate_race_script(
     // -----------------------------------------------------------------------
     // Step 7: Drama pass — photo finishes and mid-pack clustering
     // -----------------------------------------------------------------------
+    let (overtakes, final_gate_arrivals) = apply_drama_pass(
+        drones, &mut segment_paces, &gate_pass_t_all, &crashes, tuning, gate_count,
+    );
+
+    // -----------------------------------------------------------------------
+    // Step 8: Drone-on-drone crash assignment (after drama pass)
+    // -----------------------------------------------------------------------
+    assign_drone_collisions(
+        drones, &mut crashes, &mut crash_count,
+        &gate_pass_t_all, &final_gate_arrivals, gate_count, race_seed,
+    );
+
+    // -----------------------------------------------------------------------
+    // Assemble RaceScript
+    // -----------------------------------------------------------------------
+    let drone_scripts = (0..drone_count)
+        .map(|d| DroneScript {
+            segment_pace: segment_paces[d].clone(),
+            crash: crashes.get(d).and_then(|c| {
+                c.as_ref().map(|cs| CrashScript {
+                    gate_index: cs.gate_index,
+                    progress_past_gate: cs.progress_past_gate,
+                    crash_type: cs.crash_type,
+                })
+            }),
+            acrobatic_gates: acrobatic_gates_all[d].clone(),
+            gate_pass_t: gate_pass_t_all[d].clone(),
+        })
+        .collect();
+
+    RaceScript {
+        drone_scripts,
+        overtakes,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Step 7: Drama pass
+// ---------------------------------------------------------------------------
+
+/// Tighten photo finish gap and cluster mid-pack drones.
+/// Mutates `segment_paces` in place. Returns (overtakes, final_gate_arrivals).
+fn apply_drama_pass(
+    drones: &[DroneScriptInput],
+    segment_paces: &mut [Vec<f32>],
+    gate_pass_t_all: &[Vec<f32>],
+    crashes: &[Option<CrashScript>],
+    tuning: &AiTuningParams,
+    gate_count: u32,
+) -> (Vec<ScriptedOvertake>, Vec<Vec<f32>>) {
+    let num_segments = gate_count as usize;
 
     // Simulate full race to get finish times and gate arrivals
     let (sim_finish_times, _gate_arrival_times) =
-        simulate_race(drones, &segment_paces, &gate_pass_t_all, &crashes, tuning);
+        simulate_race(drones, segment_paces, gate_pass_t_all, crashes, tuning);
 
     // Sort by finish time to find top-2
     let mut finish_order: Vec<(usize, f32)> = sim_finish_times
@@ -706,7 +734,6 @@ pub fn generate_race_script(
             && drones[first_idx].skill.level > 0.5
             && drones[second_idx].skill.level > 0.5
         {
-            // Nudge slower drone's last 2-3 segments up by up to 5%
             let segments_to_nudge = 3.min(num_segments);
             let nudge_per_seg = (MAX_TOP2_NUDGE / segments_to_nudge as f32).min(MAX_TOP2_NUDGE);
             for p in &mut segment_paces[second_idx][(num_segments - segments_to_nudge)..num_segments] {
@@ -718,7 +745,6 @@ pub fn generate_race_script(
     // Mid-pack clustering: identify isolated drones and nudge toward packs
     if finish_order.len() > 4 {
         let mut nudge_count = 0;
-        // Work on a copy of finish order to avoid borrow issues
         let order_snapshot: Vec<(usize, f32)> = finish_order.clone();
 
         for rank in 1..order_snapshot.len().saturating_sub(1) {
@@ -730,7 +756,6 @@ pub fn generate_race_script(
             let gap_behind = order_snapshot[rank + 1].1 - time;
 
             if gap_ahead > PACK_GAP_THRESHOLD && gap_behind > PACK_GAP_THRESHOLD {
-                // Isolated — nudge toward the pack ahead
                 let segments_to_nudge = 2.min(num_segments);
                 for p in &mut segment_paces[d_idx][(num_segments - segments_to_nudge)..num_segments] {
                     *p *= 1.0 + MAX_MIDPACK_NUDGE;
@@ -741,15 +766,29 @@ pub fn generate_race_script(
     }
 
     // Re-simulate after drama adjustments to get final overtakes
-    let (final_finish_times, final_gate_arrivals) =
-        simulate_race(drones, &segment_paces, &gate_pass_t_all, &crashes, tuning);
-    let _ = final_finish_times;
+    let (_, final_gate_arrivals) =
+        simulate_race(drones, segment_paces, gate_pass_t_all, crashes, tuning);
 
     let overtakes = detect_overtakes(&final_gate_arrivals, gate_count);
+    (overtakes, final_gate_arrivals)
+}
 
-    // -----------------------------------------------------------------------
-    // Step 8: Drone-on-drone crash assignment (after drama pass)
-    // -----------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Step 8: Drone-on-drone crash assignment
+// ---------------------------------------------------------------------------
+
+/// Assign drone-on-drone collisions based on proximity at gates.
+/// Mutates `crashes` and `crash_count` in place.
+fn assign_drone_collisions(
+    drones: &[DroneScriptInput],
+    crashes: &mut [Option<CrashScript>],
+    crash_count: &mut usize,
+    gate_pass_t_all: &[Vec<f32>],
+    final_gate_arrivals: &[Vec<f32>],
+    gate_count: u32,
+    race_seed: u32,
+) {
+    let drone_count = drones.len();
     let cycle_t = gate_count as f32 * POINTS_PER_GATE;
 
     // Find pairs of drones that arrive at the same gate within 1s of each other
@@ -788,10 +827,10 @@ pub fn generate_race_script(
         .sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap_or(std::cmp::Ordering::Equal));
 
     for &(d1, d2, gate, _) in &collision_candidates {
-        if crash_count >= MAX_DNFS {
+        if *crash_count >= MAX_DNFS {
             break;
         }
-        if drone_count - crash_count <= MIN_FINISHERS {
+        if drone_count - *crash_count <= MIN_FINISHERS {
             break;
         }
         if crashes[d1].is_some() || crashes[d2].is_some() {
@@ -811,44 +850,20 @@ pub fn generate_race_script(
                 other_drone_idx: survivor as u8,
             },
         });
-        crash_count += 1;
+        *crash_count += 1;
     }
 
     // Re-check minimum finishers after drone-on-drone crashes
-    while drone_count - crash_count < MIN_FINISHERS && crash_count > 0 {
-        // Remove least-dramatic crash (last assigned drone collision)
+    while drone_count - *crash_count < MIN_FINISHERS && *crash_count > 0 {
         if let Some(pos) = crashes.iter().rposition(|c| {
             c.as_ref()
                 .is_some_and(|cs| matches!(cs.crash_type, ScriptedCrashType::DroneCollision { .. }))
         }) {
             crashes[pos] = None;
-            crash_count -= 1;
+            *crash_count -= 1;
         } else {
             break;
         }
-    }
-
-    // -----------------------------------------------------------------------
-    // Assemble RaceScript
-    // -----------------------------------------------------------------------
-    let drone_scripts = (0..drone_count)
-        .map(|d| DroneScript {
-            segment_pace: segment_paces[d].clone(),
-            crash: crashes.get(d).and_then(|c| {
-                c.as_ref().map(|cs| CrashScript {
-                    gate_index: cs.gate_index,
-                    progress_past_gate: cs.progress_past_gate,
-                    crash_type: cs.crash_type,
-                })
-            }),
-            acrobatic_gates: acrobatic_gates_all[d].clone(),
-            gate_pass_t: gate_pass_t_all[d].clone(),
-        })
-        .collect();
-
-    RaceScript {
-        drone_scripts,
-        overtakes,
     }
 }
 
@@ -882,12 +897,7 @@ fn simulate_paced_time(
         }
 
         let seg_idx = ((t / POINTS_PER_GATE).floor() as usize).min(num_segments - 1);
-        let curvature = cyclic_curvature(spline, t, cycle_t);
-        let base_speed = safe_speed_for_curvature(curvature, tuning);
-        let speed = base_speed * paces[seg_idx];
-        let tangent = spline.velocity(t.rem_euclid(cycle_t));
-        let tangent_len = tangent.length().max(0.01);
-        let dt_spline = speed * SIMULATION_DT / tangent_len;
+        let (_speed, dt_spline) = spline_step(spline, t, cycle_t, paces[seg_idx], tuning);
 
         t += dt_spline;
         seg_time += SIMULATION_DT;

@@ -1,18 +1,20 @@
 # Sonar Lark
 
-A drone racing simulator with a built-in map editor, built in Rust using [Bevy 0.18](https://bevyengine.org/).
+A drone racing league organizer with a built-in map editor, built in Rust using [Bevy 0.18](https://bevyengine.org/).
 
-Define obstacle types by importing 3D models from Blender, build race courses by placing obstacles, then watch 12 AI drones race through the course.
+Define obstacle types by importing 3D models from Blender, build race courses by placing obstacles, then watch 12 AI drones race through choreographed spline-following with scripted outcomes, acrobatic maneuvers, and dramatic overtakes.
 
 ## Features
 
 - **Map Editor** — Obstacle Workshop for defining obstacle types from `.glb` models, and a Course Editor for placing obstacles, props, and gates with drag/rotate/scale controls
-- **12 AI Drones** — Thrust-through-body quadrotor physics with cascaded PID control, per-drone variation (cornering aggression, braking, attitude damping), dirty air/prop wash perturbations, and battery sag
-- **Race System** — Gate validation with plane-crossing detection (tunneling-proof), per-drone timing, DNF on missed gates, countdown sequence, and a results screen with standings
+- **Choreographed Racing** — Race outcomes predetermined by a script generator (pilot skill + course geometry + randomness), played back via spline-following with curvature-based banking, per-segment pacing that produces natural overtakes, and a drama pass for photo finishes
+- **12 AI Drones** — Per-drone unique racing lines, physics-based wandering (thrust-through-body quadrotor with 3-stage PID), choreographed spline playback during races
+- **Acrobatic Maneuvers** — Split-S dips and power loops at tight turns for skilled pilots, with rotation keyframes, altitude offsets, and smooth blend zones
+- **Race System** — Scripted gate passes from spline progress thresholds, 0-3 crashes per race (obstacle + drone-on-drone collisions), per-drone timing, countdown with convergence sequence, results screen with standings
 - **Cel-Shaded Rendering** — Custom WGSL shaders with halftone dot transitions, hue-shifted highlights/shadows, and a procedural TRON-style night skybox
-- **Obstacle Collision** — Swept segment vs OBB collision detection with gate opening exemption, editable collision volumes per obstacle type in the Workshop
+- **Obstacle Collision** — Editable collision volumes per obstacle type in the Workshop, scripted crash events with ballistic arcs and explosions
 - **Camera Modes** — Editor-placed course cameras (up to 9), chase camera (pack-follow), FPV (drone-mounted with target cycling), and Spectator (RTS orbit), with PiP preview in the editor
-- **Post-Race Wandering** — Drones transition to ambient wandering with deterministic Fibonacci-hashed waypoints after results, replacing static victory laps
+- **Natural Drone Behavior** — Drones wander freely pre-race (warm-up feel), converge to start positions on countdown, return to ambient wandering immediately after finishing (no victory laps)
 - **Victory Effects** — Confetti fans and staggered shell bursts from course-placed firework emitter props
 - **Procedural Pilots** — 24 generated pilots with unique gamertags (6 naming styles), 8 personality traits that modify flying behavior, skill profiles (level/speed/cornering/consistency), and persistent stats (races, wins, crashes, best times)
 - **Procedural Portraits** — SVG-assembled pilot portraits with 7 visual layers (face, eyes, mouth, hair, shirt, accessory, drone accent), dynamic color replacement, and per-pilot deterministic generation from seeded RNG
@@ -91,12 +93,13 @@ Menu  ──►  Editor  ──►  Race  ──►  Results
 - **Editor Gizmo Rework** — Entity-local axes, move/rotate/scale modes, modifier keys, snapping
 
 ### Flight & Racing
-- **Drone Physics** — 12 drones, thrust-through-body model, cascaded PID, AI waypoint tracking
+- **Drone Physics** — 12 drones, thrust-through-body model, 3-stage cascaded PID, AI waypoint tracking
 - **Drone Realism** — Motor lag, dirty air, prop wash, battery sag, per-drone variation
 - **Drone Models** — Blender-exported visual models replacing placeholders
 - **Obstacle Collision** — Swept OBB detection, gate opening exemption, crash effects
 - **Race System** — Gate validation, timing, countdown, completion detection, crash/DNF
 - **Post-Race Wandering** — Ambient wandering with Fibonacci-hashed waypoints after results
+- **Choreographed Racing** — Physics-based AI replaced by scripted spline playback during races: race script generator, per-segment pacing, curvature-based banking, acrobatic maneuvers (Split-S, power loops), scripted crashes (obstacle + drone-on-drone), visual noise (attitude jitter, dirty air wobble, micro-drift), drama pass for close finishes and mid-pack clustering, pre-race convergence sequence
 
 ### Presentation
 - **Rendering Overhaul** — Cel-shaded materials, halftone gradients, procedural TRON skybox

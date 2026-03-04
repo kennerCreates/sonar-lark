@@ -6,9 +6,9 @@ This is a **drone racing simulator with a built-in map editor**, built in **Rust
 
 Key facts:
 - **State machine**: `AppState` (Menu → Editor → Race → Results) with `EditorMode` SubStates (ObstacleWorkshop, CourseEditor)
-- **Physics**: Thrust-through-body quadrotor with cascaded PID, 12 AI drones. See [`docs/drone-system.md`](docs/drone-system.md), [`docs/drone-physics.md`](docs/drone-physics.md).
+- **Choreographed racing**: Race outcomes predetermined by script generator (`race/script.rs`), played back via spline-following (`drone/choreography.rs`). Physics only used for wandering drones. See [`docs/drone-system.md`](docs/drone-system.md), [`docs/race-system.md`](docs/race-system.md).
+- **Physics**: Thrust-through-body quadrotor with 3-stage PID (position→acceleration→attitude), used for pre/post-race wandering. See [`docs/drone-physics.md`](docs/drone-physics.md).
 - **Data**: Obstacle definitions and courses serialized as RON. Single `.glb` for obstacle models, separate `.glb` for drone.
-- **Gate validation**: Trigger volumes, gates passed in order. See [`docs/race-system.md`](docs/race-system.md).
 
 ## MCP Tools
 
@@ -44,7 +44,7 @@ The performance target is a stable **60fps**. Performance is paramount.
 - **State scoping**: use `DespawnOnExit` on entities that should be cleaned up when leaving a state. Do not manually despawn in `OnExit` unless there's a reason.
 - **Serialization**: all persistent data uses RON via serde (`assets/library/`, `assets/courses/`, `assets/pilots/`).
 - **Asset loading**: obstacle models from single `.glb`, accessed by Blender name. See [`docs/editor-system.md`](docs/editor-system.md).
-- **Physics**: all physics in `FixedUpdate` with `.chain()`. No physics in `Update`. See [`docs/drone-system.md`](docs/drone-system.md).
+- **Dual FixedUpdate chains**: Choreography chain (Racing drones) and physics chain (Wandering/Idle drones) both in FixedUpdate with `.chain()`. Per-entity `DronePhase` guards determine which chain processes each drone. No physics in `Update`. See [`docs/drone-system.md`](docs/drone-system.md).
 - **Rendering**: all visible geometry uses `CelMaterial`. Use `cel_material_from_color(base_color, light_dir)`. See [`docs/rendering.md`](docs/rendering.md).
 - **Asset readiness**: `drone_gltf_ready()` / `obstacles_gltf_ready()` run-conditions gate glTF-dependent systems. See [`docs/drone-system.md`](docs/drone-system.md).
 - **Bevy 0.18**: See `docs/bevy-018.md` for Bevy 0.18 API specifics — consult before writing any Bevy code.
@@ -56,9 +56,9 @@ The performance target is a stable **60fps**. Performance is paramount.
 | Document | ONLY read when... |
 |----------|-------------------|
 | [`docs/bevy-018.md`](docs/bevy-018.md) | Writing or modifying Bevy systems, queries, or ECS code |
-| [`docs/drone-system.md`](docs/drone-system.md) | Changing drone spawning, physics systems, AI, paths, explosions, or fireworks |
+| [`docs/drone-system.md`](docs/drone-system.md) | Changing drone spawning, choreography, physics systems, AI, paths, explosions, or fireworks |
 | [`docs/drone-physics.md`](docs/drone-physics.md) | Tuning flight parameters or modifying physics code (quick ref; see `drone-physics-deep-dive.md` for real-world reference) |
-| [`docs/race-system.md`](docs/race-system.md) | Changing race flow, gate detection, collision, leaderboard, or results |
+| [`docs/race-system.md`](docs/race-system.md) | Changing race flow, script generation, scripted events, leaderboard, or results |
 | [`docs/editor-system.md`](docs/editor-system.md) | Changing workshop, course editor, asset loading, props, or cameras |
 | [`docs/pilot-system.md`](docs/pilot-system.md) | Changing pilot roster, portraits, or dev menu palette editor |
 | [`docs/camera-system.md`](docs/camera-system.md) | Changing camera modes or switching logic |

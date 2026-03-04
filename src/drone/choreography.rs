@@ -56,31 +56,16 @@ const MICRO_DRIFT_AMP: f32 = 0.01;
 // System: advance_choreography
 // ---------------------------------------------------------------------------
 
-/// Advances Racing drones along their splines using the pre-computed pace profiles.
-/// Also handles ballistic arcs for crashed drones and acrobatic position offsets.
-/// Writes Transform.translation, DroneDynamics.velocity, AIController.spline_t.
-#[allow(clippy::too_many_arguments)]
-pub fn advance_choreography(
+/// Updates crashed drones falling under gravity in ballistic arcs.
+/// Runs independently of RaceScript so drones mid-crash-arc continue falling
+/// even after the script is cleaned up (e.g., during Results transition).
+pub fn update_ballistic_arcs(
     mut commands: Commands,
     time: Res<Time>,
-    tuning: Res<AiTuningParams>,
-    script: Option<Res<RaceScript>>,
     mut progress: Option<ResMut<RaceProgress>>,
-    _event_log: Option<ResMut<RaceEventLog>>,
     explosion_meshes: Option<Res<ExplosionMeshes>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     crash_sounds: Option<Res<CrashSounds>>,
-    mut racing_query: Query<(
-        Entity,
-        &Drone,
-        &DroneIdentity,
-        &mut DronePhase,
-        &mut AIController,
-        &mut DroneDynamics,
-        &mut Transform,
-        &mut Visibility,
-        &mut ChoreographyState,
-    ), Without<BallisticState>>,
     mut ballistic_query: Query<(
         Entity,
         &Drone,
@@ -97,9 +82,6 @@ pub fn advance_choreography(
         return;
     }
 
-    // --- Ballistic arc update (Phase 4): crashed drones falling under gravity ---
-    // Runs independently of RaceScript so drones mid-crash-arc continue falling
-    // even after the script is cleaned up (e.g., during Results transition).
     for (entity, drone, identity, mut phase, mut dynamics, mut transform, mut visibility, mut ballistic) in &mut ballistic_query {
         if *phase != DronePhase::Racing {
             continue;
@@ -130,11 +112,35 @@ pub fn advance_choreography(
             commands.entity(entity).remove::<BallisticState>();
         }
     }
+}
 
-    // --- Racing spline advancement (requires RaceScript) ---
+// ---------------------------------------------------------------------------
+// System: advance_choreography
+// ---------------------------------------------------------------------------
+
+/// Advances Racing drones along their splines using the pre-computed pace profiles.
+/// Writes Transform.translation, DroneDynamics.velocity, AIController.spline_t.
+pub fn advance_choreography(
+    time: Res<Time>,
+    tuning: Res<AiTuningParams>,
+    script: Option<Res<RaceScript>>,
+    mut racing_query: Query<(
+        &Drone,
+        &DronePhase,
+        &mut AIController,
+        &mut DroneDynamics,
+        &mut Transform,
+        &mut ChoreographyState,
+    ), Without<BallisticState>>,
+) {
+    let dt = time.delta_secs();
+    if dt == 0.0 {
+        return;
+    }
+
     let Some(script) = script else { return };
 
-    for (_entity, drone, _identity, phase, mut ai, mut dynamics, mut transform, _visibility, mut choreo) in &mut racing_query {
+    for (drone, phase, mut ai, mut dynamics, mut transform, mut choreo) in &mut racing_query {
         if *phase != DronePhase::Racing {
             continue;
         }
@@ -183,13 +189,11 @@ pub fn advance_choreography(
         let mut vel = tangent_dir * speed;
 
         // Phase 5: Acrobatic position offset
-        if let Some((acro_type, t_local, _gate_idx)) = active_acrobatic(ai.spline_t, ds, &ai) {
+        if let Some((acro_type, t_local, _gate_idx, entry_t, exit_t)) = active_acrobatic(ai.spline_t, ds, &ai) {
             let sin_t = (t_local * std::f32::consts::PI).sin();
             let cos_t = (t_local * std::f32::consts::PI).cos();
             let speed_scale = speed / tuning.max_speed;
 
-            let entry_t = acro_entry_exit(ds, &ai).map(|(e, _)| e).unwrap_or(0.0);
-            let exit_t = acro_entry_exit(ds, &ai).map(|(_, x)| x).unwrap_or(1.0);
             let window_len = (exit_t - entry_t).max(0.01);
             let spline_t_per_sec = speed / tangent_len;
             let dt_local_per_sec = spline_t_per_sec / window_len;
@@ -218,12 +222,6 @@ pub fn advance_choreography(
         transform.translation = new_pos;
         dynamics.velocity = vel;
 
-        // Phase 6: Position micro-drift
-        let phase_offset = drone.index as f32 * 1.618;
-        let t_secs = time.elapsed_secs();
-        transform.translation.x += (t_secs * 3.1 + phase_offset).sin() * MICRO_DRIFT_AMP;
-        transform.translation.z += (t_secs * 4.7 + phase_offset).sin() * MICRO_DRIFT_AMP;
-
         // Update target_gate_index for leaderboard
         ai.target_gate_index = (ai.spline_t / POINTS_PER_GATE).floor() as u32;
         ai.target_gate_index = ai.target_gate_index.min(gate_count.saturating_sub(1));
@@ -240,7 +238,6 @@ pub fn advance_choreography(
 /// Bank angle is exponentially smoothed to prevent instant flips at S-curve
 /// inflection points, producing a cinematic "broadcast TV" banking feel.
 pub fn compute_choreographed_rotation(
-    _tuning: Res<AiTuningParams>,
     time: Res<Time>,
     script: Option<Res<RaceScript>>,
     mut query: Query<(
@@ -312,7 +309,7 @@ pub fn compute_choreographed_rotation(
         };
 
         // Phase 5: Acrobatic rotation keyframes
-        if let Some((acro_type, t_local, _gate_idx)) = active_acrobatic(ai.spline_t, ds, ai) {
+        if let Some((acro_type, t_local, _gate_idx, _entry_t, _exit_t)) = active_acrobatic(ai.spline_t, ds, ai) {
             let roll_sign = if drone.index % 2 == 0 { 1.0 } else { -1.0 };
 
             // Compute exit rotation (normal bank at window exit)
@@ -358,36 +355,19 @@ enum AcroType {
     PowerLoop,
 }
 
-/// Determine the acrobatic entry/exit t for the first active acrobatic window.
-fn acro_entry_exit(
-    ds: &crate::race::script::DroneScript,
-    ai: &AIController,
-) -> Option<(f32, f32)> {
-    for &gate_idx in &ds.acrobatic_gates {
-        let gate_t = ds.gate_pass_t.get(gate_idx as usize).copied().unwrap_or(0.0);
-        let entry_t = gate_t - ACRO_ENTRY_OFFSET;
-        let exit_t = gate_t + ACRO_EXIT_OFFSET;
-        if ai.spline_t >= entry_t && ai.spline_t <= exit_t {
-            return Some((entry_t, exit_t));
-        }
-    }
-    None
-}
-
 /// Check if a spline_t falls within an acrobatic window. Returns the acro type,
-/// local progress (0..1), and gate index.
+/// local progress (0..1), gate index, and the window's entry/exit spline_t values.
 fn active_acrobatic(
     spline_t: f32,
     ds: &crate::race::script::DroneScript,
     ai: &AIController,
-) -> Option<(AcroType, f32, u32)> {
+) -> Option<(AcroType, f32, u32, f32, f32)> {
     for &gate_idx in &ds.acrobatic_gates {
         let gate_t = ds.gate_pass_t.get(gate_idx as usize).copied().unwrap_or(0.0);
         let entry_t = gate_t - ACRO_ENTRY_OFFSET;
         let exit_t = gate_t + ACRO_EXIT_OFFSET;
         if spline_t >= entry_t && spline_t <= exit_t {
             let t_local = ((spline_t - entry_t) / (exit_t - entry_t)).clamp(0.0, 1.0);
-            // Choose maneuver type based on altitude of next gate vs current
             let next_gate = (gate_idx as usize + 1) % ai.gate_positions.len().max(1);
             let current_y = ai.gate_positions.get(gate_idx as usize).map(|p| p.y).unwrap_or(0.0);
             let next_y = ai.gate_positions.get(next_gate).map(|p| p.y).unwrap_or(0.0);
@@ -396,7 +376,7 @@ fn active_acrobatic(
             } else {
                 AcroType::SplitS
             };
-            return Some((acro_type, t_local, gate_idx));
+            return Some((acro_type, t_local, gate_idx, entry_t, exit_t));
         }
     }
     None
@@ -543,6 +523,11 @@ pub fn apply_visual_noise(
             (t_secs * JITTER_FREQ_3 + phase_offset).sin() * amp,
         );
         transform.rotation *= Quat::from_euler(EulerRot::XYZ, jitter.x, jitter.y, jitter.z);
+
+        // Position micro-drift (small floating motion, distinct phase from rotation jitter)
+        let drift_phase = drone.index as f32 * 1.618;
+        transform.translation.x += (t_secs * 3.1 + drift_phase).sin() * MICRO_DRIFT_AMP;
+        transform.translation.z += (t_secs * 4.7 + drift_phase).sin() * MICRO_DRIFT_AMP;
     }
 }
 
@@ -860,17 +845,15 @@ pub fn fire_scripted_events(
             // Transition Racing → Wandering
             *phase = DronePhase::Wandering;
             commands.entity(entity).remove::<ChoreographyState>();
+            let mut phys = PhysicsResetBundle {
+                dynamics: &mut dynamics,
+                pid: &mut pid,
+                desired_pos: &mut desired_pos,
+                desired_accel: &mut desired_accel,
+                desired_att: &mut desired_att,
+            };
             reset_physics_for_wandering(
-                &mut commands,
-                entity,
-                drone,
-                transform,
-                &mut dynamics,
-                &mut pid,
-                &mut desired_pos,
-                &mut desired_accel,
-                &mut desired_att,
-                bounds.as_deref(),
+                &mut commands, entity, drone, transform, &mut phys, bounds.as_deref(),
             );
         }
     }
@@ -880,44 +863,47 @@ pub fn fire_scripted_events(
 // reset_physics_for_wandering
 // ---------------------------------------------------------------------------
 
+/// Mutable physics state to reset when transitioning to wandering.
+struct PhysicsResetBundle<'a> {
+    dynamics: &'a mut DroneDynamics,
+    pid: &'a mut PositionPid,
+    desired_pos: &'a mut DesiredPosition,
+    desired_accel: &'a mut DesiredAcceleration,
+    desired_att: &'a mut DesiredAttitude,
+}
+
 /// Resets stale physics state when a drone transitions from Racing to Wandering.
 /// Called per-entity at the moment of phase transition.
-pub fn reset_physics_for_wandering(
+fn reset_physics_for_wandering(
     commands: &mut Commands,
     entity: Entity,
     drone: &Drone,
     transform: &Transform,
-    dynamics: &mut DroneDynamics,
-    pid: &mut PositionPid,
-    desired_pos: &mut DesiredPosition,
-    desired_accel: &mut DesiredAcceleration,
-    desired_att: &mut DesiredAttitude,
+    phys: &mut PhysicsResetBundle,
     bounds: Option<&WanderBounds>,
 ) {
-    // Velocity: keep as-is from choreography for smooth handoff
     // Angular velocity: zero (stale from choreography)
-    dynamics.angular_velocity = Vec3::ZERO;
+    phys.dynamics.angular_velocity = Vec3::ZERO;
     // Thrust: set to hover thrust
-    let hover_thrust = dynamics.mass * GRAVITY;
-    dynamics.thrust = hover_thrust;
-    dynamics.commanded_thrust = hover_thrust;
+    let hover_thrust = phys.dynamics.mass * GRAVITY;
+    phys.dynamics.thrust = hover_thrust;
+    phys.dynamics.commanded_thrust = hover_thrust;
     // PID integral: zero to prevent windup
-    pid.integral = Vec3::ZERO;
+    phys.pid.integral = Vec3::ZERO;
     // DesiredPosition: current position
-    desired_pos.position = transform.translation;
-    desired_pos.velocity_hint = Vec3::ZERO;
-    desired_pos.max_speed = 8.0; // Wander speed
+    phys.desired_pos.position = transform.translation;
+    phys.desired_pos.velocity_hint = Vec3::ZERO;
+    phys.desired_pos.max_speed = 8.0; // Wander speed
     // DesiredAcceleration: zero
-    desired_accel.acceleration = Vec3::ZERO;
+    phys.desired_accel.acceleration = Vec3::ZERO;
     // DesiredAttitude: hover defaults
-    desired_att.orientation = Quat::IDENTITY;
-    desired_att.thrust_magnitude = hover_thrust;
+    phys.desired_att.orientation = Quat::IDENTITY;
+    phys.desired_att.thrust_magnitude = hover_thrust;
 
     // Insert WanderState
     let target = bounds.map_or(
         transform.translation + Vec3::Y * 5.0,
         |b| {
-            // Simple deterministic waypoint
             let hash = (drone.index as u32).wrapping_mul(2654435769);
             let fx = ((hash & 0xFFFF) as f32) / 65535.0;
             let fz = (((hash >> 16) & 0xFFFF) as f32) / 65535.0;

@@ -24,6 +24,17 @@ pub const ALL_TRAITS: [PersonalityTrait; 8] = [
     PersonalityTrait::Hotdog,
 ];
 
+/// Modifier values used by the race script generator.
+/// Separate from TraitModifiers (which affect DroneConfig/flight parameters).
+pub struct ScriptModifiers {
+    /// Multiplicative crash probability factor (1.0 = neutral).
+    pub risk_factor: f32,
+    /// Additive straight-line pace bonus.
+    pub straight_line_bonus: f32,
+    /// Additive cornering pace bonus.
+    pub cornering_bonus: f32,
+}
+
 /// Modifier values applied on top of skill-based DroneConfig.
 /// Additive fields are added directly. Scale fields multiply the randomized magnitude.
 pub struct TraitModifiers {
@@ -44,6 +55,20 @@ pub struct TraitModifiers {
 }
 
 impl PersonalityTrait {
+    pub fn script_modifiers(self) -> ScriptModifiers {
+        use PersonalityTrait::*;
+        match self {
+            Reckless   => ScriptModifiers { risk_factor: 1.5,  straight_line_bonus:  0.12, cornering_bonus: -0.06 },
+            Aggressive => ScriptModifiers { risk_factor: 1.3,  straight_line_bonus:  0.08, cornering_bonus: -0.03 },
+            Hotdog     => ScriptModifiers { risk_factor: 1.2,  straight_line_bonus:  0.05, cornering_bonus: -0.04 },
+            Flashy     => ScriptModifiers { risk_factor: 1.1,  straight_line_bonus:  0.03, cornering_bonus: -0.02 },
+            Technical  => ScriptModifiers { risk_factor: 0.9,  straight_line_bonus:  0.0,  cornering_bonus:  0.05 },
+            Smooth     => ScriptModifiers { risk_factor: 0.85, straight_line_bonus: -0.03, cornering_bonus:  0.03 },
+            Methodical => ScriptModifiers { risk_factor: 0.7,  straight_line_bonus: -0.07, cornering_bonus:  0.02 },
+            Cautious   => ScriptModifiers { risk_factor: 0.6,  straight_line_bonus: -0.08, cornering_bonus:  0.01 },
+        }
+    }
+
     pub fn modifiers(self) -> TraitModifiers {
         use PersonalityTrait::*;
         match self {

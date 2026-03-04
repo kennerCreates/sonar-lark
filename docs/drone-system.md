@@ -2,7 +2,7 @@
 
 ## Asset Loading
 
-`DroneGltfHandle` loaded `OnEnter(Race)`, `DroneAssets` extracted via `run_if(drone_gltf_ready)` + `run_if(not(resource_exists::<DroneAssets>))`, `spawn_drones` gated by `run_if(resource_exists::<DroneAssets>)` + `run_if(resource_exists::<CourseData>)`. 12 drones with `DespawnOnExit(AppState::Race)`. Resources cleaned up `OnExit(Race)`.
+`DroneGltfHandle` loaded `OnEnter(Race)`, `DroneAssets` extracted via `run_if(drone_gltf_ready)` + `run_if(not(resource_exists::<DroneAssets>))`, `spawn_drones` gated by `run_if(resource_exists::<DroneAssets>)` + `run_if(resource_exists::<CourseData>)`. 12 drones with `DespawnOnExit(AppState::Race)`. Resources cleaned up `OnExit(Results)`.
 
 ## Asset Readiness Pattern
 
@@ -10,66 +10,96 @@
 
 ## Drone Lifecycle
 
-`DronePhase` (defined in `common::race_participant`, re-exported from `drone::components`) tracks state: `Idle → Racing → VictoryLap → Wandering` (or `Racing → Crashed` on DNF). On Results entry: `VictoryLap → Wandering` (deterministic waypoints via Fibonacci hashing, `WanderState` component, `WanderBounds` resource from course extents). Crashed drones: hidden, zero velocity, skipped by physics/AI. `ReturnPath` component holds return spline. `drones_are_active()` run condition keeps AI alive during Racing + VictoryLap + Wandering.
-
-## Physics Pipeline
-
-11-system `.chain()` in FixedUpdate (thrust-through-body model). Each drone gets a unique spline via `generate_drone_race_path()`. Per-drone variation via `DroneConfig` (generated from pilot skill+personality when `PilotConfigs` is available, else random). `RaceSeed` resource randomizes outcomes between races.
+`DronePhase` (defined in `common::race_participant`, re-exported from `drone::components`) tracks state:
 
 ```
-Blender ──► drone.glb ──► DroneGltfHandle (OnEnter(Race) load)
-                                │
-                          DroneAssets (run_if drone_gltf_ready)
-                                │
-CourseData ──► generate_race_path() ──► base Catmull-Rom CubicCurve (editor preview)
-  (paths/generation.rs)  │
-                    └──► generate_drone_race_path() ──► per-drone unique CubicCurve (12x)
-                         (midleg lateral shift + gate 2D offset + approach scaling)
-                                                                   │
-                                                        spawn_drones() ──► 12 Drone entities
-                                                                   │
-                                                        FixedFirst: restore_physics_transforms (undo visual interp)
-                                                        FixedPreUpdate: save_previous_transforms
-                                                        FixedUpdate chain (11-system, thrust-through-body):
-                                                        update_ai_targets → compute_racing_line
-                                                        → proximity_avoidance → update_wander_targets
-                                                        → hover_target → position_pid
-                                                        → attitude_controller → dirty_air_perturbation → motor_lag
-                                                        → apply_forces → integrate_motion → clamp_transform
-                                                        FixedPostUpdate: save_physics_transforms
-                                                        PostUpdate: interpolate_visual_transforms
-
-                                                        Post-race: Racing → Returning (per-drone)
-                                                        → generate_return_path() → non-cyclic spline
-                                                        → smoothstep deceleration → return to start
-                                                        → Returning → Idle (hover)
-
-                                                        Results state: VictoryLap → Wandering
-                                                        → deterministic waypoint generation (Fibonacci hash)
-                                                        → dwell at waypoint → pick next → continuous flight
+OnEnter(Race) → spawn_drones → DronePhase::Idle
+  Idle → Wandering (pre-race wandering near start area, physics-based)
+  START RACE → convergence window → countdown → GO
+  GO → DronePhase::Racing (choreography takes over)
+  Racing → finish → DronePhase::Wandering (immediate, per-entity)
+  Racing → crash → DronePhase::Crashed (ballistic arc → explosion)
+  OnEnter(Results) → transition_to_wandering (any remaining non-wandering drones)
 ```
 
-The physics model uses a **thrust-through-body** architecture: the drone's orientation determines its thrust direction (always body-up). A cascaded controller (outer position PID → inner attitude PD) drives orientation, and motor lag filters thrust changes. Quadratic drag and angular dynamics with moment of inertia produce realistic banking, braking, and hover behavior. Aerodynamic perturbations (dirty air from leading drones, prop wash on descent) add angular wobble that the PD must fight, producing visible instability in dirty air. Battery sag linearly reduces max thrust over the race duration.
+**No VictoryLap phase** — finished drones return to wandering immediately. Crashed drones: hidden after ground impact, zero velocity, skipped by all systems.
+
+## Dual-Chain Architecture
+
+Two system chains run in FixedUpdate during Race/Results states, separated by per-entity `DronePhase` filtering:
+
+```
+FixedUpdate:
+  Choreography chain (DronePhase::Racing only):
+    advance_choreography → compute_choreographed_rotation
+    → apply_visual_noise → fire_scripted_events
+
+  Physics chain (skips DronePhase::Racing):
+    AI: update_ai_targets → compute_racing_line → proximity_avoidance → update_wander_targets
+    Physics: sync_tilt_clamp → position_to_acceleration → acceleration_to_attitude
+    → attitude_controller → dirty_air_perturbation → motor_lag
+    → apply_forces → integrate_motion → clamp_transform
+```
+
+The choreography chain reads from `RaceScript` (per-drone pacing, crashes, acrobatics) and writes `Transform`, `DroneDynamics.velocity`, `AIController.spline_t`. The physics chain handles pre-race wandering, post-finish wandering, and Results state.
+
+## Choreography (Racing Drones)
+
+See [`PLAN.md`](../PLAN.md) for the full choreographed spline racing design.
+
+**`advance_choreography`**: Advances `spline_t` at `base_speed * segment_pace[current_segment]` where base speed comes from `safe_speed_for_curvature()`. Writes `Transform.translation` from spline position (with acrobatic offsets), `DroneDynamics.velocity` from tangent, `AIController.spline_t`. Also handles ballistic arcs for crashed drones.
+
+**`compute_choreographed_rotation`**: Derives rotation from spline curvature — bank angle from `atan(speed² × κ / g)` with exponential smoothing. Acrobatic rotation keyframes (Split-S, Power Loop) at marked gates. Smoothstep blend at entry/exit.
+
+**`apply_visual_noise`**: Attitude jitter (layered sine waves), dirty air wobble (proximity-based amplitude boost), position micro-drift (~1cm).
+
+**`fire_scripted_events`**: Checks `spline_t` against pre-computed `gate_pass_t` thresholds. Fires gate passes, overtakes, crashes, and finishes. Updates `RaceProgress`, `RaceEventLog`, `AIController.target_gate_index`. Calls `crash_drone()` for scripted crashes.
+
+### Convergence & Start
+
+1. Player presses START RACE → `begin_convergence` sets `DesiredPosition` to spline start positions
+2. Drones fly there naturally via physics chain (~5s window or until all within 2m)
+3. 3-2-1 countdown (3s)
+4. GO → `snap_to_start_positions` places drones exactly on spline start → `DronePhase::Racing`
+
+### Components
+
+- `ChoreographyState`: `previous_spline_t` (for crossing detection), `consistency` (pilot skill, cached), `smoothed_bank` (exponential smoothing)
+- `BallisticState`: `velocity` (inserted on crash, removed on ground impact)
+
+## Physics Pipeline (Wandering Drones)
+
+The physics model uses **thrust-through-body** architecture with a 3-stage decomposed PID. See [`drone-physics.md`](drone-physics.md) for parameters and tuning.
+
+```
+DesiredPosition (from AI or hover_target)
+       |
+  position_to_acceleration   Stage 1: position error → desired acceleration (with gravity compensation, anti-windup)
+       |
+  DesiredAcceleration
+       |
+  acceleration_to_attitude   Stage 2: acceleration → body orientation + thrust (reads TiltClamp)
+       |
+  DesiredAttitude
+       |
+  attitude_controller        Stage 3: orientation error → torque → angular velocity → rotation
+       |
+  motor_lag → apply_forces → integrate_motion → clamp_transform
+```
+
+Per-drone variation via `DroneConfig` (generated from pilot skill+personality when `PilotConfigs` is available, else random). `RaceSeed` resource randomizes outcomes between races.
 
 ## Visual Transform Interpolation
 
-`PhysicsTranslation`/`PhysicsRotation` store authoritative post-tick state; `restore_physics_transforms` (FixedFirst) undoes visual interpolation before physics, `save_physics_transforms` (FixedPostUpdate) captures result, `interpolate_visual_transforms` (PostUpdate) blends `Previous*` → `Physics*` using `overstep_fraction` for smooth rendering.
+`PhysicsTranslation`/`PhysicsRotation` store authoritative post-tick state; `restore_physics_transforms` (FixedFirst) undoes visual interpolation before physics/choreography, `save_physics_transforms` (FixedPostUpdate) captures result, `interpolate_visual_transforms` (PostUpdate) blends `Previous*` → `Physics*` using `overstep_fraction`. Works identically for both choreography and physics — both write `Transform` at the same FixedUpdate insertion point.
 
 ## AI Path Following
 
-Each drone follows a unique cyclic Catmull-Rom spline (3 control points per gate). Per-drone variation: gate pass offset, approach scaling, midleg lateral bias (all deterministic via Fibonacci hashing + `RaceSeed`). `POINTS_PER_GATE = 3.0`. Full lap: all gates + gate 0 again. Curvature-aware speed limiting + gate correction blending + adaptive look-ahead. Requires >= 2 gates. Wandering logic extracted to `wander.rs` (`WanderBounds`, `wander_waypoint()`, `update_wander_targets()`, `transition_to_wandering()`, `build_wander_bounds()`).
-
-## Aerodynamic Perturbations
-
-Dirty air (wake cone wobble behind leading drones) + prop wash (descent wobble). Deterministic sine waves, no RNG. Battery sag reduces thrust linearly over race. All tunable via dev dashboard.
-
-## Proximity Avoidance
-
-Lateral dodge when drones are nearby. O(12²) per tick. Gate-proximity suppression prevents dodging near gate openings. Tunable via dev dashboard.
+Each drone follows a unique cyclic Catmull-Rom spline (3 control points per gate). Per-drone variation: gate pass offset, approach scaling, midleg lateral bias (all deterministic via Fibonacci hashing + `RaceSeed`). `POINTS_PER_GATE = 3.0`. Full lap: all gates + gate 0 again. Curvature-aware speed limiting + gate correction blending + adaptive look-ahead. Requires >= 2 gates. Wandering logic in `wander.rs` (`WanderBounds`, `wander_waypoint()`, `update_wander_targets()`, `transition_to_wandering()`, `build_wander_bounds()`).
 
 ## Explosion Effects
 
-Three particle layers (debris, hot smoke, dark smoke) using pre-allocated `ExplosionMeshes`. 4 random explosion sounds. Loaded `OnEnter(Race)`, cleaned up `OnExit(Race)`. All `StandardMaterial` (unlit emissive).
+Three particle layers (debris, hot smoke, dark smoke) using pre-allocated `ExplosionMeshes`. 4 random explosion sounds. Loaded `OnEnter(Race)`, cleaned up `OnExit(Results)`. All `StandardMaterial` (unlit emissive).
 
 ## Firework Effects
 
@@ -78,6 +108,10 @@ Confetti fan + staggered shell bursts on first finish. `FireworkEmitter` entitie
 ## Dev Dashboard
 
 `AiTuningParams` resource (14 tunable params, persists across restarts). F4 toggles dashboard UI in Race. `PARAM_META` defines display names, step sizes, ranges. Index-based get/set for UI.
+
+## Debug Draw
+
+F3 toggles visualization: spline paths (color-coded by speed), gate markers, gate planes, drone state indicators, progress indicators.
 
 ## Flight Spline Preview
 

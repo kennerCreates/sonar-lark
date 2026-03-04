@@ -4,25 +4,34 @@ Simulation parameters and architecture. For real-world flight dynamics backgroun
 
 ## Architecture
 
-Thrust-through-body model with cascaded control:
+Thrust-through-body model with 3-stage cascaded control. The former monolithic `position_pid` was decomposed into `position_to_acceleration` → `acceleration_to_attitude` for composability (allows maneuver systems to inject at either stage).
 
 ```
 DesiredPosition (from AI or hover_target)
        |
-  position_pid        Outer loop: position error -> desired acceleration
-       |                 -> desired body orientation + thrust magnitude
+  sync_tilt_clamp           Sync TiltClamp component from AiTuningParams
+       |
+  position_to_acceleration  Stage 1: position error → DesiredAcceleration
+       |                      PID with gravity compensation + anti-windup
+  DesiredAcceleration
+       |
+  acceleration_to_attitude  Stage 2: acceleration → DesiredAttitude
+       |                      Maps world-frame accel to body orientation + thrust
+       |                      Applies per-entity TiltClamp
   DesiredAttitude
        |
-  attitude_controller  Inner loop: orientation error -> torque
-       |                 -> angular velocity -> rotation (on Transform)
-  motor_lag            First-order filter on thrust (40 ms tau)
+  attitude_controller       Stage 3: orientation error → torque → angular velocity
+       |                      Also supports DesiredBodyRates (rate-tracking mode)
+  motor_lag                 First-order filter on thrust (25 ms tau)
        |
-  apply_forces         Thrust along body-up + gravity + quadratic drag -> velocity
+  apply_forces              Thrust along body-up + gravity + quadratic drag → velocity
        |
-  integrate_motion     Velocity -> position
+  integrate_motion          Velocity → position
        |
-  clamp_transform      Floor collision
+  clamp_transform           Floor collision
 ```
+
+**Note:** During races, the physics chain only processes non-Racing drones (Idle, Wandering). Racing drones are handled by the choreography chain. See [`drone-system.md`](drone-system.md).
 
 ## Parameters
 
@@ -33,12 +42,12 @@ drag_constant:       0.025 (quadratic, F = k*v^2)
 max_speed:           45.0 m/s (safety clamp, rarely reached)
 max_tilt_angle:      1.3 rad (75 deg)
 moment_of_inertia:   (0.003, 0.005, 0.003) kg*m^2
-motor_time_constant: 0.040 s
+motor_time_constant: 0.025 s
 
 Position PID:        kp (6, 8, 6)  ki (0.1, 0.2, 0.1)  kd (4, 5, 4)
-Attitude PD:         kp_roll_pitch 25.0  kd_roll_pitch 8.0
-                     kp_yaw 15.0  kd_yaw 5.0
-Max angular rate:    (20, 20, 10) rad/s
+Attitude PD:         kp_roll_pitch 7.0  kd_roll_pitch 0.20
+                     kp_yaw 3.0  kd_yaw 0.25
+Max angular rate:    (8, 8, 6) rad/s
 
 Hover noise amp:     0.01-0.03 m per axis
 Hover noise freq:    0.3-2.0 Hz per axis
