@@ -78,6 +78,7 @@ pub(crate) fn load_course_into_editor(
             None,
             instance.gate_forward_flipped,
             &def.collision_volumes,
+            instance.color_override.map(|rgba| Color::srgb(rgba[0], rgba[1], rgba[2])),
         );
 
         if let Some(entity) = spawned {
@@ -86,6 +87,7 @@ pub(crate) fn load_course_into_editor(
                 obstacle_id: instance.obstacle_id.clone(),
                 gate_order: instance.gate_order,
                 gate_forward_flipped: instance.gate_forward_flipped,
+                color_override: instance.color_override,
             });
 
             // Spawn camera child if this obstacle has one

@@ -28,6 +28,7 @@ pub fn build_course_data<'a>(
                 is_primary: cam.is_primary,
                 label: cam.label.clone(),
             }),
+            color_override: placed.color_override,
         })
         .collect();
 
@@ -87,6 +88,7 @@ mod tests {
             obstacle_id: ObstacleId("gate_air".to_string()),
             gate_order: Some(2),
             gate_forward_flipped: true,
+            color_override: None,
         };
         let transform = Transform {
             translation: Vec3::new(1.0, 2.0, 3.0),
@@ -137,11 +139,13 @@ mod tests {
             obstacle_id: ObstacleId("gate1".to_string()),
             gate_order: Some(0),
             gate_forward_flipped: false,
+            color_override: None,
         };
         let obs2 = PlacedObstacle {
             obstacle_id: ObstacleId("wall".to_string()),
             gate_order: None,
             gate_forward_flipped: false,
+            color_override: None,
         };
         let t1 = Transform::from_translation(Vec3::ZERO);
         let t2 = Transform::from_translation(Vec3::X);
@@ -172,6 +176,7 @@ mod tests {
             obstacle_id: ObstacleId("gate_loop".to_string()),
             gate_order: Some(0),
             gate_forward_flipped: false,
+            color_override: None,
         };
         let transform = Transform::from_translation(Vec3::new(10.0, 0.0, 0.0));
         let cam = PlacedCamera {
@@ -210,6 +215,7 @@ mod tests {
             gate_order: None,
             gate_forward_flipped: false,
             camera: None,
+            color_override: None,
         }];
         assert_eq!(next_gate_order_from_instances(&instances), 0);
     }
@@ -225,6 +231,7 @@ mod tests {
                 gate_order: Some(0),
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("g".to_string()),
@@ -234,6 +241,7 @@ mod tests {
                 gate_order: Some(1),
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("g".to_string()),
@@ -243,6 +251,7 @@ mod tests {
                 gate_order: Some(2),
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             },
         ];
         assert_eq!(next_gate_order_from_instances(&instances), 3);
@@ -259,6 +268,7 @@ mod tests {
                 gate_order: Some(0),
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("g".to_string()),
@@ -268,6 +278,7 @@ mod tests {
                 gate_order: Some(5),
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             },
         ];
         assert_eq!(next_gate_order_from_instances(&instances), 6);
@@ -284,6 +295,7 @@ mod tests {
                 gate_order: Some(3),
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("wall".to_string()),
@@ -293,6 +305,7 @@ mod tests {
                 gate_order: None,
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             },
             ObstacleInstance {
                 obstacle_id: ObstacleId("gate".to_string()),
@@ -302,6 +315,7 @@ mod tests {
                 gate_order: Some(1),
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             },
         ];
         assert_eq!(next_gate_order_from_instances(&instances), 4);

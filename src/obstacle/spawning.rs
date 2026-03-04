@@ -44,7 +44,7 @@ pub fn obstacles_gltf_ready(
     handle.is_some_and(|h| asset_server.is_loaded_with_dependencies(&h.0))
 }
 
-fn gate_color(obstacle_id: &ObstacleId) -> Option<Color> {
+pub(crate) fn gate_color(obstacle_id: &ObstacleId) -> Option<Color> {
     match obstacle_id.0.as_str() {
         "gate_loop"   => Some(palette::DANDELION),
         "gate_ground" => Some(palette::CHERRY),
@@ -75,6 +75,7 @@ pub fn spawn_obstacle(
     gate_index: Option<u32>,
     gate_forward_flipped: bool,
     collision_configs: &[CollisionVolumeConfig],
+    color_override: Option<Color>,
 ) -> Option<Entity> {
     let gltf = gltf_assets.get(&gltf_handle.0)?;
     let node_handle = gltf.named_nodes.get(node_name)?;
@@ -89,7 +90,8 @@ pub fn spawn_obstacle(
         rotation: model_rotation * node.transform.rotation,
         scale: node.transform.scale,
     };
-    let override_mat = gate_color(obstacle_id)
+    let override_mat = color_override
+        .or_else(|| gate_color(obstacle_id))
         .map(|color| cel_materials.add(cel_material_from_color(color, light_dir)));
     let primitives: Vec<(Handle<Mesh>, MeshMaterial3d<CelMaterial>)> = gltf_mesh
         .primitives

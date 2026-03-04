@@ -189,6 +189,7 @@ mod tests {
             gate_order: Some(order),
             gate_forward_flipped: false,
             camera: None,
+            color_override: None,
         }
     }
 
@@ -201,6 +202,7 @@ mod tests {
             gate_order: None,
             gate_forward_flipped: false,
             camera: None,
+            color_override: None,
         }
     }
 

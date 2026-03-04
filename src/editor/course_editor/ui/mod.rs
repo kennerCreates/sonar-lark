@@ -2,6 +2,7 @@ mod camera_interaction;
 mod data;
 mod discover;
 mod display_updates;
+mod gate_color;
 mod left_panel;
 mod load;
 mod obstacle_interaction;
@@ -28,6 +29,9 @@ pub use prop_interaction::{
 pub use camera_interaction::{
     handle_camera_placement, handle_camera_primary_toggle, handle_remove_camera,
     setup_camera_editor_meshes, spawn_gate_camera, update_camera_primary_label,
+};
+pub use gate_color::{
+    handle_gate_color_click, handle_gate_color_default, update_gate_color_label,
 };
 pub use display_updates::{
     handle_button_hover, handle_name_field_focus, handle_name_text_input,

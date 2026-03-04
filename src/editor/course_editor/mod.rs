@@ -86,6 +86,7 @@ pub struct PlacedObstacle {
     pub obstacle_id: ObstacleId,
     pub gate_order: Option<u32>,
     pub gate_forward_flipped: bool,
+    pub color_override: Option<[f32; 4]>,
 }
 
 /// Marker on every prop entity spawned in the course editor.
@@ -168,6 +169,9 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_transform_mode_buttons,
                     ui::handle_prop_color_cycle,
                     ui::update_prop_color_label,
+                    ui::handle_gate_color_click,
+                    ui::handle_gate_color_default,
+                    ui::update_gate_color_label,
                     ui::handle_camera_placement,
                     ui::handle_remove_camera,
                     ui::handle_camera_primary_toggle,

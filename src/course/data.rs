@@ -26,6 +26,9 @@ pub struct ObstacleInstance {
     /// Optional camera attached to this gate, with local offset/rotation.
     #[serde(default)]
     pub camera: Option<GateCamera>,
+    /// RGBA override color. None = use default gate_color() behavior.
+    #[serde(default)]
+    pub color_override: Option<[f32; 4]>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

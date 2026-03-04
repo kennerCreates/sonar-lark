@@ -60,6 +60,7 @@ pub fn handle_palette_selection(
             None,
             false,
             &def.collision_volumes,
+            if def.is_gate { Some(crate::palette::VANILLA) } else { None },
         );
 
         if let Some(entity) = spawned {
@@ -70,11 +71,17 @@ pub fn handle_palette_selection(
             } else {
                 None
             };
+            let color_override = if def.is_gate {
+                Some(DEFAULT_GATE_COLOR)
+            } else {
+                None
+            };
             commands.entity(entity).remove::<DespawnOnExit<AppState>>();
             commands.entity(entity).insert(PlacedObstacle {
                 obstacle_id: btn.0.clone(),
                 gate_order,
                 gate_forward_flipped: false,
+                color_override,
             });
 
             // Auto-spawn a primary camera on the first gate (gate_order == 0)
@@ -110,6 +117,7 @@ pub fn handle_palette_selection(
                 gate_order,
                 gate_forward_flipped: false,
                 camera: camera_snapshot,
+                color_override,
             });
 
             selection.entity = Some(entity);

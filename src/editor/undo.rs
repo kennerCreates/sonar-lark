@@ -82,6 +82,7 @@ pub enum CourseEditorAction {
         gate_order: Option<u32>,
         gate_forward_flipped: bool,
         camera: Option<CameraSnapshot>,
+        color_override: Option<[f32; 4]>,
     },
     SpawnProp {
         entity: Entity,
@@ -103,6 +104,7 @@ pub enum CourseEditorAction {
         gate_order: Option<u32>,
         gate_forward_flipped: bool,
         camera: Option<CameraSnapshot>,
+        color_override: Option<[f32; 4]>,
     },
     DeleteProp {
         old_entity: Entity,
@@ -121,6 +123,11 @@ pub enum CourseEditorAction {
         entity: Entity,
     },
     PropColorChange {
+        entity: Entity,
+        before: Option<[f32; 4]>,
+        after: Option<[f32; 4]>,
+    },
+    GateColorChange {
         entity: Entity,
         before: Option<[f32; 4]>,
         after: Option<[f32; 4]>,
@@ -162,6 +169,7 @@ impl CourseEditorAction {
             }
             Self::FlipGate { entity } if *entity == old => *entity = new,
             Self::PropColorChange { entity, .. } if *entity == old => *entity = new,
+            Self::GateColorChange { entity, .. } if *entity == old => *entity = new,
             _ => {}
         }
     }

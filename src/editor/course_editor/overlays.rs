@@ -135,6 +135,7 @@ pub(super) fn draw_flight_spline_preview(
                 gate_order: placed.gate_order,
                 gate_forward_flipped: placed.gate_forward_flipped,
                 camera: None,
+                color_override: placed.color_override,
             })
             .collect();
 

@@ -87,6 +87,7 @@ pub fn spawn_course(
             instance.gate_order,
             instance.gate_forward_flipped,
             &def.collision_volumes,
+            instance.color_override.map(|rgba| Color::srgb(rgba[0], rgba[1], rgba[2])),
         );
 
         if spawned.is_none() {
@@ -165,6 +166,7 @@ mod tests {
                     gate_order: Some(0),
                     gate_forward_flipped: false,
                     camera: None,
+                    color_override: None,
                 },
                 ObstacleInstance {
                     obstacle_id: ObstacleId("gate_air".to_string()),
@@ -174,6 +176,7 @@ mod tests {
                     gate_order: Some(1),
                     gate_forward_flipped: false,
                     camera: None,
+                    color_override: None,
                 },
                 ObstacleInstance {
                     obstacle_id: ObstacleId("wall_short".to_string()),
@@ -183,6 +186,7 @@ mod tests {
                     gate_order: None,
                     gate_forward_flipped: false,
                     camera: None,
+                    color_override: None,
                 },
             ],
             props: vec![],
@@ -280,6 +284,7 @@ mod tests {
                 gate_order: Some(7),
                 gate_forward_flipped: false,
                 camera: None,
+                color_override: None,
             }],
             props: vec![],
             cameras: vec![],

@@ -118,6 +118,24 @@ pub struct CameraEditorMeshes {
     pub primary_material: Handle<CelMaterial>,
 }
 
+// --- Gate color picker ---
+
+#[derive(Component)]
+pub struct GateColorLabel;
+
+#[derive(Component)]
+pub struct GateColorCell(pub usize);
+
+#[derive(Component)]
+pub struct GateColorDefaultButton;
+
+pub const DEFAULT_GATE_COLOR: [f32; 4] = [0.949, 0.949, 0.855, 1.0];
+
+pub const GATE_COLOR_CELL_SIZE: f32 = 24.0;
+pub const GATE_COLOR_GRID_COLS: usize = 8;
+
+// --- Prop color cycle ---
+
 pub const COLOR_CYCLE: &[(&str, Option<[f32; 4]>)] = &[
     ("Auto", None),
     ("Gold", Some([1.0, 0.725, 0.220, 1.0])),

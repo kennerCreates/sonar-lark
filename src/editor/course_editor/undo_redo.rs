@@ -79,6 +79,7 @@ pub(super) fn handle_course_undo_input(
             gate_order,
             gate_forward_flipped,
             camera,
+            color_override,
         } => {
             if is_undo {
                 // Undo spawn = despawn
@@ -107,6 +108,7 @@ pub(super) fn handle_course_undo_input(
                     gate_forward_flipped,
                     camera.as_ref(),
                     camera_meshes.as_deref(),
+                    color_override,
                 ) {
                     remap_entity_in_stack(&mut undo_stack, entity, new_entity);
                     selection.entity = Some(new_entity);
@@ -162,6 +164,7 @@ pub(super) fn handle_course_undo_input(
             gate_order,
             gate_forward_flipped,
             camera,
+            color_override,
         } => {
             if is_undo {
                 // Undo delete = respawn
@@ -181,6 +184,7 @@ pub(super) fn handle_course_undo_input(
                     gate_forward_flipped,
                     camera.as_ref(),
                     camera_meshes.as_deref(),
+                    color_override,
                 ) {
                     remap_entity_in_stack(&mut undo_stack, old_entity, new_entity);
                     selection.entity = Some(new_entity);
@@ -268,6 +272,18 @@ pub(super) fn handle_course_undo_input(
                 selection.entity = Some(entity);
             }
         }
+
+        CourseEditorAction::GateColorChange {
+            entity,
+            before,
+            after,
+        } => {
+            let target = if is_undo { before } else { after };
+            if let Ok(mut placed) = component_queries.p0().get_mut(entity) {
+                placed.color_override = target;
+                selection.entity = Some(entity);
+            }
+        }
     }
 
     // Move the action to the opposite stack
@@ -310,6 +326,7 @@ pub(super) fn snapshot_for_delete(
             gate_order: placed.gate_order,
             gate_forward_flipped: placed.gate_forward_flipped,
             camera,
+            color_override: placed.color_override,
         });
     }
 
@@ -362,6 +379,7 @@ fn respawn_obstacle(
     gate_forward_flipped: bool,
     camera: Option<&CameraSnapshot>,
     camera_meshes: Option<&CameraEditorMeshes>,
+    color_override: Option<[f32; 4]>,
 ) -> Option<Entity> {
     let handle = gltf_handle?;
     let def = library.get(obstacle_id)?;
@@ -384,6 +402,7 @@ fn respawn_obstacle(
         gate_order,
         gate_forward_flipped,
         &def.collision_volumes,
+        color_override.map(|rgba| Color::srgb(rgba[0], rgba[1], rgba[2])),
     )?;
 
     commands.entity(entity).remove::<DespawnOnExit<AppState>>();
@@ -391,6 +410,7 @@ fn respawn_obstacle(
         obstacle_id: obstacle_id.clone(),
         gate_order,
         gate_forward_flipped,
+        color_override,
     });
 
     // Respawn camera child if present

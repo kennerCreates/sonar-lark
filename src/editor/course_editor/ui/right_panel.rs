@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::dev_menu::color_picker_data::PALETTE_COLORS;
 use crate::editor::course_editor::TransformMode;
 use crate::obstacle::definition::ObstacleId;
 use crate::palette;
@@ -158,6 +159,58 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, existing_courses: &[
                 });
 
             ui_theme::spawn_panel_button(panel, "Clear Gate Orders", ClearGateOrdersButton);
+
+            ui_theme::spawn_divider(panel);
+
+            // --- Gate Color section ---
+            panel.spawn((
+                Text::new("Gate Color"),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(palette::SIDEWALK),
+            ));
+
+            panel.spawn((
+                Text::new("Color: (select a gate)"),
+                TextFont {
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(palette::CHAINMAIL),
+                GateColorLabel,
+            ));
+
+            panel
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
+                    column_gap: Val::Px(2.0),
+                    row_gap: Val::Px(2.0),
+                    max_width: Val::Px(
+                        (GATE_COLOR_CELL_SIZE + 2.0) * GATE_COLOR_GRID_COLS as f32,
+                    ),
+                    ..default()
+                })
+                .with_children(|grid| {
+                    for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
+                        grid.spawn((
+                            Button,
+                            GateColorCell(i),
+                            Node {
+                                width: Val::Px(GATE_COLOR_CELL_SIZE),
+                                height: Val::Px(GATE_COLOR_CELL_SIZE),
+                                border: UiRect::all(Val::Px(1.0)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(rgb[0], rgb[1], rgb[2])),
+                            BorderColor::all(Color::srgba(0.0, 0.0, 0.0, 0.3)),
+                        ));
+                    }
+                });
+
+            ui_theme::spawn_panel_button(panel, "Default Color", GateColorDefaultButton);
 
             ui_theme::spawn_divider(panel);
 
