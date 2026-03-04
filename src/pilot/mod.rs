@@ -8,6 +8,7 @@ use bevy::prelude::*;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
+use crate::dev_menu::portrait_config::{self, PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS};
 use crate::drone::components::DroneConfig;
 use crate::race::progress::RaceResults;
 use crate::states::AppState;
@@ -57,6 +58,7 @@ pub struct ColorScheme {
 }
 
 impl ColorScheme {
+    #[cfg(test)]
     pub fn to_color(&self) -> Color {
         Color::srgb(self.primary[0], self.primary[1], self.primary[2])
     }
@@ -127,7 +129,10 @@ pub struct PilotConfigs {
     pub configs: Vec<DroneConfig>,
 }
 
-fn select_pilots_for_race(mut commands: Commands, roster: Option<Res<roster::PilotRoster>>) {
+fn select_pilots_for_race(
+    mut commands: Commands,
+    roster: Option<Res<roster::PilotRoster>>,
+) {
     let Some(roster) = roster else {
         warn!("No PilotRoster resource — pilots will not be selected");
         return;
@@ -151,15 +156,19 @@ fn select_pilots_for_race(mut commands: Commands, roster: Option<Res<roster::Pil
         indices.push(extra);
     }
 
+    // Assign unique colors from the allowed drone palette, shuffled each race
+    let palette_config = portrait_config::load_config();
+    let race_colors = pick_race_colors(&mut rng, indices.len(), &palette_config);
+
     let mut selected = Vec::with_capacity(12);
     let mut configs = Vec::with_capacity(12);
 
-    for &idx in &indices {
+    for (slot, &idx) in indices.iter().enumerate() {
         let pilot = &roster.pilots[idx];
         selected.push(SelectedPilot {
             pilot_id: pilot.id,
             gamertag: pilot.gamertag.clone(),
-            color: pilot.color_scheme.to_color(),
+            color: race_colors[slot],
         });
         configs.push(pilot.generate_drone_config(&mut rng));
     }
@@ -167,6 +176,27 @@ fn select_pilots_for_race(mut commands: Commands, roster: Option<Res<roster::Pil
     commands.insert_resource(SelectedPilots { pilots: selected });
     commands.insert_resource(PilotConfigs { configs });
     info!("Selected {} pilots for race", indices.len());
+}
+
+/// Pick unique drone colors for a race from the allowed palette colors.
+/// Shuffles the allowed colors and assigns one per slot, cycling if needed.
+fn pick_race_colors(
+    rng: &mut impl rand::Rng,
+    count: usize,
+    config: &PortraitPaletteConfig,
+) -> Vec<Color> {
+    let mut allowed = config.allowed_indices(PortraitColorSlot::Drone);
+
+    // Shuffle for random assignment each race
+    allowed.shuffle(rng);
+
+    (0..count)
+        .map(|i| {
+            let idx = allowed[i % allowed.len()];
+            let [r, g, b] = PALETTE_COLORS[idx].1;
+            Color::srgb(r, g, b)
+        })
+        .collect()
 }
 
 fn update_pilot_stats_after_race(

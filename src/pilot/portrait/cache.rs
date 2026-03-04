@@ -45,11 +45,10 @@ pub fn setup_portrait_cache(
         })
         .unwrap_or_default();
 
-    for sel in &selected.pilots {
-        if cache.portraits.contains_key(&sel.pilot_id) {
-            continue;
-        }
+    // Invalidate all cached portraits since drone colors change each race.
+    cache.invalidate();
 
+    for sel in &selected.pilots {
         let Some(pilot) = roster.get(sel.pilot_id) else {
             warn!(
                 "Pilot {:?} not found in roster, skipping portrait",
@@ -58,9 +57,13 @@ pub fn setup_portrait_cache(
             continue;
         };
 
+        // Use the race-assigned color (not the pilot's stored color_scheme)
+        let srgba = sel.color.to_srgba();
+        let drone_color = [srgba.red, srgba.green, srgba.blue];
+
         let image = rasterize_portrait(
             &pilot.portrait,
-            pilot.color_scheme.primary,
+            drone_color,
             PORTRAIT_SIZE,
             &parts,
         );
