@@ -3,6 +3,7 @@ mod tools;
 mod ui;
 
 use bevy::prelude::*;
+use bevy::time::Timer;
 
 use crate::states::HypeMode;
 
@@ -25,6 +26,8 @@ impl Plugin for PosterEditorPlugin {
                     tools::handle_delete_text,
                     tools::handle_undo_redo,
                     tools::handle_start_race,
+                    tools::update_brush_cursor,
+                    tools::update_text_cursor_blink,
                 )
                     .run_if(in_state(HypeMode::PosterEditor)),
             );
@@ -102,7 +105,20 @@ pub struct PosterTextElement;
 #[derive(Component)]
 pub struct ToolButtonMarker(pub PosterTool);
 
+#[derive(Component)]
+pub struct BrushCursorPreview;
+
+#[derive(Component)]
+pub struct TextCursorBar;
+
+#[derive(Resource)]
+pub struct CursorBlinkTimer {
+    pub timer: Timer,
+    pub visible: bool,
+}
+
 fn cleanup_poster_editor(mut commands: Commands) {
     commands.remove_resource::<PosterEditorState>();
     commands.remove_resource::<crate::editor::undo::UndoStack<PosterAction>>();
+    commands.remove_resource::<CursorBlinkTimer>();
 }

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::time::{Timer, TimerMode};
 use bevy::ui::RelativeCursorPosition;
 
 use crate::dev_menu::color_picker_data::PALETTE_COLORS;
@@ -9,9 +10,9 @@ use crate::ui_theme;
 
 use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH};
 use super::{
-    BrushSizeButton, CanvasContainer, EraseToolButton, PaintToolButton, PosterAction,
-    PosterCanvas, PosterColorCell, PosterEditorState, PosterStartRaceButton, PosterTool,
-    TextToolButton, ToolButtonMarker,
+    BrushCursorPreview, BrushSizeButton, CanvasContainer, CursorBlinkTimer, EraseToolButton,
+    PaintToolButton, PosterAction, PosterCanvas, PosterColorCell, PosterEditorState,
+    PosterStartRaceButton, PosterTool, TextToolButton, ToolButtonMarker,
 };
 
 const COLOR_CELL_SIZE: f32 = 28.0;
@@ -36,6 +37,10 @@ pub fn setup_poster_editor(mut commands: Commands, mut images: ResMut<Assets<Ima
         editing_text: None,
     });
     commands.insert_resource(UndoStack::<PosterAction>::default());
+    commands.insert_resource(CursorBlinkTimer {
+        timer: Timer::from_seconds(0.5, TimerMode::Repeating),
+        visible: true,
+    });
 
     // Root container
     commands
@@ -239,6 +244,23 @@ fn spawn_canvas_area(parent: &mut ChildSpawnerCommands, canvas_handle: Handle<Im
                             height: Val::Percent(100.0),
                             ..default()
                         },
+                    ));
+
+                    // Brush cursor preview (circle outline, hidden by default)
+                    container.spawn((
+                        BrushCursorPreview,
+                        ZIndex(2),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            width: Val::Px(20.0),
+                            height: Val::Px(20.0),
+                            border: UiRect::all(Val::Px(1.5)),
+                            border_radius: BorderRadius::MAX,
+                            ..default()
+                        },
+                        BorderColor::all(Color::BLACK),
+                        BackgroundColor(Color::NONE),
+                        Visibility::Hidden,
                     ));
                 });
         });

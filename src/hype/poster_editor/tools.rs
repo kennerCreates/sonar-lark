@@ -11,8 +11,9 @@ use crate::dev_menu::color_picker_data::PALETTE_COLORS;
 
 use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH, CANVAS_HEIGHT, CANVAS_WIDTH};
 use super::{
-    BrushSizeButton, CanvasContainer, PaintStroke, PosterAction, PosterColorCell,
-    PosterEditorState, PosterStartRaceButton, PosterTextElement, PosterTool, ToolButtonMarker,
+    BrushCursorPreview, BrushSizeButton, CanvasContainer, CursorBlinkTimer, PaintStroke,
+    PosterAction, PosterColorCell, PosterEditorState, PosterStartRaceButton, PosterTextElement,
+    PosterTool, TextCursorBar, ToolButtonMarker,
 };
 
 // --- Tool selection ---
@@ -270,7 +271,12 @@ pub fn handle_text_placement(
     // Finalize any previous text
     state.editing_text = None;
 
+    // Use brush color for text
+    let [r, g, b, _] = state.brush_color;
+    let text_color = Color::srgb_u8(r, g, b);
+
     // Spawn a new text entity as child of the canvas container
+    // ZIndex(1) ensures text renders above the canvas ImageNode
     let text_entity = commands
         .spawn((
             PosterTextElement,
@@ -279,7 +285,8 @@ pub fn handle_text_placement(
                 font_size: 32.0,
                 ..default()
             },
-            TextColor(Color::BLACK),
+            TextColor(text_color),
+            ZIndex(1),
             Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(local_x),
@@ -299,6 +306,7 @@ pub fn handle_text_input(
     mut state: ResMut<PosterEditorState>,
     mut events: MessageReader<KeyboardInput>,
     mut text_query: Query<&mut Text, With<PosterTextElement>>,
+    mut blink: ResMut<CursorBlinkTimer>,
 ) {
     let Some(entity) = state.editing_text else {
         // Consume events so they don't pile up
@@ -310,6 +318,10 @@ pub fn handle_text_input(
         if !event.state.is_pressed() {
             continue;
         }
+
+        // Reset blink on any keypress so cursor stays visible while typing
+        blink.visible = true;
+        blink.timer.reset();
 
         match &event.logical_key {
             Key::Enter | Key::Escape => {
@@ -415,4 +427,127 @@ pub fn handle_start_race(
             next_state.set(AppState::Race);
         }
     }
+}
+
+// --- Brush cursor preview ---
+
+const DISPLAY_SCALE: f32 = CANVAS_DISPLAY_WIDTH / CANVAS_WIDTH as f32;
+
+pub fn update_brush_cursor(
+    state: Res<PosterEditorState>,
+    container_query: Query<&RelativeCursorPosition, With<CanvasContainer>>,
+    mut cursor_query: Query<
+        (&mut Node, &mut Visibility, &mut BorderColor),
+        With<BrushCursorPreview>,
+    >,
+) {
+    let Ok(rel_cursor) = container_query.single() else {
+        return;
+    };
+    let Ok((mut node, mut vis, mut border)) = cursor_query.single_mut() else {
+        return;
+    };
+
+    let show = matches!(state.active_tool, PosterTool::Paint | PosterTool::Erase)
+        && rel_cursor.cursor_over;
+
+    if !show {
+        *vis = Visibility::Hidden;
+        return;
+    }
+
+    let Some(norm) = rel_cursor.normalized else {
+        *vis = Visibility::Hidden;
+        return;
+    };
+
+    *vis = Visibility::Inherited;
+
+    let diameter = state.brush_radius * 2.0 * DISPLAY_SCALE;
+    let local_x = (norm.x + 0.5) * CANVAS_DISPLAY_WIDTH;
+    let local_y = (norm.y + 0.5) * CANVAS_DISPLAY_HEIGHT;
+
+    node.width = Val::Px(diameter);
+    node.height = Val::Px(diameter);
+    node.left = Val::Px(local_x - diameter * 0.5);
+    node.top = Val::Px(local_y - diameter * 0.5);
+
+    // Color: brush color for paint, gray for erase
+    let color = if state.active_tool == PosterTool::Erase {
+        Color::srgba(0.4, 0.4, 0.4, 0.8)
+    } else {
+        let [r, g, b, _] = state.brush_color;
+        Color::srgba_u8(r, g, b, 200)
+    };
+    *border = BorderColor::all(color);
+}
+
+// --- Text cursor blink ---
+
+pub fn update_text_cursor_blink(
+    mut commands: Commands,
+    time: Res<Time>,
+    state: Res<PosterEditorState>,
+    mut blink: ResMut<CursorBlinkTimer>,
+    text_query: Query<Entity, With<PosterTextElement>>,
+    cursor_bar_query: Query<(Entity, &ChildOf), With<TextCursorBar>>,
+) {
+    blink.timer.tick(time.delta());
+
+    let Some(editing) = state.editing_text else {
+        // No active text — remove any lingering cursor bars
+        for (bar, _) in &cursor_bar_query {
+            commands.entity(bar).despawn();
+        }
+        return;
+    };
+
+    // Toggle visibility on timer tick
+    if blink.timer.just_finished() {
+        blink.visible = !blink.visible;
+    }
+
+    // Find existing cursor bar for the active text, remove bars from other texts
+    let mut active_bar = None;
+    for (bar, child_of) in &cursor_bar_query {
+        if child_of.parent() == editing {
+            active_bar = Some(bar);
+        } else {
+            commands.entity(bar).despawn();
+        }
+    }
+
+    let bar_entity = if let Some(bar) = active_bar {
+        bar
+    } else {
+        // Don't spawn until the text entity actually exists in the world
+        if text_query.get(editing).is_err() {
+            return;
+        }
+
+        // Reset blink state when creating a new cursor
+        blink.visible = true;
+        blink.timer.reset();
+
+        let bar = commands
+            .spawn((
+                TextCursorBar,
+                TextSpan::new("|"),
+                TextFont {
+                    font_size: 32.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+            ))
+            .id();
+        commands.entity(editing).add_child(bar);
+        bar
+    };
+
+    // Toggle visibility
+    commands.entity(bar_entity).insert(if blink.visible {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    });
 }
