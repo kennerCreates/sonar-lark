@@ -8,6 +8,7 @@ pub struct CourseEntry {
     pub path: String,
     #[allow(dead_code)] // read in tests; will be used in game loop later
     pub gate_count: usize,
+    pub thumbnail_path: Option<String>,
 }
 
 pub fn discover_courses() -> Vec<CourseEntry> {
@@ -32,10 +33,18 @@ pub fn discover_courses_in(courses_dir: &Path) -> Vec<CourseEntry> {
                             .count()
                     })
                     .unwrap_or(0);
+                // e.g. "course_001.course.ron" → "course_001.png"
+                let thumb_path = courses_dir.join(format!("{display_name}.png"));
+                let thumbnail_path = if thumb_path.exists() {
+                    Some(thumb_path.to_string_lossy().to_string())
+                } else {
+                    None
+                };
                 courses.push(CourseEntry {
                     name: display_name,
                     path: path.to_string_lossy().to_string(),
                     gate_count,
+                    thumbnail_path,
                 });
             }
         }

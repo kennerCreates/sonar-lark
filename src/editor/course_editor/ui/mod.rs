@@ -15,6 +15,7 @@ pub(crate) use data::build_course_data;
 pub use load::auto_load_pending_course;
 pub(crate) use load::load_course_into_editor;
 pub use save_delete::{
+    PendingThumbnailSave,
     handle_back_to_menu, handle_clear_gate_orders_button,
     handle_gate_order_toggle, handle_save_button,
 };
@@ -30,7 +31,7 @@ pub use gate_color::{
     handle_gate_color_click, handle_gate_color_default, update_gate_color_label,
 };
 pub use display_updates::{
-    handle_button_hover, handle_name_field_focus, handle_name_text_input,
+    handle_button_hover,
     handle_transform_mode_buttons, update_display_values, update_gate_count_display,
     update_transform_mode_ui,
 };

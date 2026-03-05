@@ -7,6 +7,7 @@ mod undo_redo;
 
 use bevy::{
     asset::AssetEvent,
+    camera::visibility::RenderLayers,
     gizmos::config::{DefaultGizmoConfigGroup, GizmoConfigStore},
     picking::mesh_picking::ray_cast::{MeshRayCast, MeshRayCastSettings},
     prelude::*,
@@ -54,14 +55,12 @@ pub struct EditorTransform {
 #[derive(Resource)]
 pub struct EditorCourse {
     pub name: String,
-    pub editing_name: bool,
 }
 
 impl Default for EditorCourse {
     fn default() -> Self {
         Self {
             name: DEFAULT_COURSE_NAME.to_string(),
-            editing_name: false,
         }
     }
 }
@@ -116,7 +115,6 @@ pub fn reset_editor_to_default(
     selection.entity = None;
     selection.palette_id = None;
     course_state.name = DEFAULT_COURSE_NAME.to_string();
-    course_state.editing_name = false;
     transform_state.gate_order_mode = false;
     transform_state.next_gate_order = 0;
 }
@@ -154,8 +152,6 @@ impl Plugin for CourseEditorPlugin {
                 Update,
                 (
                     ui::handle_clear_gate_orders_button,
-                    ui::handle_name_field_focus,
-                    ui::handle_name_text_input,
                     ui::update_display_values,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
@@ -227,6 +223,12 @@ impl Plugin for CourseEditorPlugin {
             )
             .add_systems(
                 Update,
+                preview::save_thumbnail_when_ready
+                    .run_if(in_state(EditorMode::CourseEditor))
+                    .run_if(resource_exists::<ui::PendingThumbnailSave>),
+            )
+            .add_systems(
+                Update,
                 snapshot_and_despawn_on_glb_reload
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -272,9 +274,17 @@ fn setup_course_editor(
     commands.insert_resource(ScaleWidgetState::default());
     commands.insert_resource(UndoStack::<CourseEditorAction>::default());
 
+    // Gizmos on layer 1 so only the main camera (layers 0+1) sees them,
+    // not the camera preview render-to-texture camera (layer 0 only).
+    let gizmo_layers = RenderLayers::layer(1);
+
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = -1.0;
     config.line.width = 3.0;
+    config.render_layers = gizmo_layers.clone();
+
+    let (course_config, _) = config_store.config_mut::<overlays::CourseGizmoGroup>();
+    course_config.render_layers = gizmo_layers;
 }
 
 fn cleanup_course_editor(
@@ -298,16 +308,21 @@ fn cleanup_course_editor(
         commands.entity(entity).despawn();
     }
 
+    let default_layers = RenderLayers::default();
+
     let (config, _) = config_store.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = 0.0;
     config.line.width = 2.0;
+    config.render_layers = default_layers.clone();
+
+    let (course_config, _) = config_store.config_mut::<overlays::CourseGizmoGroup>();
+    course_config.render_layers = default_layers;
 }
 
 // --- Placement and Selection ---
 
 fn handle_placement_and_selection(
     mut selection: ResMut<EditorSelection>,
-    mut course_state: ResMut<EditorCourse>,
     mut transform_state: ResMut<EditorTransform>,
     move_widget: Res<MoveWidgetState>,
     rotate_widget: Res<RotateWidgetState>,
@@ -335,14 +350,6 @@ fn handle_placement_and_selection(
     }
 
     let over_ui = interaction_query.iter().any(|i| *i != Interaction::None);
-
-    // Clicking in the 3D viewport while editing the course name unfocuses the text field.
-    if course_state.editing_name {
-        if mouse_buttons.just_pressed(MouseButton::Left) && !over_ui {
-            course_state.editing_name = false;
-        }
-        return;
-    }
 
     if over_ui || !mouse_buttons.just_pressed(MouseButton::Left) {
         return;
@@ -392,7 +399,6 @@ fn handle_placement_and_selection(
 fn handle_delete_key(
     mut commands: Commands,
     mut selection: ResMut<EditorSelection>,
-    course_state: Res<EditorCourse>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
     obstacle_query: Query<&PlacedObstacle>,
@@ -401,10 +407,6 @@ fn handle_delete_key(
     transform_query: Query<&Transform, PlacedFilter>,
     camera_child_query: Query<(Entity, &ChildOf, &PlacedCamera, &Transform)>,
 ) {
-    if course_state.editing_name {
-        return;
-    }
-
     if keyboard.just_pressed(KeyCode::Delete)
         && let Some(entity) = selection.entity.take()
     {
@@ -424,16 +426,11 @@ fn handle_delete_key(
 
 fn handle_transform_mode_keys(
     mut transform_state: ResMut<EditorTransform>,
-    course_state: Res<EditorCourse>,
     mut move_widget: ResMut<MoveWidgetState>,
     mut rotate_widget: ResMut<RotateWidgetState>,
     mut scale_widget: ResMut<ScaleWidgetState>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
-    if course_state.editing_name {
-        return;
-    }
-
     let new_mode = if keyboard.just_pressed(KeyCode::Digit1) {
         Some(TransformMode::Move)
     } else if keyboard.just_pressed(KeyCode::Digit2) {
@@ -458,14 +455,10 @@ fn handle_transform_mode_keys(
 
 fn handle_flip_gate_key(
     selection: Res<EditorSelection>,
-    course_state: Res<EditorCourse>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut placed_query: Query<&mut PlacedObstacle>,
     mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
 ) {
-    if course_state.editing_name {
-        return;
-    }
     if !keyboard.just_pressed(KeyCode::KeyF) {
         return;
     }

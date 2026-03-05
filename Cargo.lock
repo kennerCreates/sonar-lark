@@ -4585,6 +4585,7 @@ name = "sonar-lark"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "image",
  "rand 0.8.5",
  "resvg",
  "ron",

@@ -29,12 +29,6 @@ pub struct ClearGateOrdersButton;
 pub struct GateCountText;
 
 #[derive(Component)]
-pub struct CourseNameField;
-
-#[derive(Component)]
-pub struct CourseNameDisplayText;
-
-#[derive(Component)]
 pub struct PaletteContainer;
 
 #[derive(Component)]
@@ -74,6 +68,17 @@ pub struct CameraEditorMeshes {
     pub mesh: Handle<Mesh>,
     pub material: Handle<CelMaterial>,
     pub primary_material: Handle<CelMaterial>,
+}
+
+// --- Thumbnail camera ---
+
+#[derive(Component)]
+pub struct ThumbnailCamera;
+
+#[derive(Resource)]
+pub struct ThumbnailRenderTarget {
+    pub image_handle: Handle<Image>,
+    pub camera_entity: Entity,
 }
 
 // --- Gate color picker ---

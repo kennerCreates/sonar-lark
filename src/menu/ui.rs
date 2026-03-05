@@ -1,11 +1,15 @@
 use std::fs;
 
 use bevy::prelude::*;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 use crate::course::discovery::{discover_courses, CourseEntry};
 use crate::palette;
 use crate::states::{AppState, PendingEditorCourse};
 use crate::ui_theme;
+
+const THUMBNAIL_DISPLAY_WIDTH: f32 = 192.0;
+const THUMBNAIL_DISPLAY_HEIGHT: f32 = 108.0;
 
 #[derive(Component)]
 pub(crate) struct StartGameButton;
@@ -251,18 +255,19 @@ pub fn handle_course_library_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<CourseLibraryButton>)>,
     location_root: Query<Entity, With<LocationSelectRoot>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             for entity in &location_root {
                 commands.entity(entity).despawn();
             }
-            spawn_course_library(&mut commands);
+            spawn_course_library(&mut commands, &mut images);
         }
     }
 }
 
-fn spawn_course_library(commands: &mut Commands) {
+fn spawn_course_library(commands: &mut Commands, images: &mut Assets<Image>) {
     let courses = discover_courses();
 
     commands
@@ -288,11 +293,14 @@ fn spawn_course_library(commands: &mut Commands) {
 
             parent
                 .spawn(Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px(8.0),
+                    flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
+                    justify_content: JustifyContent::Center,
+                    column_gap: Val::Px(12.0),
+                    row_gap: Val::Px(12.0),
                     margin: UiRect::vertical(Val::Px(10.0)),
-                    max_height: Val::Px(400.0),
+                    max_height: Val::Px(500.0),
+                    max_width: Val::Px(900.0),
                     overflow: Overflow::scroll_y(),
                     ..default()
                 })
@@ -305,7 +313,7 @@ fn spawn_course_library(commands: &mut Commands) {
                         ));
                     } else {
                         for course in &courses {
-                            spawn_course_list_item(list, course);
+                            spawn_course_list_item(list, course, images);
                         }
                     }
                 });
@@ -321,21 +329,32 @@ fn spawn_course_library(commands: &mut Commands) {
         });
 }
 
-fn spawn_course_list_item(parent: &mut ChildSpawnerCommands, course: &CourseEntry) {
+fn spawn_course_list_item(
+    parent: &mut ChildSpawnerCommands,
+    course: &CourseEntry,
+    images: &mut Assets<Image>,
+) {
+    let thumbnail_handle = course
+        .thumbnail_path
+        .as_ref()
+        .and_then(|path| load_thumbnail_image(path, images));
+
     parent
         .spawn(Node {
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(4.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(4.0),
             ..default()
         })
-        .with_children(|row| {
-            row.spawn((
+        .with_children(|col| {
+            // Thumbnail or placeholder as the clickable button
+            col.spawn((
                 Button,
                 ui_theme::ThemedButton,
                 CourseListItem(course.path.clone()),
                 Node {
-                    width: Val::Px(360.0),
-                    height: Val::Px(50.0),
+                    width: Val::Px(THUMBNAIL_DISPLAY_WIDTH + 4.0),
+                    height: Val::Px(THUMBNAIL_DISPLAY_HEIGHT + 4.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     border: UiRect::all(Val::Px(2.0)),
@@ -345,23 +364,35 @@ fn spawn_course_list_item(parent: &mut ChildSpawnerCommands, course: &CourseEntr
                 BorderColor::all(ui_theme::BORDER_NORMAL),
             ))
             .with_children(|btn| {
-                btn.spawn((
-                    Text::new(&course.name),
-                    TextFont { font_size: 20.0, ..default() },
-                    TextColor(palette::VANILLA),
-                ));
+                if let Some(handle) = thumbnail_handle {
+                    btn.spawn((
+                        ImageNode::new(handle),
+                        Node {
+                            width: Val::Px(THUMBNAIL_DISPLAY_WIDTH),
+                            height: Val::Px(THUMBNAIL_DISPLAY_HEIGHT),
+                            ..default()
+                        },
+                    ));
+                } else {
+                    btn.spawn((
+                        Text::new(&course.name),
+                        TextFont { font_size: 16.0, ..default() },
+                        TextColor(palette::CHAINMAIL),
+                    ));
+                }
             });
 
-            row.spawn((
+            // Delete button below thumbnail
+            col.spawn((
                 Button,
                 ui_theme::ThemedButton,
                 CourseDeleteItem(course.path.clone()),
                 Node {
-                    width: Val::Px(36.0),
-                    height: Val::Px(50.0),
+                    width: Val::Px(THUMBNAIL_DISPLAY_WIDTH + 4.0),
+                    height: Val::Px(24.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
-                    border: UiRect::all(Val::Px(2.0)),
+                    border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
                 BackgroundColor(ui_theme::BUTTON_NORMAL),
@@ -369,12 +400,31 @@ fn spawn_course_list_item(parent: &mut ChildSpawnerCommands, course: &CourseEntr
             ))
             .with_children(|btn| {
                 btn.spawn((
-                    Text::new("X"),
-                    TextFont { font_size: 18.0, ..default() },
-                    TextColor(palette::VANILLA),
+                    Text::new("Delete"),
+                    TextFont { font_size: 12.0, ..default() },
+                    TextColor(palette::CHAINMAIL),
                 ));
             });
         });
+}
+
+/// Load a PNG from disk into a Bevy Image asset.
+fn load_thumbnail_image(path: &str, images: &mut Assets<Image>) -> Option<Handle<Image>> {
+    let bytes = fs::read(path).ok()?;
+    let decoded = image::load_from_memory(&bytes).ok()?.to_rgba8();
+    let (width, height) = decoded.dimensions();
+    let bevy_image = Image::new(
+        Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        decoded.into_raw(),
+        TextureFormat::Rgba8UnormSrgb,
+        default(),
+    );
+    Some(images.add(bevy_image))
 }
 
 pub fn handle_course_list_item(
@@ -396,6 +446,7 @@ pub fn handle_course_delete_item(
     mut commands: Commands,
     query: Query<(&Interaction, &CourseDeleteItem), Changed<Interaction>>,
     library_root: Query<Entity, With<CourseLibraryRoot>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     for (interaction, item) in &query {
         if *interaction == Interaction::Pressed {
@@ -404,11 +455,20 @@ pub fn handle_course_delete_item(
                 Ok(()) => info!("Deleted course: {}", item.0),
                 Err(e) => error!("Failed to delete course '{}': {e}", item.0),
             }
+            // Also delete the thumbnail if it exists
+            let name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .trim_end_matches(".course");
+            let thumb_path = path.with_file_name(format!("{name}.png"));
+            let _ = fs::remove_file(thumb_path);
+
             // Refresh the library view
             for entity in &library_root {
                 commands.entity(entity).despawn();
             }
-            spawn_course_library(&mut commands);
+            spawn_course_library(&mut commands, &mut images);
             return;
         }
     }

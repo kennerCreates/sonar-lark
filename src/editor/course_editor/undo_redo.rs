@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::editor::course_editor::{
-    EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, PlacedObstacle,
+    EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, PlacedObstacle,
     PlacedProp,
 };
 use crate::editor::undo::{
@@ -19,7 +19,6 @@ use super::ui::{CameraEditorMeshes, PropEditorMeshes, spawn_gate_camera};
 pub(super) fn handle_course_undo_input(
     mut commands: Commands,
     keyboard: Res<ButtonInput<KeyCode>>,
-    course_state: Res<EditorCourse>,
     mut selection: ResMut<EditorSelection>,
     mut transform_state: ResMut<EditorTransform>,
     mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
@@ -37,10 +36,6 @@ pub(super) fn handle_course_undo_input(
     prop_meshes: Option<Res<PropEditorMeshes>>,
     camera_meshes: Option<Res<CameraEditorMeshes>>,
 ) {
-    if course_state.editing_name {
-        return;
-    }
-
     let ctrl = keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight);
     if !ctrl {
         return;

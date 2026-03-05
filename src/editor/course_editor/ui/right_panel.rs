@@ -23,42 +23,6 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             BackgroundColor(ui_theme::PANEL_BG),
         ))
         .with_children(|panel| {
-            panel.spawn((
-                Text::new("Course Name"),
-                TextFont {
-                    font_size: 14.0,
-                    ..default()
-                },
-                TextColor(palette::SIDEWALK),
-            ));
-
-            panel
-                .spawn((
-                    Button,
-                    CourseNameField,
-                    Node {
-                        width: Val::Percent(100.0),
-                        height: Val::Px(32.0),
-                        padding: UiRect::horizontal(Val::Px(8.0)),
-                        align_items: AlignItems::Center,
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    BackgroundColor(palette::BLACK),
-                    BorderColor::all(palette::STEEL),
-                ))
-                .with_children(|field| {
-                    field.spawn((
-                        Text::new("new_course"),
-                        TextFont {
-                            font_size: 14.0,
-                            ..default()
-                        },
-                        TextColor(palette::SAND),
-                        CourseNameDisplayText,
-                    ));
-                });
-
             ui_theme::spawn_action_button(
                 panel,
                 "Save Course",

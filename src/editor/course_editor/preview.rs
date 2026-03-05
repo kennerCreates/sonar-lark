@@ -9,14 +9,19 @@ use crate::palette;
 use crate::rendering::{FOG_END, FOG_START, fog_color};
 use crate::states::EditorMode;
 
-use super::{EditorSelection, PlacedCamera};
+use super::PlacedCamera;
+use super::ui::{PendingThumbnailSave, ThumbnailCamera, ThumbnailRenderTarget};
+use super::EditorSelection;
 
 const PREVIEW_WIDTH: u32 = 384;
 const PREVIEW_HEIGHT: u32 = 216;
 const PREVIEW_MARGIN: f32 = 12.0;
-const PREVIEW_BORDER: f32 = 2.0;
+const PREVIEW_BORDER: f32 = 3.0;
 /// Offset from the right edge to clear the 280px right panel.
 const RIGHT_PANEL_WIDTH: f32 = 280.0;
+
+const THUMBNAIL_WIDTH: u32 = 384;
+const THUMBNAIL_HEIGHT: u32 = 216;
 
 #[derive(Resource)]
 pub struct CameraPreview {
@@ -33,6 +38,7 @@ pub struct PreviewOverlay;
 pub struct PreviewLabel;
 
 pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    // --- Gate camera preview ---
     let image = Image::new_target_texture(
         PREVIEW_WIDTH,
         PREVIEW_HEIGHT,
@@ -87,7 +93,7 @@ pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Im
                         padding: UiRect::all(Val::Px(PREVIEW_BORDER)),
                         ..default()
                     },
-                    BackgroundColor(palette::STEEL),
+                    BackgroundColor(palette::SAND),
                 ))
                 .with_children(|border| {
                     border.spawn((
@@ -117,6 +123,44 @@ pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Im
         });
 
     commands.insert_resource(CameraPreview { camera_entity });
+
+    // --- Thumbnail camera (for saving course screenshots) ---
+    let thumb_image = Image::new_target_texture(
+        THUMBNAIL_WIDTH,
+        THUMBNAIL_HEIGHT,
+        TextureFormat::Rgba8UnormSrgb,
+        None,
+    );
+    let thumb_handle = images.add(thumb_image);
+
+    let thumb_entity = commands
+        .spawn((
+            Camera3d::default(),
+            Camera {
+                order: -2,
+                is_active: false,
+                clear_color: ClearColorConfig::Custom(fog_color()),
+                ..default()
+            },
+            RenderTarget::from(thumb_handle.clone()),
+            Transform::default(),
+            DistanceFog {
+                color: fog_color(),
+                directional_light_color: Color::NONE,
+                directional_light_exponent: 0.0,
+                falloff: FogFalloff::Linear {
+                    start: FOG_START,
+                    end: FOG_END,
+                },
+            },
+            ThumbnailCamera,
+        ))
+        .id();
+
+    commands.insert_resource(ThumbnailRenderTarget {
+        image_handle: thumb_handle,
+        camera_entity: thumb_entity,
+    });
 }
 
 pub fn sync_preview_camera(
@@ -174,9 +218,71 @@ pub fn sync_preview_camera(
     }
 }
 
-pub fn cleanup_camera_preview(mut commands: Commands, preview: Option<Res<CameraPreview>>) {
+/// System that positions the thumbnail camera, waits for it to render, then saves as PNG.
+pub fn save_thumbnail_when_ready(
+    mut commands: Commands,
+    mut pending: ResMut<PendingThumbnailSave>,
+    thumbnail: Res<ThumbnailRenderTarget>,
+    images: Res<Assets<Image>>,
+    mut thumbnail_cam: Query<(&mut Camera, &mut Transform), With<ThumbnailCamera>>,
+    editor_cam: Query<&GlobalTransform, (With<MainCamera>, Without<ThumbnailCamera>)>,
+) {
+    let Ok((mut cam, mut cam_tf)) = thumbnail_cam.single_mut() else {
+        return;
+    };
+
+    // Frame 0: position and activate the thumbnail camera
+    if pending.frames_waited == 0 {
+        if let Ok(editor_gt) = editor_cam.single() {
+            let (_, rotation, translation) = editor_gt.to_scale_rotation_translation();
+            *cam_tf = Transform::from_translation(translation).with_rotation(rotation);
+            cam.is_active = true;
+        }
+        pending.frames_waited = 1;
+        return;
+    }
+
+    pending.frames_waited += 1;
+    if pending.frames_waited < 3 {
+        return;
+    }
+
+    // Read the rendered image
+    if let Some(bevy_image) = images.get(&thumbnail.image_handle)
+        && let Some(data) = bevy_image.data.as_ref()
+    {
+        let path_str = format!("assets/courses/{}.png", pending.course_name);
+        let width = bevy_image.width();
+        let height = bevy_image.height();
+
+        if let Some(rgba) = image::RgbaImage::from_raw(width, height, data.clone()) {
+            match rgba.save(&path_str) {
+                Ok(()) => info!("Saved thumbnail to {path_str}"),
+                Err(e) => error!("Failed to save thumbnail: {e}"),
+            }
+        } else {
+            error!("Failed to construct image from render target data");
+        }
+    }
+
+    // Deactivate thumbnail camera
+    cam.is_active = false;
+    commands.remove_resource::<PendingThumbnailSave>();
+}
+
+pub fn cleanup_camera_preview(
+    mut commands: Commands,
+    preview: Option<Res<CameraPreview>>,
+    thumbnail: Option<Res<ThumbnailRenderTarget>>,
+) {
     if let Some(preview) = preview {
         commands.entity(preview.camera_entity).despawn();
     }
     commands.remove_resource::<CameraPreview>();
+
+    if let Some(thumbnail) = thumbnail {
+        commands.entity(thumbnail.camera_entity).despawn();
+    }
+    commands.remove_resource::<ThumbnailRenderTarget>();
+    commands.remove_resource::<PendingThumbnailSave>();
 }

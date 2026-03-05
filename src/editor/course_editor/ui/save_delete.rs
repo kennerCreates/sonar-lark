@@ -1,13 +1,23 @@
+use std::fs;
+
 use bevy::prelude::*;
 
 use crate::course::loader::save_course;
 use crate::editor::course_editor::{
-    EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
+    DEFAULT_COURSE_NAME, EditorCourse, EditorSelection, EditorTransform, PlacedCamera,
+    PlacedObstacle, PlacedProp,
 };
 use crate::states::{AppState, LastEditedCourse};
 
 use super::data::build_course_data;
 use super::types::*;
+
+/// Resource inserted when a thumbnail render is pending after a save.
+#[derive(Resource)]
+pub struct PendingThumbnailSave {
+    pub course_name: String,
+    pub frames_waited: u8,
+}
 
 pub fn handle_back_to_menu(
     query: Query<&Interaction, (Changed<Interaction>, With<BackToMenuButton>)>,
@@ -23,7 +33,7 @@ pub fn handle_back_to_menu(
 pub fn handle_save_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<SaveCourseButton>)>,
-    course_state: Res<EditorCourse>,
+    mut course_state: ResMut<EditorCourse>,
     placed_query: Query<(Entity, &PlacedObstacle, &Transform)>,
     prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
     camera_child_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
@@ -34,9 +44,9 @@ pub fn handle_save_button(
             continue;
         }
 
-        if course_state.name.is_empty() {
-            warn!("Cannot save: course name is empty");
-            continue;
+        // Auto-assign name if still default
+        if course_state.name == DEFAULT_COURSE_NAME || course_state.name.is_empty() {
+            course_state.name = next_auto_name();
         }
 
         let camera_count = child_of_query.iter().count();
@@ -77,6 +87,12 @@ pub fn handle_save_button(
                 commands.insert_resource(LastEditedCourse {
                     path: path_str.clone(),
                 });
+
+                // Trigger thumbnail capture (handled by separate system)
+                commands.insert_resource(PendingThumbnailSave {
+                    course_name: course_state.name.clone(),
+                    frames_waited: 0,
+                });
             }
             Err(e) => {
                 error!("Failed to save course: {e}");
@@ -84,6 +100,27 @@ pub fn handle_save_button(
             }
         }
     }
+}
+
+/// Scan `assets/courses/` for `course_NNN.course.ron` and return the next name.
+fn next_auto_name() -> String {
+    let courses_dir = std::path::Path::new("assets/courses");
+    let mut max_num: u32 = 0;
+
+    if let Ok(entries) = fs::read_dir(courses_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if let Some(stem) = name_str.strip_suffix(".course.ron")
+                && let Some(num_str) = stem.strip_prefix("course_")
+                && let Ok(num) = num_str.parse::<u32>()
+            {
+                max_num = max_num.max(num);
+            }
+        }
+    }
+
+    format!("course_{:03}", max_num + 1)
 }
 
 pub fn handle_gate_order_toggle(

@@ -4,7 +4,6 @@ use bevy::{
 };
 
 use super::settings::CameraSettings;
-use crate::editor::course_editor::EditorCourse;
 use crate::editor::workshop::WorkshopState;
 
 #[derive(Component)]
@@ -133,7 +132,6 @@ pub fn rts_camera_system(
     time: Res<Time>,
     windows: Query<&Window>,
     settings: Res<CameraSettings>,
-    course_state: Option<Res<EditorCourse>>,
     workshop_state: Option<Res<WorkshopState>>,
     mut rig_query: Query<(&mut Transform, &mut OrbitState), With<CameraRig>>,
     mut camera_query: Query<(&mut Transform, &GlobalTransform), (With<MainCamera>, Without<CameraRig>)>,
@@ -145,12 +143,9 @@ pub fn rts_camera_system(
         return;
     };
 
-    let editing_name = course_state
+    let editing_name = workshop_state
         .as_ref()
-        .is_some_and(|s| s.editing_name)
-        || workshop_state
-            .as_ref()
-            .is_some_and(|s| s.editing_name);
+        .is_some_and(|s| s.editing_name);
 
     let dt = time.delta_secs();
     let mut orbit_changed = false;
