@@ -32,6 +32,8 @@ pub struct CameraState {
     pub mode: CameraMode,
     /// Index into standings order (0 = leader). Used for FPV targeting.
     pub target_standings_index: usize,
+    /// When true, camera systems freeze in place (no updates, no key switching).
+    pub locked: bool,
 }
 
 impl Default for CameraState {
@@ -39,6 +41,7 @@ impl Default for CameraState {
         Self {
             mode: CameraMode::Chase,
             target_standings_index: 0,
+            locked: false,
         }
     }
 }
@@ -198,6 +201,7 @@ pub fn reset_camera_for_race(
         CameraMode::Chase
     };
     state.target_standings_index = 0;
+    state.locked = false;
     if let Ok(mut projection) = camera.single_mut()
         && let Projection::Perspective(ref mut persp) = *projection
     {

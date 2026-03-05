@@ -46,6 +46,7 @@ impl Plugin for RacePlugin {
                     lifecycle::generate_race_script_system,
                     timing::tick_race_clock,
                     progress::sync_spline_progress,
+                    lifecycle::check_winner_finished,
                     lifecycle::check_race_finished,
                 )
                     .chain()
@@ -62,7 +63,6 @@ impl Plugin for RacePlugin {
                 (
                     start_button::handle_start_race_button,
                     start_button::update_start_button_visuals,
-                    start_button::update_start_button_text,
                     overlays::show_no_gates_banner,
                     overlays::handle_open_editor_button,
                     overlays::manage_countdown_text,

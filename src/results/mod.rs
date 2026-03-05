@@ -15,7 +15,6 @@ impl Plugin for ResultsPlugin {
                 (
                     ui::handle_replay_button,
                     ui::handle_new_race_button,
-                    ui::handle_main_menu_button,
                 )
                     .run_if(in_state(AppState::Results)),
             )

@@ -1,19 +1,13 @@
 use bevy::prelude::*;
 
-use crate::drone::components::Drone;
 use crate::palette;
 use crate::states::AppState;
 use crate::ui_theme;
 
-use super::lifecycle::{RacePhase, ResultsTransitionTimer};
-use super::progress::RaceProgress;
-use super::timing::RaceClock;
+use super::lifecycle::RacePhase;
 
 #[derive(Component)]
 pub(crate) struct StartRaceButton;
-
-#[derive(Component)]
-pub(crate) struct StartRaceButtonText;
 
 #[derive(Component)]
 pub(crate) struct CountdownText;
@@ -59,7 +53,6 @@ pub fn setup_race_ui(mut commands: Commands) {
                             ..default()
                         },
                         TextColor(palette::VANILLA),
-                        StartRaceButtonText,
                     ));
                 });
         });
@@ -67,92 +60,30 @@ pub fn setup_race_ui(mut commands: Commands) {
 
 pub fn handle_start_race_button(
     mut commands: Commands,
-    query: Query<&Interaction, (Changed<Interaction>, With<StartRaceButton>)>,
+    query: Query<(Entity, &Interaction, &ChildOf), (Changed<Interaction>, With<StartRaceButton>)>,
     mut phase: ResMut<RacePhase>,
-    drones: Query<Entity, With<Drone>>,
 ) {
-    for interaction in &query {
+    for (_entity, interaction, child_of) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
 
-        match *phase {
-            RacePhase::WaitingToStart => {
-                *phase = RacePhase::Converging;
-                info!("Drones converging to start positions!");
-            }
-            RacePhase::Converging | RacePhase::Countdown | RacePhase::Racing => {}
-            RacePhase::Finished => {
-                // Despawn all drones so spawn_drones re-runs next frame
-                // with a fresh RaceSeed and new randomized configs/splines.
-                for entity in &drones {
-                    commands.entity(entity).despawn();
-                }
-                commands.remove_resource::<RaceProgress>();
-                commands.remove_resource::<RaceClock>();
-                commands.remove_resource::<ResultsTransitionTimer>();
-                commands.remove_resource::<super::script::RaceScript>();
-                commands.remove_resource::<super::script::RaceEventLog>();
-                *phase = RacePhase::WaitingToStart;
-                info!("Race reset — drones will respawn with new randomization");
-            }
+        if *phase == RacePhase::WaitingToStart {
+            *phase = RacePhase::Converging;
+            // Despawn the entire button container (parent node + button + text)
+            commands.entity(child_of.parent()).despawn();
+            info!("Drones converging to start positions!");
         }
     }
 }
 
 pub fn update_start_button_visuals(
-    phase: Res<RacePhase>,
     mut button_query: Query<
         (&Interaction, &mut BackgroundColor, &mut BorderColor),
-        With<StartRaceButton>,
+        (Changed<Interaction>, With<StartRaceButton>),
     >,
-    interaction_changed: Query<(), (Changed<Interaction>, With<StartRaceButton>)>,
 ) {
-    if !phase.is_changed() && interaction_changed.is_empty() {
-        return;
-    }
     for (interaction, mut bg, mut border) in &mut button_query {
-        match *phase {
-            RacePhase::Converging | RacePhase::Countdown | RacePhase::Racing => {
-                *bg = BackgroundColor(ui_theme::BUTTON_DISABLED);
-                *border = BorderColor::all(ui_theme::BORDER_DISABLED);
-            }
-            RacePhase::WaitingToStart | RacePhase::Finished => {
-                ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
-            }
-        }
-    }
-}
-
-pub fn update_start_button_text(
-    phase: Res<RacePhase>,
-    mut text_query: Query<(&mut Text, &mut TextColor), With<StartRaceButtonText>>,
-) {
-    if !phase.is_changed() {
-        return;
-    }
-    for (mut text, mut color) in &mut text_query {
-        match *phase {
-            RacePhase::WaitingToStart => {
-                text.0 = "START RACE".to_string();
-                *color = TextColor(palette::VANILLA);
-            }
-            RacePhase::Converging => {
-                text.0 = "ASSEMBLING...".to_string();
-                *color = TextColor(palette::STONE);
-            }
-            RacePhase::Countdown => {
-                text.0 = "GET READY...".to_string();
-                *color = TextColor(palette::STONE);
-            }
-            RacePhase::Racing => {
-                text.0 = "RACING...".to_string();
-                *color = TextColor(palette::STONE);
-            }
-            RacePhase::Finished => {
-                text.0 = "RACE AGAIN".to_string();
-                *color = TextColor(palette::VANILLA);
-            }
-        }
+        ui_theme::apply_button_visual(interaction, &mut bg, &mut border);
     }
 }

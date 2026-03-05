@@ -54,7 +54,17 @@ const LOCATIONS: &[LocationDef] = &[
     LocationDef { name: "Golf Course", cost: 50, enabled: false },
 ];
 
-pub fn setup_menu(mut commands: Commands) {
+/// When present on entering Menu, skips the landing page and goes straight to location select.
+#[derive(Resource)]
+pub struct SkipToLocationSelect;
+
+pub fn setup_menu(mut commands: Commands, skip: Option<Res<SkipToLocationSelect>>) {
+    if skip.is_some() {
+        commands.remove_resource::<SkipToLocationSelect>();
+        spawn_location_select(&mut commands);
+        return;
+    }
+
     commands
         .spawn((
             Node {

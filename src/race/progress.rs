@@ -73,6 +73,11 @@ impl RaceProgress {
         state.dnf_reason = Some(reason);
     }
 
+    /// Returns true if at least one drone has finished the race.
+    pub fn any_finished(&self) -> bool {
+        self.drone_states.iter().any(|s| s.finished)
+    }
+
     #[allow(dead_code)]
     pub fn is_active(&self, drone_index: usize) -> bool {
         self.drone_states

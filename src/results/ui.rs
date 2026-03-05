@@ -7,6 +7,7 @@ use crate::palette;
 use crate::pilot::{PilotConfigs, SelectedPilots};
 use crate::pilot::portrait::cache::PortraitCache;
 use crate::race::progress::RaceResults;
+use crate::menu::ui::SkipToLocationSelect;
 use crate::states::AppState;
 use crate::ui_theme;
 
@@ -15,9 +16,6 @@ pub(crate) struct ReplayRaceButton;
 
 #[derive(Component)]
 pub(crate) struct NewRaceButton;
-
-#[derive(Component)]
-pub(crate) struct MainMenuButton;
 
 pub fn setup_results_ui(
     mut commands: Commands,
@@ -228,7 +226,6 @@ pub fn setup_results_ui(
                 .with_children(|row| {
                     ui_theme::spawn_menu_button(row, "REPLAY RACE", ReplayRaceButton, 220.0);
                     ui_theme::spawn_menu_button(row, "NEW RACE", NewRaceButton, 180.0);
-                    ui_theme::spawn_menu_button(row, "MAIN MENU", MainMenuButton, 200.0);
                 });
         });
 }
@@ -268,22 +265,13 @@ pub fn handle_replay_button(
 }
 
 pub fn handle_new_race_button(
+    mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<NewRaceButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            next_state.set(AppState::Race);
-        }
-    }
-}
-
-pub fn handle_main_menu_button(
-    query: Query<&Interaction, (Changed<Interaction>, With<MainMenuButton>)>,
-    mut next_state: ResMut<NextState<AppState>>,
-) {
-    for interaction in &query {
-        if *interaction == Interaction::Pressed {
+            commands.insert_resource(SkipToLocationSelect);
             next_state.set(AppState::Menu);
         }
     }

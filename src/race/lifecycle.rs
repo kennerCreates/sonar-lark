@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::camera::switching::{CameraMode, CameraState, CourseCameras};
+use crate::camera::switching::{CameraMode, CameraState};
 use crate::course::loader::SelectedCourse;
 use crate::drone::components::{AIController, Drone, DroneConfig, DronePhase, RaceSeed};
 use crate::pilot::roster::PilotRoster;
@@ -224,15 +224,33 @@ fn default_pilot_data() -> (crate::pilot::skill::SkillProfile, Vec<crate::pilot:
     )
 }
 
+/// When the first drone (winner) finishes, starts the results transition timer
+/// and locks the camera in place so it doesn't jump around.
+pub fn check_winner_finished(
+    phase: Res<RacePhase>,
+    progress: Option<Res<RaceProgress>>,
+    existing_timer: Option<Res<ResultsTransitionTimer>>,
+    mut commands: Commands,
+    mut camera_state: ResMut<CameraState>,
+) {
+    if *phase != RacePhase::Racing || existing_timer.is_some() {
+        return;
+    }
+    let Some(progress) = progress else { return };
+    if progress.any_finished() {
+        commands.insert_resource(ResultsTransitionTimer { remaining: 3.0 });
+        camera_state.locked = true;
+        info!("Winner crossed the finish line! Results in 3 seconds.");
+    }
+}
+
 /// Transitions from Racing → Finished when every drone has finished or crashed.
-/// Also starts the auto-transition timer to the Results screen.
+/// Unlocks the camera and switches to chase mode to follow the winner.
 pub fn check_race_finished(
     mut phase: ResMut<RacePhase>,
     progress: Option<Res<RaceProgress>>,
     mut clock: Option<ResMut<RaceClock>>,
-    mut commands: Commands,
     mut camera_state: ResMut<CameraState>,
-    course_cameras: Option<Res<CourseCameras>>,
 ) {
     if *phase != RacePhase::Racing {
         return;
@@ -251,11 +269,9 @@ pub fn check_race_finished(
         if let Some(ref mut clock) = clock {
             clock.running = false;
         }
-        commands.insert_resource(ResultsTransitionTimer { remaining: 3.0 });
-        // Switch to primary course camera if available
-        if course_cameras.is_some_and(|cc| !cc.cameras.is_empty()) {
-            camera_state.mode = CameraMode::CourseCamera(0);
-        }
+        // Unlock camera and follow the winner
+        camera_state.locked = false;
+        camera_state.mode = CameraMode::Chase;
         info!("Race finished! All drones completed or crashed.");
     }
 }

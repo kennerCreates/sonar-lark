@@ -61,12 +61,14 @@ impl Plugin for CameraPlugin {
                 Update,
                 chase::chase_camera_update
                     .run_if(in_race_or_results)
+                    .run_if(camera_not_locked)
                     .run_if(camera_mode_is(CameraMode::Chase)),
             )
             .add_systems(
                 Update,
                 fpv::fpv_camera_update
                     .run_if(in_race_or_results)
+                    .run_if(camera_not_locked)
                     .run_if(camera_mode_is(CameraMode::Fpv)),
             )
             .add_systems(
@@ -103,6 +105,10 @@ impl Plugin for CameraPlugin {
                     .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
             );
     }
+}
+
+fn camera_not_locked(state: Res<CameraState>) -> bool {
+    !state.locked
 }
 
 fn camera_mode_is(mode: CameraMode) -> impl Fn(Res<CameraState>) -> bool {
