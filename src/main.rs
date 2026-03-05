@@ -37,6 +37,7 @@ fn main() {
         ))
         .init_state::<states::AppState>()
         .add_sub_state::<states::EditorMode>()
+        .add_sub_state::<states::HypeMode>()
         .add_sub_state::<states::DevMenuPage>()
         .add_plugins((
             rendering::RenderingPlugin,

@@ -27,6 +27,10 @@ impl AdCampaign {
         }
     }
 
+    pub fn is_enabled(self) -> bool {
+        matches!(self, Self::Posters)
+    }
+
     pub fn cost_label(self) -> &'static str {
         match self {
             Self::Posters => "$5+",
@@ -45,6 +49,14 @@ pub const AD_CAMPAIGNS: [AdCampaign; 3] = [
 #[derive(Resource)]
 #[allow(dead_code)]
 pub struct SelectedAdCampaign(pub AdCampaign);
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, SubStates)]
+#[source(AppState = AppState::HypeSetup)]
+pub enum HypeMode {
+    #[default]
+    CampaignSelector,
+    PosterEditor,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, SubStates)]
 #[source(AppState = AppState::Editor)]

@@ -1,19 +1,22 @@
+mod poster_editor;
+
 use bevy::prelude::*;
 
 use crate::palette;
-use crate::states::{AdCampaign, AppState, SelectedAdCampaign, AD_CAMPAIGNS};
+use crate::states::{AdCampaign, HypeMode, SelectedAdCampaign, AD_CAMPAIGNS};
 use crate::ui_theme;
 
 pub struct HypePlugin;
 
 impl Plugin for HypePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::HypeSetup), setup_ui)
+        app.add_systems(OnEnter(HypeMode::CampaignSelector), setup_ui)
             .add_systems(
                 Update,
                 (handle_campaign_card, handle_select_button)
-                    .run_if(in_state(AppState::HypeSetup)),
-            );
+                    .run_if(in_state(HypeMode::CampaignSelector)),
+            )
+            .add_plugins(poster_editor::PosterEditorPlugin);
     }
 }
 
@@ -42,7 +45,7 @@ fn setup_ui(mut commands: Commands) {
                 ..default()
             },
             BackgroundColor(palette::SMOKY_BLACK),
-            DespawnOnExit(AppState::HypeSetup),
+            DespawnOnExit(HypeMode::CampaignSelector),
         ))
         .with_children(|parent| {
             // Title
@@ -110,6 +113,21 @@ fn setup_ui(mut commands: Commands) {
 }
 
 fn spawn_campaign_card(parent: &mut ChildSpawnerCommands, campaign: AdCampaign) {
+    let enabled = campaign.is_enabled();
+    let (bg, border, text_color) = if enabled {
+        (
+            ui_theme::BUTTON_NORMAL,
+            ui_theme::BORDER_NORMAL,
+            palette::VANILLA,
+        )
+    } else {
+        (
+            ui_theme::BUTTON_DISABLED,
+            ui_theme::BORDER_DISABLED,
+            palette::CHAINMAIL,
+        )
+    };
+
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Column,
@@ -119,9 +137,8 @@ fn spawn_campaign_card(parent: &mut ChildSpawnerCommands, campaign: AdCampaign) 
         })
         .with_children(|col| {
             // Card button
-            col.spawn((
+            let mut card = col.spawn((
                 Button,
-                ui_theme::ThemedButton,
                 CampaignCard(campaign),
                 Node {
                     width: Val::Px(280.0),
@@ -131,17 +148,20 @@ fn spawn_campaign_card(parent: &mut ChildSpawnerCommands, campaign: AdCampaign) 
                     border: UiRect::all(Val::Px(3.0)),
                     ..default()
                 },
-                BackgroundColor(ui_theme::BUTTON_NORMAL),
-                BorderColor::all(ui_theme::BORDER_NORMAL),
-            ))
-            .with_children(|btn| {
+                BackgroundColor(bg),
+                BorderColor::all(border),
+            ));
+            if enabled {
+                card.insert(ui_theme::ThemedButton);
+            }
+            card.with_children(|btn| {
                 btn.spawn((
                     Text::new(campaign.label()),
                     TextFont {
                         font_size: 28.0,
                         ..default()
                     },
-                    TextColor(palette::VANILLA),
+                    TextColor(text_color),
                     TextLayout::new_with_justify(Justify::Center),
                 ));
             });
@@ -153,7 +173,7 @@ fn spawn_campaign_card(parent: &mut ChildSpawnerCommands, campaign: AdCampaign) 
                     font_size: 24.0,
                     ..default()
                 },
-                TextColor(palette::VANILLA),
+                TextColor(text_color),
             ));
         });
 }
@@ -167,7 +187,7 @@ fn handle_campaign_card(
     mut select_text: Query<&mut TextColor, With<SelectButtonText>>,
 ) {
     for (interaction, clicked) in &card_query {
-        if *interaction != Interaction::Pressed {
+        if *interaction != Interaction::Pressed || !clicked.0.is_enabled() {
             continue;
         }
 
@@ -199,7 +219,7 @@ fn handle_select_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<SelectButton>)>,
     selected: Option<Res<SelectedCard>>,
-    mut next_state: ResMut<NextState<AppState>>,
+    mut next_hype: ResMut<NextState<HypeMode>>,
 ) {
     let Some(selected) = selected else { return };
 
@@ -207,7 +227,7 @@ fn handle_select_button(
         if *interaction == Interaction::Pressed {
             commands.insert_resource(SelectedAdCampaign(selected.0));
             commands.remove_resource::<SelectedCard>();
-            next_state.set(AppState::Race);
+            next_hype.set(HypeMode::PosterEditor);
         }
     }
 }

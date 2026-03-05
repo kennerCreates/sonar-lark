@@ -255,7 +255,10 @@ pub fn save_thumbnail_when_ready(
     let width = THUMBNAIL_WIDTH;
     let height = THUMBNAIL_HEIGHT;
     commands
-        .spawn(Readback::texture(thumbnail.image_handle.clone()))
+        .spawn((
+            Readback::texture(thumbnail.image_handle.clone()),
+            DespawnOnExit(EditorMode::CourseEditor),
+        ))
         .observe(move |event: On<ReadbackComplete>, mut commands: Commands| {
             let data = &event.data;
             let path_str = format!("assets/courses/{course_name}.png");
@@ -268,7 +271,8 @@ pub fn save_thumbnail_when_ready(
                 error!("Failed to construct image from render target data");
             }
             // Despawn the readback entity so it doesn't fire every frame.
-            commands.entity(event.observer()).despawn();
+            // Use try_despawn since DespawnOnExit may have already despawned it.
+            commands.entity(event.observer()).try_despawn();
         });
 
     // Deactivate thumbnail camera
