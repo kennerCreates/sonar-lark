@@ -2,7 +2,7 @@ use std::fs;
 
 use bevy::prelude::*;
 
-use crate::course::loader::save_course;
+use crate::course::loader::{SelectedCourse, save_course};
 use crate::editor::course_editor::{
     DEFAULT_COURSE_NAME, EditorCourse, EditorSelection, EditorTransform, PlacedCamera,
     PlacedObstacle, PlacedProp,
@@ -140,6 +140,65 @@ pub fn handle_gate_order_toggle(
                     .map(|m| m + 1)
                     .unwrap_or(0);
                 selection.entity = None;
+            }
+        }
+    }
+}
+
+pub fn handle_start_race(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<StartRaceButton>)>,
+    mut course_state: ResMut<EditorCourse>,
+    mut next_state: ResMut<NextState<AppState>>,
+    placed_query: Query<(Entity, &PlacedObstacle, &Transform)>,
+    prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
+    camera_child_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
+    child_of_query: Query<(Entity, &ChildOf), With<PlacedCamera>>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        if course_state.name == DEFAULT_COURSE_NAME || course_state.name.is_empty() {
+            course_state.name = next_auto_name();
+        }
+
+        let obstacles_with_cameras =
+            placed_query
+                .iter()
+                .map(|(entity, placed, transform)| {
+                    let camera = child_of_query
+                        .iter()
+                        .find(|(_, child_of)| child_of.parent() == entity)
+                        .and_then(|(cam_entity, _)| camera_child_query.get(cam_entity).ok());
+                    (placed, transform, camera)
+                });
+
+        let course = build_course_data(
+            course_state.name.clone(),
+            obstacles_with_cameras,
+            prop_query.iter(),
+        );
+
+        let path_str = format!("assets/courses/{}.course.ron", course_state.name);
+        let path = std::path::Path::new(&path_str);
+        match save_course(&course, path) {
+            Ok(()) => {
+                info!(
+                    "Saved course '{}' — starting race",
+                    course_state.name,
+                );
+                commands.insert_resource(LastEditedCourse {
+                    path: path_str.clone(),
+                });
+                commands.insert_resource(SelectedCourse {
+                    path: path_str,
+                });
+                next_state.set(AppState::Race);
+            }
+            Err(e) => {
+                error!("Failed to save course before racing: {e}");
             }
         }
     }

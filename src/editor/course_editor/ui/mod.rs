@@ -17,7 +17,7 @@ pub(crate) use load::load_course_into_editor;
 pub use save_delete::{
     PendingThumbnailSave,
     handle_back_to_menu, handle_clear_gate_orders_button,
-    handle_gate_order_toggle, handle_save_button,
+    handle_gate_order_toggle, handle_save_button, handle_start_race,
 };
 pub use obstacle_interaction::{handle_palette_selection, handle_tab_switch};
 pub use prop_interaction::{

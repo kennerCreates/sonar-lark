@@ -144,6 +144,7 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_tab_switch,
                     ui::handle_back_to_menu,
                     ui::handle_save_button,
+                    ui::handle_start_race,
                     ui::handle_gate_order_toggle,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),

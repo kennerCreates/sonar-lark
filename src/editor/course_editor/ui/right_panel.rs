@@ -30,6 +30,13 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                 palette::JUNGLE,
             );
 
+            ui_theme::spawn_action_button(
+                panel,
+                "Start Race",
+                StartRaceButton,
+                palette::TANGERINE,
+            );
+
             ui_theme::spawn_divider(panel);
 
             panel.spawn((
