@@ -1,3 +1,4 @@
+use bevy::picking::Pickable;
 use bevy::prelude::*;
 use bevy::time::{Timer, TimerMode};
 use bevy::ui::RelativeCursorPosition;
@@ -247,8 +248,10 @@ fn spawn_canvas_area(parent: &mut ChildSpawnerCommands, canvas_handle: Handle<Im
                     ));
 
                     // Brush cursor preview (circle outline, hidden by default)
+                    // Pickable::IGNORE prevents it from blocking canvas picking
                     container.spawn((
                         BrushCursorPreview,
+                        Pickable::IGNORE,
                         ZIndex(2),
                         Node {
                             position_type: PositionType::Absolute,

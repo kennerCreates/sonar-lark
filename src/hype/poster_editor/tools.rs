@@ -245,10 +245,20 @@ pub fn handle_text_placement(
     mouse: Res<ButtonInput<MouseButton>>,
     canvas_query: Query<(&RelativeCursorPosition, Entity), With<CanvasContainer>>,
     mut state: ResMut<PosterEditorState>,
+    text_interactions: Query<(Entity, &Interaction), (With<PosterTextElement>, Changed<Interaction>)>,
 ) {
     if state.active_tool != PosterTool::Text {
         return;
     }
+
+    // Check if an existing text element was clicked (reselect it)
+    for (entity, interaction) in &text_interactions {
+        if *interaction == Interaction::Pressed {
+            state.editing_text = Some(entity);
+            return;
+        }
+    }
+
     if !mouse.just_pressed(MouseButton::Left) {
         return;
     }
@@ -280,6 +290,7 @@ pub fn handle_text_placement(
     let text_entity = commands
         .spawn((
             PosterTextElement,
+            Interaction::default(),
             Text::new(""),
             TextFont {
                 font_size: 32.0,
