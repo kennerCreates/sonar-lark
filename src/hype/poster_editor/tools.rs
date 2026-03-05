@@ -13,7 +13,7 @@ use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH, CANVAS_HE
 use super::{
     BrushCursorPreview, BrushSizeButton, CanvasContainer, CursorBlinkTimer, PaintStroke,
     PosterAction, PosterColorCell, PosterEditorState, PosterStartRaceButton, PosterTextElement,
-    PosterTool, TextCursorBar, ToolButtonMarker,
+    PosterTool, ToolButtonMarker,
 };
 
 // --- Tool selection ---
@@ -22,13 +22,21 @@ pub fn handle_tool_selection(
     mut state: ResMut<PosterEditorState>,
     query: Query<(&Interaction, &ToolButtonMarker), Changed<Interaction>>,
     mut all_buttons: Query<(&ToolButtonMarker, &mut BackgroundColor, &mut BorderColor)>,
+    mut text_query: Query<&mut Text, With<PosterTextElement>>,
 ) {
     for (interaction, marker) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
 
-        // If we were editing text, finalize it
+        // Strip cursor from any active text before deselecting
+        if let Some(entity) = state.editing_text {
+            if let Ok(mut text) = text_query.get_mut(entity) {
+                if text.0.ends_with('|') {
+                    text.0.pop();
+                }
+            }
+        }
         state.editing_text = None;
         state.active_tool = marker.0;
 
@@ -51,6 +59,7 @@ pub fn handle_color_selection(
     mut state: ResMut<PosterEditorState>,
     query: Query<(&Interaction, &PosterColorCell), Changed<Interaction>>,
     mut all_cells: Query<(&PosterColorCell, &mut BorderColor)>,
+    mut text_colors: Query<&mut TextColor, With<PosterTextElement>>,
 ) {
     for (interaction, cell) in &query {
         if *interaction != Interaction::Pressed {
@@ -64,6 +73,13 @@ pub fn handle_color_selection(
             (rgb[2] * 255.0) as u8,
             255,
         ];
+
+        // Update active text element color
+        if let Some(entity) = state.editing_text {
+            if let Ok(mut tc) = text_colors.get_mut(entity) {
+                tc.0 = Color::srgb(rgb[0], rgb[1], rgb[2]);
+            }
+        }
 
         // Highlight selected cell
         for (c, mut border) in &mut all_cells {
@@ -336,33 +352,60 @@ pub fn handle_text_input(
 
         match &event.logical_key {
             Key::Enter | Key::Escape => {
+                // Strip cursor before finalizing
+                if let Ok(mut text) = text_query.get_mut(entity) {
+                    if text.0.ends_with('|') {
+                        text.0.pop();
+                    }
+                }
                 state.editing_text = None;
                 return;
             }
             Key::Backspace => {
                 if let Ok(mut text) = text_query.get_mut(entity) {
+                    // Strip cursor if present before deleting real content
+                    let had_cursor = text.0.ends_with('|');
+                    if had_cursor {
+                        text.0.pop();
+                    }
+                    // Delete last real character
                     let s = text.0.clone();
                     if let Some((idx, _)) = s.char_indices().last() {
                         text.0 = s[..idx].to_string();
+                    }
+                    // Re-add cursor
+                    if had_cursor {
+                        text.0.push('|');
                     }
                 }
             }
             Key::Space => {
                 if let Ok(mut text) = text_query.get_mut(entity) {
-                    text.0.push(' ');
+                    insert_before_cursor(&mut text.0, ' ');
                 }
             }
             Key::Character(c) => {
                 if let Ok(mut text) = text_query.get_mut(entity) {
                     for ch in c.chars() {
                         if ch.is_alphanumeric() || ch.is_ascii_punctuation() {
-                            text.0.push(ch);
+                            insert_before_cursor(&mut text.0, ch);
                         }
                     }
                 }
             }
             _ => {}
         }
+    }
+}
+
+/// Insert a character before a trailing "|" cursor, or at the end if no cursor.
+fn insert_before_cursor(s: &mut String, ch: char) {
+    if s.ends_with('|') {
+        s.pop();
+        s.push(ch);
+        s.push('|');
+    } else {
+        s.push(ch);
     }
 }
 
@@ -495,70 +538,35 @@ pub fn update_brush_cursor(
 
 // --- Text cursor blink ---
 
+/// Manages a blinking "|" cursor by appending/stripping it directly in the
+/// text string. This avoids child-entity lifecycle issues (deferred despawns
+/// causing ghost artifacts) that occur with the TextSpan approach.
 pub fn update_text_cursor_blink(
-    mut commands: Commands,
     time: Res<Time>,
     state: Res<PosterEditorState>,
     mut blink: ResMut<CursorBlinkTimer>,
-    text_query: Query<Entity, With<PosterTextElement>>,
-    cursor_bar_query: Query<(Entity, &ChildOf), With<TextCursorBar>>,
+    mut text_query: Query<&mut Text, With<PosterTextElement>>,
 ) {
     blink.timer.tick(time.delta());
 
-    let Some(editing) = state.editing_text else {
-        // No active text — remove any lingering cursor bars
-        for (bar, _) in &cursor_bar_query {
-            commands.entity(bar).despawn();
-        }
-        return;
-    };
-
-    // Toggle visibility on timer tick
     if blink.timer.just_finished() {
         blink.visible = !blink.visible;
     }
 
-    // Find existing cursor bar for the active text, remove bars from other texts
-    let mut active_bar = None;
-    for (bar, child_of) in &cursor_bar_query {
-        if child_of.parent() == editing {
-            active_bar = Some(bar);
-        } else {
-            commands.entity(bar).despawn();
+    // Strip cursor from all text elements, then re-add to the active one
+    for mut text in &mut text_query {
+        if text.0.ends_with('|') {
+            text.0.pop();
         }
     }
 
-    let bar_entity = if let Some(bar) = active_bar {
-        bar
-    } else {
-        // Don't spawn until the text entity actually exists in the world
-        if text_query.get(editing).is_err() {
-            return;
-        }
-
-        // Reset blink state when creating a new cursor
-        blink.visible = true;
-        blink.timer.reset();
-
-        let bar = commands
-            .spawn((
-                TextCursorBar,
-                TextSpan::new("|"),
-                TextFont {
-                    font_size: 32.0,
-                    ..default()
-                },
-                TextColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
-            ))
-            .id();
-        commands.entity(editing).add_child(bar);
-        bar
+    let Some(editing) = state.editing_text else {
+        return;
     };
 
-    // Toggle visibility
-    commands.entity(bar_entity).insert(if blink.visible {
-        Visibility::Inherited
-    } else {
-        Visibility::Hidden
-    });
+    if blink.visible {
+        if let Ok(mut text) = text_query.get_mut(editing) {
+            text.0.push('|');
+        }
+    }
 }

@@ -108,9 +108,6 @@ pub struct ToolButtonMarker(pub PosterTool);
 #[derive(Component)]
 pub struct BrushCursorPreview;
 
-#[derive(Component)]
-pub struct TextCursorBar;
-
 #[derive(Resource)]
 pub struct CursorBlinkTimer {
     pub timer: Timer,
