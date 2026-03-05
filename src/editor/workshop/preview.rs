@@ -15,7 +15,7 @@ use super::{PreviewObstacle, WorkshopState};
 const VIEW_WIDTH: u32 = 384;
 const VIEW_HEIGHT: u32 = 216;
 const VIEW_MARGIN: f32 = 12.0;
-const VIEW_BORDER: f32 = 2.0;
+const VIEW_BORDER: f32 = 3.0;
 const RIGHT_PANEL_WIDTH: f32 = 280.0;
 
 #[derive(Resource)]
@@ -203,7 +203,7 @@ pub(super) fn setup_camera_view(mut commands: Commands, mut images: ResMut<Asset
                         padding: UiRect::all(Val::Px(VIEW_BORDER)),
                         ..default()
                     },
-                    BackgroundColor(palette::STEEL),
+                    BackgroundColor(palette::SAND),
                 ))
                 .with_children(|border| {
                     border.spawn((
