@@ -5,10 +5,46 @@ pub enum AppState {
     #[default]
     Menu,
     Editor,
+    HypeSetup,
     Race,
     Results,
     DevMenu,
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AdCampaign {
+    Posters,
+    HighlightReel,
+    Merch,
+}
+
+impl AdCampaign {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Posters => "Posters",
+            Self::HighlightReel => "Highlight\nReel",
+            Self::Merch => "Merch",
+        }
+    }
+
+    pub fn cost_label(self) -> &'static str {
+        match self {
+            Self::Posters => "$5+",
+            Self::HighlightReel => "$50+",
+            Self::Merch => "$20+",
+        }
+    }
+}
+
+pub const AD_CAMPAIGNS: [AdCampaign; 3] = [
+    AdCampaign::Posters,
+    AdCampaign::HighlightReel,
+    AdCampaign::Merch,
+];
+
+#[derive(Resource)]
+#[allow(dead_code)]
+pub struct SelectedAdCampaign(pub AdCampaign);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, SubStates)]
 #[source(AppState = AppState::Editor)]

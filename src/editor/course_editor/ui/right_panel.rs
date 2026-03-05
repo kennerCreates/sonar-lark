@@ -32,7 +32,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
 
             ui_theme::spawn_action_button(
                 panel,
-                "Start Race",
+                "Hype Race",
                 StartRaceButton,
                 palette::TANGERINE,
             );

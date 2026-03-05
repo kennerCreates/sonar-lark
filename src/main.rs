@@ -6,6 +6,7 @@ mod course;
 mod dev_menu;
 mod drone;
 mod editor;
+mod hype;
 mod menu;
 mod obstacle;
 pub mod palette;
@@ -45,6 +46,7 @@ fn main() {
             obstacle::ObstaclePlugin,
             course::CoursePlugin,
             editor::EditorPlugin,
+            hype::HypePlugin,
             pilot::PilotPlugin,
             drone::DronePlugin,
             race::RacePlugin,

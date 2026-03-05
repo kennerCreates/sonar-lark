@@ -222,7 +222,7 @@ pub fn check_pending_race_transition(
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     commands.remove_resource::<PendingRaceTransition>();
-    next_state.set(AppState::Race);
+    next_state.set(AppState::HypeSetup);
 }
 
 pub fn handle_clear_gate_orders_button(
