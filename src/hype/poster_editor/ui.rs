@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::ui::RelativeCursorPosition;
 
+use crate::dev_menu::color_picker_data::PALETTE_COLORS;
 use crate::editor::undo::UndoStack;
 use crate::palette;
 use crate::states::HypeMode;
@@ -13,21 +14,9 @@ use super::{
     TextToolButton, ToolButtonMarker,
 };
 
-/// 9-color subset for the poster painter.
-pub const POSTER_COLORS: [(&str, Color); 9] = [
-    ("Black", palette::BLACK),
-    ("White", palette::VANILLA),
-    ("Blue", palette::CAROLINA),
-    ("Purple", palette::ORCHID),
-    ("Orange", palette::DANDELION),
-    ("Green", palette::GREEN),
-    ("Salmon", palette::PEACH),
-    ("Pink", palette::PINK),
-    ("Lime", palette::LIME),
-];
-
-const COLOR_CELL_SIZE: f32 = 60.0;
-const COLOR_GRID_COLS: usize = 3;
+const COLOR_CELL_SIZE: f32 = 28.0;
+const COLOR_GRID_COLS: usize = 8;
+const COLOR_GAP: f32 = 2.0;
 
 const BRUSH_SMALL: f32 = 4.0;
 const BRUSH_MEDIUM: f32 = 10.0;
@@ -258,7 +247,7 @@ fn spawn_canvas_area(parent: &mut ChildSpawnerCommands, canvas_handle: Handle<Im
 fn spawn_right_panel(parent: &mut ChildSpawnerCommands) {
     parent
         .spawn(Node {
-            width: Val::Px(240.0),
+            width: Val::Px(280.0),
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
             padding: UiRect::all(Val::Px(20.0)),
@@ -266,20 +255,19 @@ fn spawn_right_panel(parent: &mut ChildSpawnerCommands) {
             ..default()
         })
         .with_children(|panel| {
-            // 3x3 color grid
             panel
                 .spawn(Node {
                     flex_direction: FlexDirection::Row,
                     flex_wrap: FlexWrap::Wrap,
-                    column_gap: Val::Px(4.0),
-                    row_gap: Val::Px(4.0),
+                    column_gap: Val::Px(COLOR_GAP),
+                    row_gap: Val::Px(COLOR_GAP),
                     max_width: Val::Px(
-                        (COLOR_CELL_SIZE + 4.0) * COLOR_GRID_COLS as f32,
+                        (COLOR_CELL_SIZE + COLOR_GAP) * COLOR_GRID_COLS as f32,
                     ),
                     ..default()
                 })
                 .with_children(|grid| {
-                    for (i, &(_, color)) in POSTER_COLORS.iter().enumerate() {
+                    for (i, (_, rgb)) in PALETTE_COLORS.iter().enumerate() {
                         let selected = i == 0; // Black selected by default
                         grid.spawn((
                             Button,
@@ -287,14 +275,10 @@ fn spawn_right_panel(parent: &mut ChildSpawnerCommands) {
                             Node {
                                 width: Val::Px(COLOR_CELL_SIZE),
                                 height: Val::Px(COLOR_CELL_SIZE),
-                                border: UiRect::all(Val::Px(if selected {
-                                    3.0
-                                } else {
-                                    1.0
-                                })),
+                                border: UiRect::all(Val::Px(1.0)),
                                 ..default()
                             },
-                            BackgroundColor(color),
+                            BackgroundColor(Color::srgb(rgb[0], rgb[1], rgb[2])),
                             BorderColor::all(if selected {
                                 palette::VANILLA
                             } else {

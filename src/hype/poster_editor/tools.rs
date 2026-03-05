@@ -7,8 +7,9 @@ use crate::palette;
 use crate::states::AppState;
 use crate::ui_theme;
 
+use crate::dev_menu::color_picker_data::PALETTE_COLORS;
+
 use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH, CANVAS_HEIGHT, CANVAS_WIDTH};
-use super::ui::POSTER_COLORS;
 use super::{
     BrushSizeButton, CanvasContainer, PaintStroke, PosterAction, PosterColorCell,
     PosterEditorState, PosterStartRaceButton, PosterTextElement, PosterTool, ToolButtonMarker,
@@ -55,12 +56,11 @@ pub fn handle_color_selection(
             continue;
         }
 
-        let color = POSTER_COLORS[cell.0].1;
-        let rgba = color.to_srgba();
+        let rgb = PALETTE_COLORS[cell.0].1;
         state.brush_color = [
-            (rgba.red * 255.0) as u8,
-            (rgba.green * 255.0) as u8,
-            (rgba.blue * 255.0) as u8,
+            (rgb[0] * 255.0) as u8,
+            (rgb[1] * 255.0) as u8,
+            (rgb[2] * 255.0) as u8,
             255,
         ];
 

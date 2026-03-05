@@ -314,7 +314,10 @@ fn cleanup_course_editor(
     commands.remove_resource::<ui::CameraEditorMeshes>();
     commands.remove_resource::<ui::PendingRaceTransition>();
     for entity in &placed_query {
-        commands.entity(entity).despawn();
+        // Use try_despawn because PlacedCamera entities are children of
+        // PlacedObstacle entities — recursive despawn of the parent already
+        // removes the child, so it may be gone by the time we iterate to it.
+        commands.entity(entity).try_despawn();
     }
 
     let default_layers = RenderLayers::default();
