@@ -1,4 +1,3 @@
-mod discover;
 pub mod ui;
 
 use bevy::prelude::*;
@@ -16,10 +15,11 @@ impl Plugin for MenuPlugin {
                 (
                     ui::handle_start_game_button,
                     ui::handle_dev_mode_button,
-                    ui::handle_course_selection,
-                    ui::update_course_highlights,
-                    ui::handle_editor_button,
-                    ui::handle_race_button,
+                    ui::handle_location_card,
+                    ui::handle_course_library_button,
+                    ui::handle_course_list_item,
+                    ui::handle_course_delete_item,
+                    ui::handle_course_library_back,
                 )
                     .run_if(in_state(AppState::Menu)),
             );

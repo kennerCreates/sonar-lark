@@ -135,54 +135,21 @@ pub fn handle_tab_switch(
     mut editor_ui: ResMut<EditorUI>,
     obstacle_tab: Query<&Interaction, (Changed<Interaction>, With<ObstacleTabButton>)>,
     props_tab: Query<&Interaction, (Changed<Interaction>, With<PropsTabButton>)>,
-    cameras_tab: Query<&Interaction, (Changed<Interaction>, With<CamerasTabButton>)>,
     mut obstacle_content: Query<
         &mut Node,
-        (
-            With<ObstaclePaletteContent>,
-            Without<PropPaletteContent>,
-            Without<CameraPaletteContent>,
-        ),
+        (With<ObstaclePaletteContent>, Without<PropPaletteContent>),
     >,
     mut prop_content: Query<
         &mut Node,
-        (
-            With<PropPaletteContent>,
-            Without<ObstaclePaletteContent>,
-            Without<CameraPaletteContent>,
-        ),
-    >,
-    mut camera_content: Query<
-        &mut Node,
-        (
-            With<CameraPaletteContent>,
-            Without<ObstaclePaletteContent>,
-            Without<PropPaletteContent>,
-        ),
+        (With<PropPaletteContent>, Without<ObstaclePaletteContent>),
     >,
     mut obstacle_tab_bg: Query<
         &mut BackgroundColor,
-        (
-            With<ObstacleTabButton>,
-            Without<PropsTabButton>,
-            Without<CamerasTabButton>,
-        ),
+        (With<ObstacleTabButton>, Without<PropsTabButton>),
     >,
     mut props_tab_bg: Query<
         &mut BackgroundColor,
-        (
-            With<PropsTabButton>,
-            Without<ObstacleTabButton>,
-            Without<CamerasTabButton>,
-        ),
-    >,
-    mut cameras_tab_bg: Query<
-        &mut BackgroundColor,
-        (
-            With<CamerasTabButton>,
-            Without<ObstacleTabButton>,
-            Without<PropsTabButton>,
-        ),
+        (With<PropsTabButton>, Without<ObstacleTabButton>),
     >,
 ) {
     let mut new_tab = None;
@@ -197,11 +164,6 @@ pub fn handle_tab_switch(
             new_tab = Some(EditorTab::Props);
         }
     }
-    for interaction in &cameras_tab {
-        if *interaction == Interaction::Pressed {
-            new_tab = Some(EditorTab::Cameras);
-        }
-    }
 
     let Some(tab) = new_tab else { return };
     if tab == editor_ui.active_tab {
@@ -209,10 +171,9 @@ pub fn handle_tab_switch(
     }
     editor_ui.active_tab = tab;
 
-    let (obs_display, prop_display, cam_display) = match tab {
-        EditorTab::Obstacles => (Display::Flex, Display::None, Display::None),
-        EditorTab::Props => (Display::None, Display::Flex, Display::None),
-        EditorTab::Cameras => (Display::None, Display::None, Display::Flex),
+    let (obs_display, prop_display) = match tab {
+        EditorTab::Obstacles => (Display::Flex, Display::None),
+        EditorTab::Props => (Display::None, Display::Flex),
     };
 
     if let Ok(mut node) = obstacle_content.single_mut() {
@@ -221,22 +182,15 @@ pub fn handle_tab_switch(
     if let Ok(mut node) = prop_content.single_mut() {
         node.display = prop_display;
     }
-    if let Ok(mut node) = camera_content.single_mut() {
-        node.display = cam_display;
-    }
 
-    let (obs_bg, prop_bg, cam_bg) = match tab {
-        EditorTab::Obstacles => (ui_theme::BUTTON_SELECTED, ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_NORMAL),
-        EditorTab::Props => (ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_SELECTED, ui_theme::BUTTON_NORMAL),
-        EditorTab::Cameras => (ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_SELECTED),
+    let (obs_bg, prop_bg) = match tab {
+        EditorTab::Obstacles => (ui_theme::BUTTON_SELECTED, ui_theme::BUTTON_NORMAL),
+        EditorTab::Props => (ui_theme::BUTTON_NORMAL, ui_theme::BUTTON_SELECTED),
     };
     if let Ok(mut bg) = obstacle_tab_bg.single_mut() {
         *bg = BackgroundColor(obs_bg);
     }
     if let Ok(mut bg) = props_tab_bg.single_mut() {
         *bg = BackgroundColor(prop_bg);
-    }
-    if let Ok(mut bg) = cameras_tab_bg.single_mut() {
-        *bg = BackgroundColor(cam_bg);
     }
 }

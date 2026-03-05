@@ -1,24 +1,11 @@
+use std::fs;
+
 use bevy::prelude::*;
 
-use crate::course::loader::SelectedCourse;
-use crate::states::{LastEditedCourse, PendingEditorCourse};
+use crate::course::discovery::{discover_courses, CourseEntry};
 use crate::palette;
-use crate::states::AppState;
+use crate::states::{AppState, PendingEditorCourse};
 use crate::ui_theme;
-
-use super::discover::{discover_courses, CourseEntry};
-
-const SELECTED_COURSE: Color = palette::TEAL;
-const NORMAL_COURSE: Color = palette::SMOKY_BLACK;
-const HOVERED_COURSE: Color = palette::INDIGO;
-
-const MIN_RACEABLE_GATES: usize = 3;
-
-#[derive(Resource, Default)]
-pub struct AvailableCourses {
-    pub courses: Vec<CourseEntry>,
-    pub selected_index: Option<usize>,
-}
 
 #[derive(Component)]
 pub(crate) struct StartGameButton;
@@ -30,25 +17,40 @@ pub(crate) struct DevModeButton;
 pub(crate) struct LandingRoot;
 
 #[derive(Component)]
-pub(crate) struct GameMenuRoot;
+pub(crate) struct LocationSelectRoot;
+
+/// Marker on the one enabled location card (Abandoned Warehouse).
+#[derive(Component)]
+pub(crate) struct LocationCard;
 
 #[derive(Component)]
-pub(crate) struct EditorButton;
+pub(crate) struct CourseLibraryButton;
 
 #[derive(Component)]
-pub(crate) struct RaceButton;
+pub(crate) struct CourseLibraryRoot;
 
 #[derive(Component)]
-pub(crate) struct CourseItem(usize);
+pub(crate) struct CourseListItem(String);
 
 #[derive(Component)]
-pub(crate) struct RaceButtonText;
+pub(crate) struct CourseDeleteItem(String);
 
 #[derive(Component)]
-pub(crate) struct HintText;
+pub(crate) struct CourseLibraryBackButton;
+
+struct LocationDef {
+    name: &'static str,
+    cost: u32,
+    enabled: bool,
+}
+
+const LOCATIONS: &[LocationDef] = &[
+    LocationDef { name: "Local Park", cost: 5, enabled: false },
+    LocationDef { name: "Abandoned\nWarehouse", cost: 0, enabled: true },
+    LocationDef { name: "Golf Course", cost: 50, enabled: false },
+];
 
 pub fn setup_menu(mut commands: Commands) {
-    // Landing screen: title + two buttons
     commands
         .spawn((
             Node {
@@ -64,27 +66,18 @@ pub fn setup_menu(mut commands: Commands) {
             LandingRoot,
         ))
         .with_children(|parent| {
-            // Title
             parent.spawn((
                 Text::new("SONAR LARK"),
-                TextFont {
-                    font_size: 64.0,
-                    ..default()
-                },
+                TextFont { font_size: 64.0, ..default() },
                 TextColor(palette::VANILLA),
             ));
 
-            // Subtitle
             parent.spawn((
                 Text::new("Drone Racing Simulator"),
-                TextFont {
-                    font_size: 24.0,
-                    ..default()
-                },
+                TextFont { font_size: 24.0, ..default() },
                 TextColor(palette::SIDEWALK),
             ));
 
-            // Button column
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Column,
@@ -109,12 +102,10 @@ pub fn handle_start_game_button(
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            // Despawn landing screen
             for entity in &landing_query {
                 commands.entity(entity).despawn();
             }
-            // Spawn game menu
-            spawn_game_menu(&mut commands);
+            spawn_location_select(&mut commands);
         }
     }
 }
@@ -130,12 +121,149 @@ pub fn handle_dev_mode_button(
     }
 }
 
-fn spawn_game_menu(commands: &mut Commands) {
+fn spawn_location_select(commands: &mut Commands) {
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                row_gap: Val::Px(30.0),
+                ..default()
+            },
+            DespawnOnExit(AppState::Menu),
+            LocationSelectRoot,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Choose your Location..."),
+                TextFont { font_size: 48.0, ..default() },
+                TextColor(palette::VANILLA),
+            ));
+
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(40.0),
+                    margin: UiRect::vertical(Val::Px(20.0)),
+                    ..default()
+                })
+                .with_children(|row| {
+                    for loc in LOCATIONS {
+                        spawn_location_card(row, loc);
+                    }
+                });
+
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(20.0),
+                    position_type: PositionType::Absolute,
+                    bottom: Val::Px(40.0),
+                    right: Val::Px(40.0),
+                    ..default()
+                })
+                .with_children(|row| {
+                    ui_theme::spawn_menu_button(row, "Course Library", CourseLibraryButton, 220.0);
+                    ui_theme::spawn_disabled_menu_button(row, "SELECT", 200.0);
+                });
+        });
+}
+
+fn spawn_location_card(parent: &mut ChildSpawnerCommands, loc: &LocationDef) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(8.0),
+            ..default()
+        })
+        .with_children(|col| {
+            col.spawn((
+                Text::new(format!("${}", loc.cost)),
+                TextFont { font_size: 20.0, ..default() },
+                TextColor(if loc.enabled { palette::VANILLA } else { palette::CHAINMAIL }),
+            ));
+
+            if loc.enabled {
+                col.spawn((
+                    Button,
+                    ui_theme::ThemedButton,
+                    LocationCard,
+                    Node {
+                        width: Val::Px(220.0),
+                        height: Val::Px(140.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(3.0)),
+                        ..default()
+                    },
+                    BackgroundColor(ui_theme::BUTTON_NORMAL),
+                    BorderColor::all(ui_theme::BORDER_NORMAL),
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new(loc.name),
+                        TextFont { font_size: 22.0, ..default() },
+                        TextColor(palette::VANILLA),
+                        TextLayout::new_with_justify(Justify::Center),
+                    ));
+                });
+            } else {
+                col.spawn((
+                    Node {
+                        width: Val::Px(220.0),
+                        height: Val::Px(140.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(3.0)),
+                        ..default()
+                    },
+                    BackgroundColor(ui_theme::BUTTON_DISABLED),
+                    BorderColor::all(ui_theme::BORDER_DISABLED),
+                ))
+                .with_children(|card| {
+                    card.spawn((
+                        Text::new(loc.name),
+                        TextFont { font_size: 22.0, ..default() },
+                        TextColor(palette::CHAINMAIL),
+                        TextLayout::new_with_justify(Justify::Center),
+                    ));
+                });
+            }
+        });
+}
+
+pub fn handle_location_card(
+    query: Query<&Interaction, (Changed<Interaction>, With<LocationCard>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(AppState::Editor);
+        }
+    }
+}
+
+pub fn handle_course_library_button(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<CourseLibraryButton>)>,
+    location_root: Query<Entity, With<LocationSelectRoot>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            for entity in &location_root {
+                commands.entity(entity).despawn();
+            }
+            spawn_course_library(&mut commands);
+        }
+    }
+}
+
+fn spawn_course_library(commands: &mut Commands) {
     let courses = discover_courses();
-    let available = AvailableCourses {
-        courses,
-        selected_index: None,
-    };
 
     commands
         .spawn((
@@ -149,276 +277,156 @@ fn spawn_game_menu(commands: &mut Commands) {
                 ..default()
             },
             DespawnOnExit(AppState::Menu),
-            GameMenuRoot,
+            CourseLibraryRoot,
         ))
         .with_children(|parent| {
-            // Title
             parent.spawn((
-                Text::new("SONAR LARK"),
-                TextFont {
-                    font_size: 64.0,
-                    ..default()
-                },
+                Text::new("Course Library"),
+                TextFont { font_size: 48.0, ..default() },
                 TextColor(palette::VANILLA),
             ));
 
-            // Subtitle
-            parent.spawn((
-                Text::new("Drone Racing Tycoon"),
-                TextFont {
-                    font_size: 24.0,
-                    ..default()
-                },
-                TextColor(palette::SIDEWALK),
-            ));
-
-            // Course selection area
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
                     row_gap: Val::Px(8.0),
-                    margin: UiRect::vertical(Val::Px(20.0)),
+                    margin: UiRect::vertical(Val::Px(10.0)),
+                    max_height: Val::Px(400.0),
+                    overflow: Overflow::scroll_y(),
                     ..default()
                 })
-                .with_children(|course_area| {
-                    course_area.spawn((
-                        Text::new("Select Course"),
-                        TextFont {
-                            font_size: 20.0,
-                            ..default()
-                        },
-                        TextColor(palette::SIDEWALK),
-                    ));
-
-                    if available.courses.is_empty() {
-                        course_area.spawn((
+                .with_children(|list| {
+                    if courses.is_empty() {
+                        list.spawn((
                             Text::new("No courses found"),
-                            TextFont {
-                                font_size: 16.0,
-                                ..default()
-                            },
+                            TextFont { font_size: 18.0, ..default() },
                             TextColor(palette::CHAINMAIL),
                         ));
                     } else {
-                        for (i, course) in available.courses.iter().enumerate() {
-                            course_area
-                                .spawn((
-                                    Button,
-                                    CourseItem(i),
-                                    Node {
-                                        width: Val::Px(300.0),
-                                        height: Val::Px(40.0),
-                                        justify_content: JustifyContent::Center,
-                                        align_items: AlignItems::Center,
-                                        border: UiRect::all(Val::Px(2.0)),
-                                        ..default()
-                                    },
-                                    BackgroundColor(NORMAL_COURSE),
-                                    BorderColor::all(palette::STEEL),
-                                ))
-                                .with_children(|btn| {
-                                    btn.spawn((
-                                        Text::new(&course.name),
-                                        TextFont {
-                                            font_size: 18.0,
-                                            ..default()
-                                        },
-                                        TextColor(palette::SAND),
-                                    ));
-                                });
+                        for course in &courses {
+                            spawn_course_list_item(list, course);
                         }
                     }
                 });
 
-            // Button row
             parent
                 .spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(20.0),
+                    margin: UiRect::top(Val::Px(20.0)),
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "Editor", EditorButton, 200.0);
-
-                    row.spawn((
-                        Button,
-                        ui_theme::ThemedButton,
-                        RaceButton,
-                        Node {
-                            width: Val::Px(200.0),
-                            height: Val::Px(60.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border: UiRect::all(Val::Px(3.0)),
-                            ..default()
-                        },
-                        BackgroundColor(ui_theme::BUTTON_NORMAL),
-                        BorderColor::all(ui_theme::BORDER_NORMAL),
-                    ))
-                    .with_children(|btn| {
-                        btn.spawn((
-                            Text::new("Race"),
-                            TextFont {
-                                font_size: 24.0,
-                                ..default()
-                            },
-                            TextColor(palette::CHAINMAIL),
-                            RaceButtonText,
-                        ));
-                    });
+                    ui_theme::spawn_menu_button(row, "Back", CourseLibraryBackButton, 200.0);
                 });
+        });
+}
 
-            parent.spawn((
-                Text::new("Select a course to enable racing"),
-                TextFont {
-                    font_size: 14.0,
+fn spawn_course_list_item(parent: &mut ChildSpawnerCommands, course: &CourseEntry) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(4.0),
+            ..default()
+        })
+        .with_children(|row| {
+            row.spawn((
+                Button,
+                ui_theme::ThemedButton,
+                CourseListItem(course.path.clone()),
+                Node {
+                    width: Val::Px(360.0),
+                    height: Val::Px(50.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(2.0)),
                     ..default()
                 },
-                TextColor(palette::STONE),
-                HintText,
-            ));
+                BackgroundColor(ui_theme::BUTTON_NORMAL),
+                BorderColor::all(ui_theme::BORDER_NORMAL),
+            ))
+            .with_children(|btn| {
+                btn.spawn((
+                    Text::new(&course.name),
+                    TextFont { font_size: 20.0, ..default() },
+                    TextColor(palette::VANILLA),
+                ));
+            });
+
+            row.spawn((
+                Button,
+                ui_theme::ThemedButton,
+                CourseDeleteItem(course.path.clone()),
+                Node {
+                    width: Val::Px(36.0),
+                    height: Val::Px(50.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(2.0)),
+                    ..default()
+                },
+                BackgroundColor(ui_theme::BUTTON_NORMAL),
+                BorderColor::all(ui_theme::BORDER_NORMAL),
+            ))
+            .with_children(|btn| {
+                btn.spawn((
+                    Text::new("X"),
+                    TextFont { font_size: 18.0, ..default() },
+                    TextColor(palette::VANILLA),
+                ));
+            });
         });
-
-    commands.insert_resource(available);
 }
 
-
-pub fn handle_course_selection(
-    available: Option<ResMut<AvailableCourses>>,
-    mut course_query: Query<
-        (&Interaction, &CourseItem, &mut BackgroundColor, &mut BorderColor),
-        Changed<Interaction>,
-    >,
-) {
-    let Some(mut available) = available else { return };
-    for (interaction, course_item, mut bg, mut border) in &mut course_query {
-        match *interaction {
-            Interaction::Pressed => {
-                available.selected_index = Some(course_item.0);
-            }
-            Interaction::Hovered => {
-                if available.selected_index != Some(course_item.0) {
-                    *bg = BackgroundColor(HOVERED_COURSE);
-                    *border = BorderColor::all(palette::CHAINMAIL);
-                }
-            }
-            Interaction::None => {
-                if available.selected_index != Some(course_item.0) {
-                    *bg = BackgroundColor(NORMAL_COURSE);
-                    *border = BorderColor::all(palette::STEEL);
-                }
-            }
-        }
-    }
-}
-
-pub fn update_course_highlights(
-    available: Option<Res<AvailableCourses>>,
-    mut course_query: Query<(&CourseItem, &mut BackgroundColor, &mut BorderColor)>,
-    mut race_text_query: Query<&mut TextColor, (With<RaceButtonText>, Without<HintText>)>,
-    mut hint_query: Query<(&mut Text, &mut TextColor), (With<HintText>, Without<RaceButtonText>)>,
-) {
-    let Some(available) = available else { return };
-    if !available.is_changed() {
-        return;
-    }
-
-    for (course_item, mut bg, mut border) in &mut course_query {
-        if available.selected_index == Some(course_item.0) {
-            *bg = BackgroundColor(SELECTED_COURSE);
-            *border = BorderColor::all(palette::SKY);
-        } else {
-            *bg = BackgroundColor(NORMAL_COURSE);
-            *border = BorderColor::all(palette::STEEL);
-        }
-    }
-
-    let selected_course = available
-        .selected_index
-        .and_then(|idx| available.courses.get(idx));
-    let raceable = selected_course.is_some_and(|c| c.gate_count >= MIN_RACEABLE_GATES);
-
-    for mut text_color in &mut race_text_query {
-        *text_color = if raceable {
-            TextColor(palette::VANILLA)
-        } else {
-            TextColor(palette::CHAINMAIL)
-        };
-    }
-
-    for (mut text, mut color) in &mut hint_query {
-        match selected_course {
-            Some(course) if course.gate_count < MIN_RACEABLE_GATES => {
-                **text = format!(
-                    "Course has {} gate{} — needs at least {} to race",
-                    course.gate_count,
-                    if course.gate_count == 1 { "" } else { "s" },
-                    MIN_RACEABLE_GATES,
-                );
-                *color = TextColor(palette::BRONZE);
-            }
-            Some(_) => {
-                **text = "Ready to race!".to_string();
-                *color = TextColor(palette::MINT);
-            }
-            None => {
-                **text = "Select a course to enable racing".to_string();
-                *color = TextColor(palette::STONE);
-            }
-        }
-    }
-}
-
-pub fn handle_editor_button(
+pub fn handle_course_list_item(
     mut commands: Commands,
-    query: Query<&Interaction, (Changed<Interaction>, With<EditorButton>)>,
+    query: Query<(&Interaction, &CourseListItem), Changed<Interaction>>,
     mut next_state: ResMut<NextState<AppState>>,
-    last_edited: Option<Res<LastEditedCourse>>,
-    available: Option<Res<AvailableCourses>>,
 ) {
-    let Some(available) = available else { return };
-    for interaction in &query {
+    for (interaction, item) in &query {
         if *interaction == Interaction::Pressed {
-            if let Some(course) = available
-                .selected_index
-                .and_then(|idx| available.courses.get(idx))
-            {
-                commands.insert_resource(PendingEditorCourse {
-                    path: course.path.clone(),
-                });
-            } else if let Some(ref last) = last_edited {
-                commands.insert_resource(PendingEditorCourse {
-                    path: last.path.clone(),
-                });
-            }
+            commands.insert_resource(PendingEditorCourse {
+                path: item.0.clone(),
+            });
             next_state.set(AppState::Editor);
         }
     }
 }
 
-pub fn handle_race_button(
-    query: Query<&Interaction, (Changed<Interaction>, With<RaceButton>)>,
-    available: Option<Res<AvailableCourses>>,
+pub fn handle_course_delete_item(
     mut commands: Commands,
-    mut next_state: ResMut<NextState<AppState>>,
+    query: Query<(&Interaction, &CourseDeleteItem), Changed<Interaction>>,
+    library_root: Query<Entity, With<CourseLibraryRoot>>,
 ) {
-    let Some(available) = available else { return };
-    for interaction in &query {
-        if *interaction == Interaction::Pressed
-            && let Some(idx) = available.selected_index
-            && let Some(course) = available.courses.get(idx)
-            && course.gate_count >= MIN_RACEABLE_GATES
-        {
-            commands.insert_resource(SelectedCourse {
-                path: course.path.clone(),
-            });
-            next_state.set(AppState::Race);
+    for (interaction, item) in &query {
+        if *interaction == Interaction::Pressed {
+            let path = std::path::Path::new(&item.0);
+            match fs::remove_file(path) {
+                Ok(()) => info!("Deleted course: {}", item.0),
+                Err(e) => error!("Failed to delete course '{}': {e}", item.0),
+            }
+            // Refresh the library view
+            for entity in &library_root {
+                commands.entity(entity).despawn();
+            }
+            spawn_course_library(&mut commands);
+            return;
         }
     }
 }
 
-
-pub fn cleanup_menu(mut commands: Commands) {
-    commands.remove_resource::<AvailableCourses>();
+pub fn handle_course_library_back(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<CourseLibraryBackButton>)>,
+    library_root: Query<Entity, With<CourseLibraryRoot>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            for entity in &library_root {
+                commands.entity(entity).despawn();
+            }
+            spawn_location_select(&mut commands);
+        }
+    }
 }
+
+pub fn cleanup_menu(mut _commands: Commands) {}

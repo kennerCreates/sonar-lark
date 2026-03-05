@@ -12,7 +12,7 @@ use crate::rendering::{CelLightDir, CelMaterial};
 use crate::states::{AppState, LastEditedCourse, PendingEditorCourse};
 
 use super::data::next_gate_order_from_instances;
-use super::types::{CameraEditorMeshes, ExistingCourseButton, PropEditorMeshes};
+use super::types::{CameraEditorMeshes, PropEditorMeshes};
 
 /// Shared logic: despawn existing obstacles/props/cameras, load course data, spawn all.
 #[allow(clippy::too_many_arguments)]
@@ -161,72 +161,6 @@ pub(crate) fn load_course_into_editor(
         course.props.len(),
         camera_count,
     );
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn handle_load_button(
-    mut commands: Commands,
-    query: Query<(&Interaction, &ExistingCourseButton), Changed<Interaction>>,
-    mut selection: ResMut<EditorSelection>,
-    mut course_state: ResMut<EditorCourse>,
-    mut transform_state: ResMut<EditorTransform>,
-    placed_query: Query<
-        Entity,
-        Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
-    >,
-    library: Res<ObstacleLibrary>,
-    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
-    gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
-    (node_assets, mesh_assets): (Res<Assets<bevy::gltf::GltfNode>>, Res<Assets<bevy::gltf::GltfMesh>>),
-    mut cel_materials: ResMut<Assets<CelMaterial>>,
-    std_materials: Res<Assets<StandardMaterial>>,
-    light_dir: Res<CelLightDir>,
-    prop_meshes: Option<Res<PropEditorMeshes>>,
-    (camera_meshes, mut undo_stack): (Option<Res<CameraEditorMeshes>>, ResMut<UndoStack<CourseEditorAction>>),
-) {
-    for (interaction, btn) in &query {
-        if *interaction != Interaction::Pressed {
-            continue;
-        }
-
-        let path = std::path::Path::new(&btn.0);
-        let course = match load_course_from_file(path) {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to load course: {e}");
-                continue;
-            }
-        };
-
-        let Some(handle) = &gltf_handle else {
-            warn!("glTF not loaded yet, cannot spawn loaded course obstacles");
-            continue;
-        };
-
-        load_course_into_editor(
-            &mut commands,
-            &mut selection,
-            &mut course_state,
-            &mut transform_state,
-            &placed_query,
-            &library,
-            handle,
-            &gltf_assets,
-            &node_assets,
-            &mesh_assets,
-            &mut cel_materials,
-            &std_materials,
-            light_dir.0,
-            &course,
-            prop_meshes.as_deref(),
-            camera_meshes.as_deref(),
-        );
-
-        undo_stack.clear();
-        commands.insert_resource(LastEditedCourse {
-            path: btn.0.clone(),
-        });
-    }
 }
 
 /// Loads a `PendingEditorCourse` once glTF assets are ready.

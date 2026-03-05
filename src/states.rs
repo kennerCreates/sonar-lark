@@ -36,6 +36,7 @@ pub struct PendingEditorCourse {
 /// Tracks the last course loaded or saved in the editor.
 /// Persists across states so the editor can reopen it.
 #[derive(Resource)]
+#[allow(dead_code)]
 pub struct LastEditedCourse {
     pub path: String,
 }

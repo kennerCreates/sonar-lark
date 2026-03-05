@@ -146,8 +146,6 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_tab_switch,
                     ui::handle_back_to_menu,
                     ui::handle_save_button,
-                    ui::handle_load_button,
-                    ui::handle_new_course_button,
                     ui::handle_gate_order_toggle,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
@@ -172,19 +170,6 @@ impl Plugin for CourseEditorPlugin {
                     ui::handle_gate_color_click,
                     ui::handle_gate_color_default,
                     ui::update_gate_color_label,
-                    ui::handle_camera_placement,
-                    ui::handle_remove_camera,
-                    ui::handle_camera_primary_toggle,
-                    ui::update_camera_primary_label,
-                )
-                    .run_if(in_state(EditorMode::CourseEditor)),
-            )
-            .add_systems(
-                Update,
-                (
-                    ui::handle_delete_button,
-                    ui::handle_confirm_delete,
-                    ui::handle_cancel_delete,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -277,8 +262,7 @@ fn setup_course_editor(
     library: Res<ObstacleLibrary>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
-    let existing_courses = ui::discover_existing_courses();
-    ui::build_course_editor_ui(&mut commands, &library, &existing_courses);
+    ui::build_course_editor_ui(&mut commands, &library);
     commands.insert_resource(EditorSelection::default());
     commands.insert_resource(EditorTransform::default());
     commands.insert_resource(EditorCourse::default());
@@ -308,7 +292,6 @@ fn cleanup_course_editor(
     commands.remove_resource::<UndoStack<CourseEditorAction>>();
     commands.remove_resource::<PendingEditorCourse>();
     commands.remove_resource::<PendingGlbReload>();
-    commands.remove_resource::<ui::PendingCourseDelete>();
     commands.remove_resource::<ui::PropEditorMeshes>();
     commands.remove_resource::<ui::CameraEditorMeshes>();
     for entity in &placed_query {

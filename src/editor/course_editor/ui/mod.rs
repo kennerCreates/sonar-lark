@@ -1,6 +1,5 @@
 mod camera_interaction;
 mod data;
-mod discover;
 mod display_updates;
 mod gate_color;
 mod left_panel;
@@ -11,15 +10,13 @@ mod right_panel;
 mod save_delete;
 mod types;
 
-pub use discover::discover_existing_courses;
 pub use left_panel::build_course_editor_ui;
 pub(crate) use data::build_course_data;
-pub use load::{auto_load_pending_course, handle_load_button};
+pub use load::auto_load_pending_course;
 pub(crate) use load::load_course_into_editor;
 pub use save_delete::{
-    handle_back_to_menu, handle_cancel_delete, handle_clear_gate_orders_button,
-    handle_confirm_delete, handle_delete_button, handle_gate_order_toggle,
-    handle_new_course_button, handle_save_button,
+    handle_back_to_menu, handle_clear_gate_orders_button,
+    handle_gate_order_toggle, handle_save_button,
 };
 pub use obstacle_interaction::{handle_palette_selection, handle_tab_switch};
 pub use prop_interaction::{
@@ -27,8 +24,7 @@ pub use prop_interaction::{
     update_prop_color_label,
 };
 pub use camera_interaction::{
-    handle_camera_placement, handle_camera_primary_toggle, handle_remove_camera,
-    setup_camera_editor_meshes, spawn_gate_camera, update_camera_primary_label,
+    setup_camera_editor_meshes, spawn_gate_camera,
 };
 pub use gate_color::{
     handle_gate_color_click, handle_gate_color_default, update_gate_color_label,

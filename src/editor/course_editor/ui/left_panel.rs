@@ -12,7 +12,6 @@ use super::types::*;
 pub fn build_course_editor_ui(
     commands: &mut Commands,
     library: &ObstacleLibrary,
-    existing_courses: &[CourseEntry],
 ) {
     commands
         .spawn((
@@ -27,7 +26,7 @@ pub fn build_course_editor_ui(
         ))
         .with_children(|root| {
             build_left_panel(root, library);
-            build_right_panel(root, existing_courses);
+            build_right_panel(root);
         });
 }
 
@@ -67,7 +66,6 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 .with_children(|row| {
                     spawn_tab_button(row, "Obstacles", ObstacleTabButton, true);
                     spawn_tab_button(row, "Props", PropsTabButton, false);
-                    spawn_tab_button(row, "Cameras", CamerasTabButton, false);
                 });
 
             // --- Obstacle palette content (visible by default) ---
@@ -168,120 +166,6 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 TextColor(palette::SAND),
                             ));
                         });
-                });
-
-            // --- Camera palette content (hidden by default) ---
-            panel
-                .spawn((
-                    CameraPaletteContent,
-                    Node {
-                        flex_direction: FlexDirection::Column,
-                        row_gap: Val::Px(4.0),
-                        display: Display::None,
-                        ..default()
-                    },
-                ))
-                .with_children(|content| {
-                    content
-                        .spawn((
-                            Button,
-                            PlaceCameraButton,
-                            Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Px(28.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                border: UiRect::all(Val::Px(1.0)),
-                                ..default()
-                            },
-                            BackgroundColor(ui_theme::BUTTON_NORMAL),
-                            BorderColor::all(palette::SAPPHIRE),
-                        ))
-                        .with_children(|btn| {
-                            btn.spawn((
-                                Text::new("Add Camera to Gate"),
-                                TextFont {
-                                    font_size: 13.0,
-                                    ..default()
-                                },
-                                TextColor(palette::SKY),
-                            ));
-                        });
-
-                    content
-                        .spawn((
-                            Button,
-                            RemoveCameraButton,
-                            Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Px(28.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                border: UiRect::all(Val::Px(1.0)),
-                                ..default()
-                            },
-                            BackgroundColor(ui_theme::BUTTON_NORMAL),
-                            BorderColor::all(palette::STEEL),
-                        ))
-                        .with_children(|btn| {
-                            btn.spawn((
-                                Text::new("Remove Camera"),
-                                TextFont {
-                                    font_size: 12.0,
-                                    ..default()
-                                },
-                                TextColor(palette::PEACH),
-                            ));
-                        });
-
-                    ui_theme::spawn_divider(content);
-
-                    content.spawn((
-                        Text::new("Primary: (select a camera)"),
-                        TextFont {
-                            font_size: 13.0,
-                            ..default()
-                        },
-                        TextColor(palette::CHAINMAIL),
-                        CameraPrimaryLabel,
-                    ));
-
-                    content
-                        .spawn((
-                            Button,
-                            CameraPrimaryToggle,
-                            Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Px(28.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                border: UiRect::all(Val::Px(1.0)),
-                                ..default()
-                            },
-                            BackgroundColor(ui_theme::BUTTON_NORMAL),
-                            BorderColor::all(palette::STEEL),
-                        ))
-                        .with_children(|btn| {
-                            btn.spawn((
-                                Text::new("Toggle Primary"),
-                                TextFont {
-                                    font_size: 12.0,
-                                    ..default()
-                                },
-                                TextColor(palette::SAND),
-                            ));
-                        });
-
-                    ui_theme::spawn_divider(content);
-
-                    content.spawn((
-                        Text::new("Select a gate, then add a camera.\nUse Move/Rotate to aim."),
-                        TextFont {
-                            font_size: 12.0,
-                            ..default()
-                        },
-                        TextColor(palette::CHAINMAIL),
-                    ));
                 });
 
             panel.spawn(Node {

@@ -11,13 +11,7 @@ use crate::rendering::CelMaterial;
 pub struct PaletteButton(pub ObstacleId);
 
 #[derive(Component)]
-pub struct ExistingCourseButton(pub String);
-
-#[derive(Component)]
 pub struct BackToMenuButton;
-
-#[derive(Component)]
-pub struct NewCourseButton;
 
 #[derive(Component)]
 pub struct SaveCourseButton;
@@ -42,24 +36,6 @@ pub struct CourseNameDisplayText;
 
 #[derive(Component)]
 pub struct PaletteContainer;
-
-#[derive(Component)]
-pub struct ExistingCoursesContainer;
-
-#[derive(Component)]
-pub struct DeleteCourseButton(pub String);
-
-#[derive(Component)]
-pub struct ConfirmDeleteYesButton;
-
-#[derive(Component)]
-pub struct ConfirmDeleteCancelButton;
-
-#[derive(Resource)]
-pub struct PendingCourseDelete {
-    pub path: String,
-    pub display_name: String,
-}
 
 #[derive(Component)]
 pub struct TransformModeButton(pub TransformMode);
@@ -92,24 +68,6 @@ pub struct PropEditorMeshes {
     pub confetti_material: Handle<CelMaterial>,
     pub shell_material: Handle<CelMaterial>,
 }
-
-#[derive(Component)]
-pub struct CamerasTabButton;
-
-#[derive(Component)]
-pub struct CameraPaletteContent;
-
-#[derive(Component)]
-pub struct PlaceCameraButton;
-
-#[derive(Component)]
-pub struct RemoveCameraButton;
-
-#[derive(Component)]
-pub struct CameraPrimaryToggle;
-
-#[derive(Component)]
-pub struct CameraPrimaryLabel;
 
 #[derive(Resource)]
 pub struct CameraEditorMeshes {
@@ -145,5 +103,3 @@ pub const COLOR_CYCLE: &[(&str, Option<[f32; 4]>)] = &[
     ("Purple", Some([0.792, 0.494, 0.949, 1.0])),
     ("White", Some([0.949, 0.949, 0.855, 1.0])),
 ];
-
-pub use crate::course::discovery::CourseEntry;

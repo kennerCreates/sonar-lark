@@ -136,6 +136,7 @@ pub fn load_course_from_file(path: &Path) -> Result<CourseData, String> {
     persistence::load_ron(path)
 }
 
+#[allow(dead_code)]
 pub fn delete_course(path: &Path) -> Result<(), String> {
     fs::remove_file(path)
         .map_err(|e| format!("Failed to delete {}: {e}", path.display()))

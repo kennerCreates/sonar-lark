@@ -3,5 +3,4 @@ pub enum EditorTab {
     #[default]
     Obstacles,
     Props,
-    Cameras,
 }

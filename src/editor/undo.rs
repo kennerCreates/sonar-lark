@@ -90,6 +90,7 @@ pub enum CourseEditorAction {
         transform: Transform,
         color_override: Option<[f32; 4]>,
     },
+    #[allow(dead_code)]
     SpawnCamera {
         camera_entity: Entity,
         parent_gate: Entity,

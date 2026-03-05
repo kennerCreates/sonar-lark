@@ -6,6 +6,7 @@ use super::loader::load_course_from_file;
 pub struct CourseEntry {
     pub name: String,
     pub path: String,
+    #[allow(dead_code)] // read in tests; will be used in game loop later
     pub gate_count: usize,
 }
 
