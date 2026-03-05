@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::ui::RelativeCursorPosition;
 
 use crate::editor::undo::UndoStack;
 use crate::palette;
@@ -228,6 +229,8 @@ fn spawn_canvas_area(parent: &mut ChildSpawnerCommands, canvas_handle: Handle<Im
             center
                 .spawn((
                     CanvasContainer,
+                    Interaction::default(),
+                    RelativeCursorPosition::default(),
                     Node {
                         width: Val::Px(CANVAS_DISPLAY_WIDTH),
                         height: Val::Px(CANVAS_DISPLAY_HEIGHT),

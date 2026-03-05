@@ -4,12 +4,12 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 use super::PaintStroke;
 
-pub const CANVAS_WIDTH: u32 = 512;
-pub const CANVAS_HEIGHT: u32 = 384;
+pub const CANVAS_WIDTH: u32 = 400;
+pub const CANVAS_HEIGHT: u32 = 600;
 
-/// Display dimensions in UI pixels (1.5x the image resolution).
-pub const CANVAS_DISPLAY_WIDTH: f32 = 768.0;
-pub const CANVAS_DISPLAY_HEIGHT: f32 = 576.0;
+/// Display dimensions in UI pixels (matching 2:3 portrait aspect ratio).
+pub const CANVAS_DISPLAY_WIDTH: f32 = 450.0;
+pub const CANVAS_DISPLAY_HEIGHT: f32 = 675.0;
 
 /// Create a blank white RGBA canvas image.
 pub fn create_blank_canvas() -> Image {

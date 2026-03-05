@@ -1,5 +1,6 @@
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
+use bevy::ui::RelativeCursorPosition;
 
 use crate::editor::undo::UndoStack;
 use crate::palette;
@@ -9,7 +10,7 @@ use crate::ui_theme;
 use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH, CANVAS_HEIGHT, CANVAS_WIDTH};
 use super::ui::POSTER_COLORS;
 use super::{
-    BrushSizeButton, CanvasContainer, PaintStroke, PosterAction, PosterCanvas, PosterColorCell,
+    BrushSizeButton, CanvasContainer, PaintStroke, PosterAction, PosterColorCell,
     PosterEditorState, PosterStartRaceButton, PosterTextElement, PosterTool, ToolButtonMarker,
 };
 
@@ -103,8 +104,7 @@ pub fn handle_brush_size(
 
 pub fn handle_paint(
     mouse: Res<ButtonInput<MouseButton>>,
-    windows: Query<&Window>,
-    canvas_query: Query<&GlobalTransform, With<PosterCanvas>>,
+    container_query: Query<&RelativeCursorPosition, With<CanvasContainer>>,
     mut state: ResMut<PosterEditorState>,
     mut images: ResMut<Assets<Image>>,
     mut undo_stack: ResMut<UndoStack<PosterAction>>,
@@ -115,8 +115,7 @@ pub fn handle_paint(
 
     paint_or_erase(
         &mouse,
-        &windows,
-        &canvas_query,
+        &container_query,
         &mut state,
         &mut images,
         Some(&mut undo_stack),
@@ -128,8 +127,7 @@ pub fn handle_paint(
 
 pub fn handle_erase(
     mouse: Res<ButtonInput<MouseButton>>,
-    windows: Query<&Window>,
-    canvas_query: Query<&GlobalTransform, With<PosterCanvas>>,
+    container_query: Query<&RelativeCursorPosition, With<CanvasContainer>>,
     mut state: ResMut<PosterEditorState>,
     mut images: ResMut<Assets<Image>>,
 ) {
@@ -139,8 +137,7 @@ pub fn handle_erase(
 
     paint_or_erase(
         &mouse,
-        &windows,
-        &canvas_query,
+        &container_query,
         &mut state,
         &mut images,
         None,
@@ -151,26 +148,21 @@ pub fn handle_erase(
 /// Shared logic for painting and erasing.
 fn paint_or_erase(
     mouse: &ButtonInput<MouseButton>,
-    windows: &Query<&Window>,
-    canvas_query: &Query<&GlobalTransform, With<PosterCanvas>>,
+    container_query: &Query<&RelativeCursorPosition, With<CanvasContainer>>,
     state: &mut PosterEditorState,
     images: &mut Assets<Image>,
     undo_stack: Option<&mut UndoStack<PosterAction>>,
     is_erase: bool,
 ) {
-    let Ok(window) = windows.single() else {
-        return;
-    };
-    let Some(cursor_pos) = window.cursor_position() else {
-        return;
-    };
-    let Ok(canvas_gt) = canvas_query.single() else {
+    let Ok(rel_cursor) = container_query.single() else {
         return;
     };
 
-    let Some((local_x, local_y)) = cursor_to_canvas(cursor_pos, canvas_gt) else {
-        // Cursor outside canvas — finalize any in-progress stroke
-        finalize_stroke(state, undo_stack);
+    let Some((img_x, img_y)) = cursor_to_canvas_image(rel_cursor) else {
+        // Cursor outside canvas — only finalize if mouse was released
+        if mouse.just_released(MouseButton::Left) {
+            finalize_stroke(state, undo_stack);
+        }
         return;
     };
 
@@ -181,29 +173,32 @@ fn paint_or_erase(
     };
     let radius = state.brush_radius;
 
-    if mouse.just_pressed(MouseButton::Left) {
+    let start_new = mouse.just_pressed(MouseButton::Left)
+        || (mouse.pressed(MouseButton::Left) && state.current_stroke.is_none());
+
+    if start_new {
         let stroke = PaintStroke {
-            points: vec![[local_x, local_y]],
+            points: vec![[img_x, img_y]],
             color,
             radius,
         };
 
         if let Some(image) = images.get_mut(&state.canvas_handle) {
             let data = image.data.as_mut().unwrap();
-            canvas::paint_circle(data, CANVAS_WIDTH, CANVAS_HEIGHT, local_x, local_y, radius, color);
+            canvas::paint_circle(data, CANVAS_WIDTH, CANVAS_HEIGHT, img_x, img_y, radius, color);
         }
 
         state.current_stroke = Some(stroke);
     } else if mouse.pressed(MouseButton::Left)
         && let Some(ref mut stroke) = state.current_stroke
     {
-        let prev = stroke.points.last().copied().unwrap_or([local_x, local_y]);
-        stroke.points.push([local_x, local_y]);
+        let prev = stroke.points.last().copied().unwrap_or([img_x, img_y]);
+        stroke.points.push([img_x, img_y]);
 
         if let Some(image) = images.get_mut(&state.canvas_handle) {
             let data = image.data.as_mut().unwrap();
             let seg = PaintStroke {
-                points: vec![prev, [local_x, local_y]],
+                points: vec![prev, [img_x, img_y]],
                 color,
                 radius,
             };
@@ -229,24 +224,16 @@ fn finalize_stroke(
     }
 }
 
-/// Convert window cursor position to canvas-local image coordinates.
-/// Returns None if cursor is outside canvas bounds.
-fn cursor_to_canvas(cursor_pos: Vec2, canvas_gt: &GlobalTransform) -> Option<(f32, f32)> {
-    let canvas_center = canvas_gt.translation().truncate();
-    let half_w = CANVAS_DISPLAY_WIDTH / 2.0;
-    let half_h = CANVAS_DISPLAY_HEIGHT / 2.0;
-
-    let local_x = cursor_pos.x - (canvas_center.x - half_w);
-    let local_y = cursor_pos.y - (canvas_center.y - half_h);
-
-    if local_x < 0.0 || local_y < 0.0 || local_x >= CANVAS_DISPLAY_WIDTH || local_y >= CANVAS_DISPLAY_HEIGHT {
+/// Convert `RelativeCursorPosition` to canvas image pixel coordinates.
+/// Returns `None` if cursor is outside the canvas container.
+fn cursor_to_canvas_image(rel: &RelativeCursorPosition) -> Option<(f32, f32)> {
+    if !rel.cursor_over {
         return None;
     }
-
-    // Scale from display coords to image coords
-    let img_x = local_x / CANVAS_DISPLAY_WIDTH * CANVAS_WIDTH as f32;
-    let img_y = local_y / CANVAS_DISPLAY_HEIGHT * CANVAS_HEIGHT as f32;
-
+    // normalized: center=(0,0), bottom-right=(0.5,0.5)
+    let norm = rel.normalized?;
+    let img_x = (norm.x + 0.5) * CANVAS_WIDTH as f32;
+    let img_y = (norm.y + 0.5) * CANVAS_HEIGHT as f32;
     Some((img_x, img_y))
 }
 
@@ -255,8 +242,7 @@ fn cursor_to_canvas(cursor_pos: Vec2, canvas_gt: &GlobalTransform) -> Option<(f3
 pub fn handle_text_placement(
     mut commands: Commands,
     mouse: Res<ButtonInput<MouseButton>>,
-    windows: Query<&Window>,
-    canvas_query: Query<(&GlobalTransform, Entity), With<CanvasContainer>>,
+    canvas_query: Query<(&RelativeCursorPosition, Entity), With<CanvasContainer>>,
     mut state: ResMut<PosterEditorState>,
 ) {
     if state.active_tool != PosterTool::Text {
@@ -266,26 +252,20 @@ pub fn handle_text_placement(
         return;
     }
 
-    let Ok(window) = windows.single() else {
-        return;
-    };
-    let Some(cursor_pos) = window.cursor_position() else {
-        return;
-    };
-    let Ok((container_gt, container_entity)) = canvas_query.single() else {
+    let Ok((rel_cursor, container_entity)) = canvas_query.single() else {
         return;
     };
 
-    // Convert to container-local position
-    let center = container_gt.translation().truncate();
-    let half_w = CANVAS_DISPLAY_WIDTH / 2.0;
-    let half_h = CANVAS_DISPLAY_HEIGHT / 2.0;
-    let local_x = cursor_pos.x - (center.x - half_w);
-    let local_y = cursor_pos.y - (center.y - half_h);
-
-    if local_x < 0.0 || local_y < 0.0 || local_x >= CANVAS_DISPLAY_WIDTH || local_y >= CANVAS_DISPLAY_HEIGHT {
+    if !rel_cursor.cursor_over {
         return;
     }
+    let Some(norm) = rel_cursor.normalized else {
+        return;
+    };
+
+    // Convert to container-local display coordinates
+    let local_x = (norm.x + 0.5) * CANVAS_DISPLAY_WIDTH;
+    let local_y = (norm.y + 0.5) * CANVAS_DISPLAY_HEIGHT;
 
     // Finalize any previous text
     state.editing_text = None;
