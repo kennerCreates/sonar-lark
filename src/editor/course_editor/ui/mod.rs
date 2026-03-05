@@ -15,7 +15,8 @@ pub(crate) use data::build_course_data;
 pub use load::auto_load_pending_course;
 pub(crate) use load::load_course_into_editor;
 pub use save_delete::{
-    PendingThumbnailSave,
+    PendingRaceTransition, PendingThumbnailSave,
+    check_pending_race_transition,
     handle_back_to_menu, handle_clear_gate_orders_button,
     handle_gate_order_toggle, handle_save_button, handle_start_race,
 };

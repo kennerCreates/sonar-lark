@@ -19,6 +19,7 @@ pub mod ui_theme;
 
 use bevy::picking::mesh_picking::MeshPickingPlugin;
 use bevy::prelude::*;
+use bevy::render::gpu_readback::GpuReadbackPlugin;
 use bevy::window::WindowResolution;
 
 fn main() {
@@ -33,6 +34,7 @@ fn main() {
                 ..default()
             }),
             MeshPickingPlugin,
+            GpuReadbackPlugin::default(),
         ))
         .init_state::<states::AppState>()
         .add_sub_state::<states::EditorMode>()

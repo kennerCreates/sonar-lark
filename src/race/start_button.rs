@@ -70,8 +70,8 @@ pub fn handle_start_race_button(
 
         if *phase == RacePhase::WaitingToStart {
             *phase = RacePhase::Converging;
-            // Despawn the entire button container (parent node + button + text)
-            commands.entity(child_of.parent()).despawn();
+            // Hide the button container; DespawnOnExit(AppState::Race) handles cleanup.
+            commands.entity(child_of.parent()).insert(Visibility::Hidden);
             info!("Drones converging to start positions!");
         }
     }

@@ -19,6 +19,12 @@ pub struct PendingThumbnailSave {
     pub frames_waited: u8,
 }
 
+/// Resource inserted when the user clicks "Start Race". The actual state
+/// transition is deferred until the thumbnail readback entity has been spawned
+/// (i.e. `PendingThumbnailSave` is removed).
+#[derive(Resource)]
+pub struct PendingRaceTransition;
+
 pub fn handle_back_to_menu(
     query: Query<&Interaction, (Changed<Interaction>, With<BackToMenuButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
@@ -149,7 +155,6 @@ pub fn handle_start_race(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<StartRaceButton>)>,
     mut course_state: ResMut<EditorCourse>,
-    mut next_state: ResMut<NextState<AppState>>,
     placed_query: Query<(Entity, &PlacedObstacle, &Transform)>,
     prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
     camera_child_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
@@ -195,13 +200,29 @@ pub fn handle_start_race(
                 commands.insert_resource(SelectedCourse {
                     path: path_str,
                 });
-                next_state.set(AppState::Race);
+
+                // Trigger thumbnail capture; defer race transition until readback
+                // entity is spawned (PendingThumbnailSave removed).
+                commands.insert_resource(PendingThumbnailSave {
+                    course_name: course_state.name.clone(),
+                    frames_waited: 0,
+                });
+                commands.insert_resource(PendingRaceTransition);
             }
             Err(e) => {
                 error!("Failed to save course before racing: {e}");
             }
         }
     }
+}
+
+/// Transitions to Race once the thumbnail readback entity has been spawned.
+pub fn check_pending_race_transition(
+    mut commands: Commands,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    commands.remove_resource::<PendingRaceTransition>();
+    next_state.set(AppState::Race);
 }
 
 pub fn handle_clear_gate_orders_button(

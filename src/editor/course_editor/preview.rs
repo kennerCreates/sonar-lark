@@ -1,7 +1,8 @@
 use bevy::camera::{ClearColorConfig, RenderTarget};
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
-use bevy::render::render_resource::TextureFormat;
+use bevy::render::gpu_readback::{Readback, ReadbackComplete};
+use bevy::render::render_resource::{TextureFormat, TextureUsages};
 
 use crate::camera::orbit::MainCamera;
 use crate::camera::settings::CameraSettings;
@@ -125,12 +126,14 @@ pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Im
     commands.insert_resource(CameraPreview { camera_entity });
 
     // --- Thumbnail camera (for saving course screenshots) ---
-    let thumb_image = Image::new_target_texture(
+    let mut thumb_image = Image::new_target_texture(
         THUMBNAIL_WIDTH,
         THUMBNAIL_HEIGHT,
         TextureFormat::Rgba8UnormSrgb,
         None,
     );
+    // COPY_SRC is required for GPU readback to extract pixel data.
+    thumb_image.texture_descriptor.usage |= TextureUsages::COPY_SRC;
     let thumb_handle = images.add(thumb_image);
 
     let thumb_entity = commands
@@ -218,12 +221,12 @@ pub fn sync_preview_camera(
     }
 }
 
-/// System that positions the thumbnail camera, waits for it to render, then saves as PNG.
+/// System that positions the thumbnail camera, waits for it to render, then
+/// requests GPU readback. The actual PNG save happens in the readback observer.
 pub fn save_thumbnail_when_ready(
     mut commands: Commands,
     mut pending: ResMut<PendingThumbnailSave>,
     thumbnail: Res<ThumbnailRenderTarget>,
-    images: Res<Assets<Image>>,
     mut thumbnail_cam: Query<(&mut Camera, &mut Transform), With<ThumbnailCamera>>,
     editor_cam: Query<&GlobalTransform, (With<MainCamera>, Without<ThumbnailCamera>)>,
 ) {
@@ -247,23 +250,26 @@ pub fn save_thumbnail_when_ready(
         return;
     }
 
-    // Read the rendered image
-    if let Some(bevy_image) = images.get(&thumbnail.image_handle)
-        && let Some(data) = bevy_image.data.as_ref()
-    {
-        let path_str = format!("assets/courses/{}.png", pending.course_name);
-        let width = bevy_image.width();
-        let height = bevy_image.height();
-
-        if let Some(rgba) = image::RgbaImage::from_raw(width, height, data.clone()) {
-            match rgba.save(&path_str) {
-                Ok(()) => info!("Saved thumbnail to {path_str}"),
-                Err(e) => error!("Failed to save thumbnail: {e}"),
+    // Request async GPU readback of the thumbnail render target.
+    let course_name = pending.course_name.clone();
+    let width = THUMBNAIL_WIDTH;
+    let height = THUMBNAIL_HEIGHT;
+    commands
+        .spawn(Readback::texture(thumbnail.image_handle.clone()))
+        .observe(move |event: On<ReadbackComplete>, mut commands: Commands| {
+            let data = &event.data;
+            let path_str = format!("assets/courses/{course_name}.png");
+            if let Some(rgba) = image::RgbaImage::from_raw(width, height, data.clone()) {
+                match rgba.save(&path_str) {
+                    Ok(()) => info!("Saved thumbnail to {path_str}"),
+                    Err(e) => error!("Failed to save thumbnail: {e}"),
+                }
+            } else {
+                error!("Failed to construct image from render target data");
             }
-        } else {
-            error!("Failed to construct image from render target data");
-        }
-    }
+            // Despawn the readback entity so it doesn't fire every frame.
+            commands.entity(event.observer()).despawn();
+        });
 
     // Deactivate thumbnail camera
     cam.is_active = false;

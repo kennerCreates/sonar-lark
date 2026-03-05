@@ -230,6 +230,13 @@ impl Plugin for CourseEditorPlugin {
             )
             .add_systems(
                 Update,
+                ui::check_pending_race_transition
+                    .run_if(in_state(EditorMode::CourseEditor))
+                    .run_if(resource_exists::<ui::PendingRaceTransition>)
+                    .run_if(not(resource_exists::<ui::PendingThumbnailSave>)),
+            )
+            .add_systems(
+                Update,
                 snapshot_and_despawn_on_glb_reload
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -305,6 +312,7 @@ fn cleanup_course_editor(
     commands.remove_resource::<PendingGlbReload>();
     commands.remove_resource::<ui::PropEditorMeshes>();
     commands.remove_resource::<ui::CameraEditorMeshes>();
+    commands.remove_resource::<ui::PendingRaceTransition>();
     for entity in &placed_query {
         commands.entity(entity).despawn();
     }
