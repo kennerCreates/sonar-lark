@@ -7,8 +7,8 @@ use crate::ui_theme::ThemedButton;
 use super::{
     AcceptButton, DroneColorSwatch, GamertagLabel, GenBackButton, ObstacleWorkshopButton,
     PaletteEditorButton, PersonalityLabel, PilotGeneratorState, PreviewImage,
-    RerollGamertagButton, RerollPersonalityButton, RerollPortraitButton, RosterCountLabel,
-    format_personality,
+    RerollGamertagButton, RerollPersonalityButton, RerollPortraitButton, RerollSkillButton,
+    RosterCountLabel, SkillLabel, format_personality, format_skill,
 };
 
 const PANEL_BG: Color = Color::srgba(0.02, 0.04, 0.08, 0.95);
@@ -170,6 +170,36 @@ pub fn build_ui(
                             ));
                         });
 
+                    // Skill
+                    right
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(8.0),
+                            align_items: AlignItems::Baseline,
+                            ..default()
+                        })
+                        .with_children(|row| {
+                            row.spawn((
+                                Text::new("Skill:"),
+                                TextFont {
+                                    font: ui_font.clone(),
+                                    font_size: 14.0,
+                                    ..default()
+                                },
+                                TextColor(palette::SIDEWALK),
+                            ));
+                            row.spawn((
+                                SkillLabel,
+                                Text::new(format_skill(&state.candidate.skill)),
+                                TextFont {
+                                    font: ui_font.clone(),
+                                    font_size: 14.0,
+                                    ..default()
+                                },
+                                TextColor(palette::VANILLA),
+                            ));
+                        });
+
                     // Drone color swatch
                     right
                         .spawn(Node {
@@ -227,6 +257,13 @@ pub fn build_ui(
                         right,
                         "REROLL PERSONALITY",
                         RerollPersonalityButton,
+                        palette::INDIGO,
+                        &ui_font,
+                    );
+                    spawn_action_button(
+                        right,
+                        "REROLL SKILL",
+                        RerollSkillButton,
                         palette::INDIGO,
                         &ui_font,
                     );

@@ -49,6 +49,9 @@ pub struct RerollGamertagButton;
 pub struct RerollPersonalityButton;
 
 #[derive(Component)]
+pub struct RerollSkillButton;
+
+#[derive(Component)]
 pub struct AcceptButton;
 
 #[derive(Component)]
@@ -64,6 +67,9 @@ pub struct PersonalityLabel;
 pub struct DroneColorSwatch;
 
 #[derive(Component)]
+pub struct SkillLabel;
+
+#[derive(Component)]
 pub struct RosterCountLabel;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -76,10 +82,10 @@ fn generate_random_pilot(roster: &PilotRoster, config: &PortraitPaletteConfig) -
     let traits = pick_personality_traits(&mut rng);
 
     let skill = SkillProfile {
-        level: rng.gen_range(0.2..=0.95),
-        speed: rng.gen_range(0.2..=1.0),
-        cornering: rng.gen_range(0.2..=1.0),
-        consistency: rng.gen_range(0.2..=1.0),
+        level: rng.gen_range(0.05..=0.55),
+        speed: rng.gen_range(0.1..=0.6),
+        cornering: rng.gen_range(0.1..=0.6),
+        consistency: rng.gen_range(0.1..=0.6),
     };
 
     let allowed_drone_colors = config.allowed_indices(PortraitColorSlot::Drone);
@@ -120,6 +126,18 @@ fn format_personality(
             .collect::<Vec<_>>()
             .join(", ")
     }
+}
+
+pub fn format_skill(skill: &SkillProfile) -> String {
+    let avg = (skill.level + skill.speed + skill.cornering + skill.consistency) / 4.0;
+    let tier = match avg {
+        x if x >= 0.85 => "Expert",
+        x if x >= 0.70 => "Advanced",
+        x if x >= 0.55 => "Intermediate",
+        x if x >= 0.40 => "Novice",
+        _ => "Rookie",
+    };
+    format!("{tier} ({:.0}%)", avg * 100.0)
 }
 
 // ── Setup / Cleanup ────────────────────────────────────────────────────────
@@ -261,11 +279,22 @@ pub fn handle_reroll_personality_button(
         if *interaction == Interaction::Pressed {
             let mut rng = rand::thread_rng();
             state.candidate.personality = pick_personality_traits(&mut rng);
+        }
+    }
+}
+
+pub fn handle_reroll_skill_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<RerollSkillButton>)>,
+    mut state: ResMut<PilotGeneratorState>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            let mut rng = rand::thread_rng();
             state.candidate.skill = SkillProfile {
-                level: rng.gen_range(0.2..=0.95),
-                speed: rng.gen_range(0.2..=1.0),
-                cornering: rng.gen_range(0.2..=1.0),
-                consistency: rng.gen_range(0.2..=1.0),
+                level: rng.gen_range(0.05..=0.55),
+                speed: rng.gen_range(0.1..=0.6),
+                cornering: rng.gen_range(0.1..=0.6),
+                consistency: rng.gen_range(0.1..=0.6),
             };
         }
     }
@@ -344,6 +373,7 @@ pub fn update_pilot_info(
         (
             With<GamertagLabel>,
             Without<PersonalityLabel>,
+            Without<SkillLabel>,
             Without<RosterCountLabel>,
         ),
     >,
@@ -352,6 +382,16 @@ pub fn update_pilot_info(
         (
             With<PersonalityLabel>,
             Without<GamertagLabel>,
+            Without<SkillLabel>,
+            Without<RosterCountLabel>,
+        ),
+    >,
+    mut skill_q: Query<
+        &mut Text,
+        (
+            With<SkillLabel>,
+            Without<GamertagLabel>,
+            Without<PersonalityLabel>,
             Without<RosterCountLabel>,
         ),
     >,
@@ -362,6 +402,7 @@ pub fn update_pilot_info(
             With<RosterCountLabel>,
             Without<GamertagLabel>,
             Without<PersonalityLabel>,
+            Without<SkillLabel>,
         ),
     >,
 ) {
@@ -374,6 +415,9 @@ pub fn update_pilot_info(
     }
     for mut text in &mut personality_q {
         text.0 = format_personality(&state.candidate.personality);
+    }
+    for mut text in &mut skill_q {
+        text.0 = format_skill(&state.candidate.skill);
     }
     for mut bg in &mut swatch_q {
         let [r, g, b] = state.candidate.color_scheme.primary;
