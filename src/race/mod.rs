@@ -9,6 +9,7 @@ pub mod progress;
 pub mod script;
 pub mod start_button;
 pub mod timing;
+pub mod track_quality;
 
 use bevy::prelude::*;
 

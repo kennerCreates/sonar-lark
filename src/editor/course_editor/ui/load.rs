@@ -3,11 +3,12 @@ use bevy::prelude::*;
 use crate::course::data::{CourseData, PropKind};
 use crate::course::loader::load_course_from_file;
 use crate::editor::course_editor::{
-    self, EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
+    self, EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, PlacedObstacle,
+    PlacedProp,
 };
 use crate::editor::undo::{CourseEditorAction, UndoStack};
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::ObstaclesGltfHandle;
+use crate::obstacle::spawning::{ObstaclesGltfHandle, SpawnObstacleContext};
 use crate::rendering::{CelLightDir, CelMaterial};
 use crate::states::{AppState, LastEditedCourse, PendingEditorCourse};
 
@@ -15,7 +16,6 @@ use super::data::next_gate_order_from_instances;
 use super::types::{CameraEditorMeshes, PropEditorMeshes};
 
 /// Shared logic: despawn existing obstacles/props/cameras, load course data, spawn all.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn load_course_into_editor(
     commands: &mut Commands,
     selection: &mut EditorSelection,
@@ -23,16 +23,10 @@ pub(crate) fn load_course_into_editor(
     transform_state: &mut EditorTransform,
     placed_query: &Query<
         Entity,
-        Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
+        PlacedFilter,
     >,
     library: &ObstacleLibrary,
-    gltf_handle: &ObstaclesGltfHandle,
-    gltf_assets: &Assets<bevy::gltf::Gltf>,
-    node_assets: &Assets<bevy::gltf::GltfNode>,
-    mesh_assets: &Assets<bevy::gltf::GltfMesh>,
-    cel_materials: &mut Assets<CelMaterial>,
-    std_materials: &Assets<StandardMaterial>,
-    light_dir: Vec3,
+    ctx: &mut SpawnObstacleContext,
     course: &CourseData,
     prop_meshes: Option<&PropEditorMeshes>,
     camera_meshes: Option<&CameraEditorMeshes>,
@@ -62,13 +56,7 @@ pub(crate) fn load_course_into_editor(
 
         let spawned = crate::obstacle::spawning::spawn_obstacle(
             commands,
-            gltf_assets,
-            node_assets,
-            mesh_assets,
-            cel_materials,
-            std_materials,
-            light_dir,
-            gltf_handle,
+            ctx,
             &def.id,
             &def.glb_node_name,
             transform,
@@ -174,7 +162,7 @@ pub fn auto_load_pending_course(
     mut transform_state: ResMut<EditorTransform>,
     placed_query: Query<
         Entity,
-        Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>,
+        PlacedFilter,
     >,
     library: Res<ObstacleLibrary>,
     gltf_handle: Res<ObstaclesGltfHandle>,
@@ -197,6 +185,16 @@ pub fn auto_load_pending_course(
         }
     };
 
+    let mut ctx = SpawnObstacleContext::from_res(
+        &gltf_assets,
+        &node_assets,
+        &mesh_assets,
+        &mut cel_materials,
+        &std_materials,
+        &light_dir,
+        &gltf_handle,
+    );
+
     load_course_into_editor(
         &mut commands,
         &mut selection,
@@ -204,13 +202,7 @@ pub fn auto_load_pending_course(
         &mut transform_state,
         &placed_query,
         &library,
-        &gltf_handle,
-        &gltf_assets,
-        &node_assets,
-        &mesh_assets,
-        &mut cel_materials,
-        &std_materials,
-        light_dir.0,
+        &mut ctx,
         &course,
         prop_meshes.as_deref(),
         camera_meshes.as_deref(),

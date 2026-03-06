@@ -8,7 +8,7 @@ use crate::editor::undo::{
     CameraSnapshot, CourseEditorAction, UndoStack, remap_entity_in_stack,
 };
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::ObstaclesGltfHandle;
+use crate::obstacle::spawning::{ObstaclesGltfHandle, SpawnObstacleContext};
 use crate::rendering::{CelLightDir, CelMaterial};
 use crate::states::AppState;
 
@@ -54,6 +54,16 @@ pub(super) fn handle_course_undo_input(
     };
     let Some(action) = action else { return };
 
+    let mut ctx = gltf_handle.as_ref().map(|h| SpawnObstacleContext::from_res(
+        &gltf_assets,
+        &node_assets,
+        &mesh_assets,
+        &mut cel_materials,
+        &std_materials,
+        &light_dir,
+        h,
+    ));
+
     match action.clone() {
         CourseEditorAction::TransformChange {
             entity,
@@ -87,24 +97,20 @@ pub(super) fn handle_course_undo_input(
                 commands.entity(entity).despawn();
             } else {
                 // Redo spawn = respawn
-                if let Some(new_entity) = respawn_obstacle(
-                    &mut commands,
-                    &library,
-                    gltf_handle.as_deref(),
-                    &gltf_assets,
-                    &node_assets,
-                    &mesh_assets,
-                    &mut cel_materials,
-                    &std_materials,
-                    light_dir.0,
-                    &obstacle_id,
-                    transform,
-                    gate_order,
-                    gate_forward_flipped,
-                    camera.as_ref(),
-                    camera_meshes.as_deref(),
-                    color_override,
-                ) {
+                if let Some(ref mut ctx) = ctx
+                    && let Some(new_entity) = respawn_obstacle(
+                        &mut commands,
+                        &library,
+                        ctx,
+                        &obstacle_id,
+                        transform,
+                        gate_order,
+                        gate_forward_flipped,
+                        camera.as_ref(),
+                        camera_meshes.as_deref(),
+                        color_override,
+                    )
+                {
                     remap_entity_in_stack(&mut undo_stack, entity, new_entity);
                     selection.entity = Some(new_entity);
                     if gate_order.is_some() {
@@ -163,24 +169,20 @@ pub(super) fn handle_course_undo_input(
         } => {
             if is_undo {
                 // Undo delete = respawn
-                if let Some(new_entity) = respawn_obstacle(
-                    &mut commands,
-                    &library,
-                    gltf_handle.as_deref(),
-                    &gltf_assets,
-                    &node_assets,
-                    &mesh_assets,
-                    &mut cel_materials,
-                    &std_materials,
-                    light_dir.0,
-                    &obstacle_id,
-                    transform,
-                    gate_order,
-                    gate_forward_flipped,
-                    camera.as_ref(),
-                    camera_meshes.as_deref(),
-                    color_override,
-                ) {
+                if let Some(ref mut ctx) = ctx
+                    && let Some(new_entity) = respawn_obstacle(
+                        &mut commands,
+                        &library,
+                        ctx,
+                        &obstacle_id,
+                        transform,
+                        gate_order,
+                        gate_forward_flipped,
+                        camera.as_ref(),
+                        camera_meshes.as_deref(),
+                        color_override,
+                    )
+                {
                     remap_entity_in_stack(&mut undo_stack, old_entity, new_entity);
                     selection.entity = Some(new_entity);
                     if gate_order.is_some() {
@@ -357,17 +359,10 @@ pub(super) fn snapshot_for_delete(
 
 // --- Respawn helpers ---
 
-#[allow(clippy::too_many_arguments)]
 fn respawn_obstacle(
     commands: &mut Commands,
     library: &ObstacleLibrary,
-    gltf_handle: Option<&ObstaclesGltfHandle>,
-    gltf_assets: &Assets<bevy::gltf::Gltf>,
-    node_assets: &Assets<bevy::gltf::GltfNode>,
-    mesh_assets: &Assets<bevy::gltf::GltfMesh>,
-    cel_materials: &mut Assets<CelMaterial>,
-    std_materials: &Assets<StandardMaterial>,
-    light_dir: Vec3,
+    ctx: &mut SpawnObstacleContext,
     obstacle_id: &crate::obstacle::definition::ObstacleId,
     transform: Transform,
     gate_order: Option<u32>,
@@ -376,18 +371,11 @@ fn respawn_obstacle(
     camera_meshes: Option<&CameraEditorMeshes>,
     color_override: Option<[f32; 4]>,
 ) -> Option<Entity> {
-    let handle = gltf_handle?;
     let def = library.get(obstacle_id)?;
 
     let entity = crate::obstacle::spawning::spawn_obstacle(
         commands,
-        gltf_assets,
-        node_assets,
-        mesh_assets,
-        cel_materials,
-        std_materials,
-        light_dir,
-        handle,
+        ctx,
         obstacle_id,
         &def.glb_node_name,
         transform,

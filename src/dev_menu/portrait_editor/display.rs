@@ -11,7 +11,7 @@ use crate::dev_menu::portrait_config::{
 };
 use super::{
     AutoAssignAllButton, BackButton, ColorNameLabel, DroneColorPickerCell, DroneWarningLabel,
-    EditorTab, MakeUniqueButton, PairingPickerCell, PartTab, PortraitEditorState, PreviewImage,
+    PortraitEditorTab, MakeUniqueButton, PairingPickerCell, PartTab, PortraitEditorState, PreviewImage,
     PrimaryColorCell, ResetAllButton, ResetSlotButton, SaveButton, SecondaryPairingCell,
     TAB_ACTIVE, TAB_NORMAL, UniqueStatusRow, VariantPanel,
 };
@@ -164,7 +164,7 @@ pub fn update_drone_warning(
         return;
     }
     let allowed = config.drone_colors_allowed();
-    let show = state.active_tab == EditorTab::Drone && allowed <= MIN_DRONE_COLORS;
+    let show = state.active_tab == PortraitEditorTab::Drone && allowed <= MIN_DRONE_COLORS;
     for (mut text, mut vis) in &mut query {
         if show {
             *vis = Visibility::Visible;

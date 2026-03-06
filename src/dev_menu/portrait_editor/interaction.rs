@@ -12,7 +12,7 @@ use crate::dev_menu::portrait_config::{
     PortraitPaletteConfig, save_config,
 };
 use super::{
-    AutoAssignAllButton, BackButton, DroneColorPickerCell, EditorTab,
+    AutoAssignAllButton, BackButton, DroneColorPickerCell, PortraitEditorTab,
     MakeUniqueButton, PairingPickerCell, PartTab, PortraitEditorState,
     PrimaryColorCell, ResetAllButton,
     ResetSlotButton, SaveButton, SecondaryPairingCell,
@@ -52,29 +52,29 @@ pub fn handle_variant_selection(
             continue;
         }
         match vb.tab {
-            EditorTab::Face => {
+            PortraitEditorTab::Face => {
                 state.face_shape = ALL_FACE_SHAPES[vb.index];
             }
-            EditorTab::Eyes => {
+            PortraitEditorTab::Eyes => {
                 state.eye_style = ALL_EYE_STYLES[vb.index];
             }
-            EditorTab::Mouth => {
+            PortraitEditorTab::Mouth => {
                 state.mouth_style = ALL_MOUTH_STYLES[vb.index];
             }
-            EditorTab::Hair => {
+            PortraitEditorTab::Hair => {
                 state.hair_style = ALL_HAIR_STYLES[vb.index];
             }
-            EditorTab::Shirt => {
+            PortraitEditorTab::Shirt => {
                 state.shirt_style = ALL_SHIRT_STYLES[vb.index];
             }
-            EditorTab::Accessory => {
+            PortraitEditorTab::Accessory => {
                 if vb.index >= ALL_ACCESSORIES.len() {
                     state.accessory = None;
                 } else {
                     state.accessory = Some(ALL_ACCESSORIES[vb.index]);
                 }
             }
-            EditorTab::Drone => {}
+            PortraitEditorTab::Drone => {}
         }
         state.preview_dirty = true;
     }

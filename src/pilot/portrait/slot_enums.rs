@@ -98,11 +98,6 @@ impl MouthStyle {
         ALL_MOUTH_STYLES[rng.gen_range(0..ALL_MOUTH_STYLES.len())]
     }
 
-    #[allow(dead_code)]
-    pub fn index(&self) -> usize {
-        ALL_MOUTH_STYLES.iter().position(|s| s == self).unwrap()
-    }
-
     pub fn group_id(&self) -> &'static str {
         match self {
             MouthStyle::Neutral => "neutral",

@@ -17,7 +17,7 @@ Complete. Pilot avatars using hand-drawn Inkscape SVG fragments assembled at run
 **Fan network size** acts as the attraction metric for pilot recruitment. Tier thresholds on total fan count gate pilot pool access.
 
 **Track quality** (0.0–1.0, computed after each race from existing data):
-- [ ] Harvest race summary after script generation (all inputs already computed):
+- [x] Harvest race summary after script generation (all inputs already computed):
   - Gate count — bell curve peaking at ~11 (`e^(-((n - ideal)² / (2 × spread²)))`), rewards 10–12, penalizes both too few and too many
   - Obstacle variety — distinct `obstacle_id`s in course
   - Turn tightness mix — from `classify_turn_tightness()`, reward courses with a mix of gentle/moderate/tight over uniform tightness
@@ -25,73 +25,74 @@ Complete. Pilot avatars using hand-drawn Inkscape SVG fragments assembled at run
   - Overtake count — `RaceScript.overtakes.len()`
   - Crash sweet spot — same bell curve shape, peaks at 1–2 crashes, penalizes 0 (boring) and 3+ (dangerous)
   - Photo finish gap — 1st–2nd finish time delta, tighter = better
-- [ ] Normalize into a single track quality score (weighted sum of per-factor scores, each 0.0–1.0)
+- [x] Normalize into a single track quality score (weighted sum of per-factor scores, each 0.0–1.0)
 
 **Location attractiveness** (0.0–1.0, per-venue constant — separate from track quality):
-- [ ] Add `base_attractiveness: f32` to location data (not folded into track quality — kept as distinct visible stat)
+- [x] Add `base_attractiveness: f32` to location data (not folded into track quality — kept as distinct visible stat)
   - Abandoned Warehouse: 0.2 (dingy, free, but low appeal)
   - Local Park: 0.4 (pleasant, accessible, modest draw)
   - Golf Course: 0.7 (scenic, upscale, strong draw)
-- [ ] Add `capacity: u32` to location data — max spectators the venue can hold
+- [x] Add `capacity: u32` to location data — max spectators the venue can hold
   - Abandoned Warehouse: 40, Local Park: 80, Golf Course: 200
 - [ ] Display both stats in UI so player sees "Track Quality: X" and "Venue Appeal: Y" separately — makes venue upgrades feel like a concrete lever to pull
 
 **Fan network** (word-of-mouth referral tree with engagement tiers):
 
 Five-tier progression per person: **Cold → Aware → Attendee → Fan → Superfan**
-- [ ] `Person` struct: `recruited_by: Option<PersonId>`, `tier: FanTier`, `races_attended: u16`, `races_since_attended: u8`, `spread_count: u8`
-- [ ] `FanTier` enum: `Cold`, `Aware`, `Attendee`, `Fan`, `Superfan`
+- [x] `Person` struct: `recruited_by: Option<PersonId>`, `tier: FanTier`, `races_attended: u16`, `races_since_attended: u8`, `spread_count: u8`
+- [x] `FanTier` enum: `Aware`, `Attendee`, `Fan`, `Superfan` (Cold is implicit — not in network)
 
 **Tier definitions:**
-- [ ] **Cold** — default state. Not in the network yet. Unreachable except through marketing (posters) or word of mouth from someone who knows them. Cold people don't exist as data — they're the implicit infinite pool outside the network
-- [ ] **Aware** — aware the league exists but hasn't attended. Entry point into the network. Created by: word-of-mouth spread from Attendees+, or marketing campaigns. Each race, rolls an **attendance chance** based on location attractiveness + whether their recruiter is active. Low base chance, but marketing nudges it up
-- [ ] **Attendee** — has attended at least one race. Promoted from Aware after first attendance. Now participates in word-of-mouth spreading (can recruit new Aware people). Attendance chance is moderate — they've been once, might come again if the race was good
-- [ ] **Fan** — regular attendee. Promoted after attending N races (e.g., 3 of last 5). High attendance chance — they're hooked. Spreads more effectively than Attendees (higher spread chance). Counts toward pilot recruitment tier thresholds
-- [ ] **Superfan** — devoted. Promoted after attending M races (e.g., 8+ total, attended last 3 consecutively). Near-guaranteed attendance. Highest spread effectiveness. Superfans are also more resilient to decay — takes longer to drop tiers
+- [x] **Cold** — default state. Not in the network yet. Unreachable except through marketing (posters) or word of mouth from someone who knows them. Cold people don't exist as data — they're the implicit infinite pool outside the network
+- [x] **Aware** — aware the league exists but hasn't attended. Entry point into the network. Created by: word-of-mouth spread from Attendees+, or marketing campaigns. Each race, rolls an **attendance chance** based on location attractiveness + whether their recruiter is active. Low base chance, but marketing nudges it up
+- [x] **Attendee** — has attended at least one race. Promoted from Aware after first attendance. Now participates in word-of-mouth spreading (can recruit new Aware people). Attendance chance is moderate — they've been once, might come again if the race was good
+- [x] **Fan** — regular attendee. Promoted after attending N races (e.g., 3 of last 5). High attendance chance — they're hooked. Spreads more effectively than Attendees (higher spread chance). Counts toward pilot recruitment tier thresholds
+- [x] **Superfan** — devoted. Promoted after attending M races (e.g., 8+ total, attended last 3 consecutively). Near-guaranteed attendance. Highest spread effectiveness. Superfans are also more resilient to decay — takes longer to drop tiers
 
 **Tier progression & decay:**
-- [ ] **Promotion**: based on attendance history (races_attended count + recent streak). One-way ratchet during active attendance — you climb by showing up
-- [ ] **Demotion**: missing races causes tier decay. Superfan → Fan after ~3 missed. Fan → Attendee after ~3 missed. Attendee → Aware after ~3 missed. Aware → removed from network after ~5 missed (they've forgotten about you). Each tier has its own decay threshold
-- [ ] Decay is **per-person**, not global — one bad race doesn't collapse everything, but a streak of bad races causes a wave of demotions from the leaves inward
+- [x] **Promotion**: based on attendance history (races_attended count + recent streak). One-way ratchet during active attendance — you climb by showing up
+- [x] **Demotion**: missing races causes tier decay. Superfan → Fan after ~3 missed. Fan → Attendee after ~3 missed. Attendee → Aware after ~3 missed. Aware → removed from network after ~5 missed (they've forgotten about you). Each tier has its own decay threshold
+- [x] Decay is **per-person**, not global — one bad race doesn't collapse everything, but a streak of bad races causes a wave of demotions from the leaves inward
 
 **Spreading (word of mouth):**
-- [ ] Only Attendees, Fans, and Superfans can spread (Aware people don't evangelize something they haven't tried)
-- [ ] Spread chance scales with tier: Attendee < Fan < Superfan
-- [ ] Spread potency scales with race excitement (track quality + location attractiveness) — boring race = less to talk about
-- [ ] Successful spread → new Aware person added as child node in the tree
+- [x] Only Attendees, Fans, and Superfans can spread (Aware people don't evangelize something they haven't tried)
+- [x] Spread chance scales with tier: Attendee < Fan < Superfan
+- [x] Spread potency scales with race excitement (track quality + location attractiveness) — boring race = less to talk about
+- [x] Successful spread → new Aware person added as child node in the tree
 
 **Attendance & capacity:**
-- [ ] Each race: iterate all Aware+ people, roll attendance decision per tier. Compute `demand` (total wanting to attend)
-- [ ] If `demand > capacity`, show overflow in results UI (e.g., "62 wanted to attend — venue only holds 40!"). Actual attendance = `min(demand, capacity)`. Turned-away people don't decay — they tried to come
+- [x] Each race: iterate all Aware+ people, roll attendance decision per tier. Compute `demand` (total wanting to attend)
+- [x] If `demand > capacity`, actual attendance = `min(demand, capacity)`. Turned-away people don't decay — they tried to come
+- [ ] Show overflow in results UI (e.g., "62 wanted to attend — venue only holds 40!")
 - [ ] Render attending fans as low-poly instanced meshes with `CelMaterial`, sine-wave vertex cheering. Count scales with attendance. Single draw call via instancing
 
 **Seeding:**
-- [ ] League starts with 3–5 Aware people (friends/family who know about it but haven't come yet). First race attendance is small and organic
+- [x] League starts with 3–5 Aware people (friends/family who know about it but haven't come yet). First race attendance is small and organic
 
 **Marketing campaigns** (strategic decisions, not creative judgment — each affects the fan network differently):
-- [ ] All three campaigns **nudge Aware people** toward attending — slightly higher attendance chance next race. Marketing reminds people the league exists and lowers the barrier to first attendance
-- [ ] **Posters**: Inject N new Aware people (strangers who saw the poster — independent roots, no recruiter). Cheap, decent volume. Also nudges existing Aware people. Budget → diminishing returns: `new_heard_of = floor(k × ln(1 + budget))`
-- [ ] **Highlight Reel**: Boosts **spread potency** — Attendees/Fans/Superfans who spread have a higher success chance next race (the reel gives them something compelling to share). Also recruits a small number of new Aware people directly (people who stumble on the reel online). Primary value is amplifying organic growth, not raw volume
-- [ ] **Merch**: Boosts **spread volume** — spreaders get extra recruitment rolls (simulates wearing the merch in public and getting asked about it). Doesn't make each attempt more likely to convert, but gives more attempts. Merch also slows tier decay for the buyer (they're invested — takes longer to demote)
-- [ ] Budget → diminishing returns curve for all campaigns (`1 - e^(-k·budget)`)
+- [x] All three campaigns **nudge Aware people** toward attending — slightly higher attendance chance next race. Marketing reminds people the league exists and lowers the barrier to first attendance
+- [x] **Posters**: Inject N new Aware people (strangers who saw the poster — independent roots, no recruiter). Cheap, decent volume. Also nudges existing Aware people. Budget → diminishing returns: `new_heard_of = floor(k × ln(1 + budget))`
+- [x] **Highlight Reel**: Boosts **spread potency** — Attendees/Fans/Superfans who spread have a higher success chance next race (the reel gives them something compelling to share). Also recruits a small number of new Aware people directly (people who stumble on the reel online). Primary value is amplifying organic growth, not raw volume
+- [x] **Merch**: Boosts **spread volume** — spreaders get extra recruitment rolls (simulates wearing the merch in public and getting asked about it). Doesn't make each attempt more likely to convert, but gives more attempts. Merch also slows tier decay for the buyer (they're invested — takes longer to demote)
+- [x] Budget → diminishing returns curve for all campaigns (`1 - e^(-k·budget)`)
 - [ ] Poster editor remains a pure creative sandbox — no scoring or judging of player art
 - [ ] Auto-generated poster option for players who want to skip the editor
 
 **Pilot recruitment** — fan count gates the available pilot pool:
-- [ ] Fan + Superfan count determines which tier of pilots will consider joining (tier gating, not smooth curve). Aware and Attendees don't count — pilots care about dedicated following, not casual awareness
-- [ ] Within accessible tier, pilot personality traits create variance in willingness
+- [x] Fan + Superfan count determines which tier of pilots will consider joining (tier gating, not smooth curve). Aware and Attendees don't count — pilots care about dedicated following, not casual awareness
+- [ ] Within accessible tier, pilot personality traits create variance in willingness (data model ready, UI integration in Step 6)
 
 **Meta-loop:**
 - [ ] Build course → Race → Campaign → Attraction grows → Better pilots available → Repeat
 
-#### Refactoring (before or during Phase 4)
-- [ ] Bundle `spawn_obstacle` params into `SpawnObstacleContext` system param — currently 16 params, causing 15-16 param bloat in `load_course_into_editor`, `handle_load_button`, `auto_load_pending_course`. Collapse the 8 gltf/material handles into one struct. (`obstacle/spawning.rs`, `editor/course_editor/ui/load.rs`)
-- [ ] Unify `PlacedFilter` usage — `type PlacedFilter` exists at `course_editor/mod.rs:94` but is inlined 5 more times in `save_delete.rs` and `load.rs`. Make `pub` and use everywhere. Critical before post-MVP "multiple obstacle types beyond gates" or terrain.
-- [ ] Rename `EditorTab` in portrait editor to `PortraitEditorTab` — name collision with `editor/types.rs::EditorTab`. No runtime issue but confuses codebase search.
-- [ ] Remove dead code: `catchphrases()` (`personality.rs:125`), `clear_complementary_for()` (`portrait_config.rs:210`), `MouthStyle::index()` (`slot_enums.rs:111`), `ObstacleMarker::id` field (`obstacle/spawning.rs:9`).
-- [ ] Delete redundant single-line re-export files: `menu/discover.rs`, `editor/course_editor/ui/discover.rs`. Import from `crate::course::discovery` directly.
-- [ ] Replace glob re-exports (`pub use submod::*`) with named re-exports in `workshop/ui/mod.rs` and `portrait_editor/mod.rs`.
-- [ ] Deduplicate `PANEL_BG` — `dev_dashboard.rs:7` redefines the identical value from `ui_theme::PANEL_BG`. Import instead.
+#### Refactoring (before or during Phase 4) ✅
+- [x] Bundle `spawn_obstacle` params into `SpawnObstacleContext` struct
+- [x] Unify `PlacedFilter` usage — made `pub(crate)`, replaced inlined copies
+- [x] Rename `EditorTab` in portrait editor to `PortraitEditorTab`
+- [x] Remove dead code: `catchphrases()`, `clear_complementary_for()`, `MouthStyle::index()`, `ObstacleMarker::id`
+- [x] Delete redundant re-export files: `menu/discover.rs`, `editor/course_editor/ui/discover.rs`
+- [x] Replace glob re-exports with named re-exports in `workshop/ui/mod.rs` and `portrait_editor/mod.rs`
+- [x] Deduplicate `PANEL_BG` — imports from `ui_theme` now
 
 ---
 

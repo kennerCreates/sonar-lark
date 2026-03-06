@@ -144,6 +144,7 @@ pub(super) fn draw_flight_spline_preview(
             instances,
             props: vec![],
             cameras: vec![],
+            location: String::new(),
         };
 
         let Some(race_path) = generate_race_path(&course, &library) else {

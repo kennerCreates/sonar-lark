@@ -56,6 +56,10 @@ pub struct CameraInstance {
     pub label: Option<String>,
 }
 
+fn default_location() -> String {
+    "Abandoned Warehouse".to_string()
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Resource)]
 pub struct CourseData {
     pub name: String,
@@ -64,4 +68,6 @@ pub struct CourseData {
     pub props: Vec<PropInstance>,
     #[serde(default)]
     pub cameras: Vec<CameraInstance>,
+    #[serde(default = "default_location")]
+    pub location: String,
 }

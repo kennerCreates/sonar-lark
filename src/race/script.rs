@@ -96,7 +96,7 @@ pub struct DroneScriptInput<'a> {
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TurnTightness {
+pub(crate) enum TurnTightness {
     Gentle,
     Medium,
     Tight,
@@ -208,7 +208,7 @@ fn estimate_segment_times(
 // Step 2: Compute per-drone per-gate turn tightness
 // ---------------------------------------------------------------------------
 
-fn classify_turn_tightness(
+pub(crate) fn classify_turn_tightness(
     spline: &CubicCurve<Vec3>,
     gate_count: u32,
     tuning: &AiTuningParams,

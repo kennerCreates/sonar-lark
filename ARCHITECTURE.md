@@ -48,7 +48,8 @@ src/
 ├── course/              Course data layer
 │   ├── data.rs          CourseData, ObstacleInstance, PropKind, PropInstance, CameraInstance
 │   ├── discovery.rs     CourseEntry, discover_courses(), discover_courses_in() + tests
-│   └── loader.rs        Load/save/spawn courses from RON
+│   ├── loader.rs        Load/save/spawn courses from RON
+│   └── location.rs      Location, LocationRegistry, default_locations()
 ├── editor/              Map editor
 │   ├── workshop/        Define new obstacle types from glb scenes (registered by DevMenuPlugin)
 │   │   ├── mod.rs       WorkshopPlugin, WorkshopState, lifecycle, node list population
@@ -126,8 +127,14 @@ src/
 │   │   ├── generation.rs generate_race_path(), generate_drone_race_path(), adaptive_approach_offset()
 │   │   └── start_positions.rs compute_start_positions()
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems
+├── league/              Fan network & recruitment (pure logic, no ECS)
+│   ├── mod.rs           Module declarations
+│   ├── fan_network.rs   FanNetwork, Person, FanTier, simulate_race() — word-of-mouth fan simulation
+│   ├── marketing.rs     MarketingEffects, CampaignBudgets, compute_marketing_effects()
+│   └── recruitment.rs   RecruitmentTier, RECRUITMENT_TIERS, accessible_tier()
 ├── race/                Race mechanics
 │   ├── script.rs        RaceScript, DroneScript, RaceEventLog, generate_race_script() — predetermined race outcomes
+│   ├── track_quality.rs RaceSummary, TrackQuality, harvest_race_summary(), compute_track_quality()
 │   ├── gate.rs          GateIndex, GateForward, GatePlanes (built at race start, used by script generator)
 │   ├── collision.rs     ObstacleCollisionCache, crash_drone helper
 │   ├── collision_math.rs segment_obb_intersection(), point_in_gate_opening(), clip_opening_to_ground() — pure geometry
@@ -247,7 +254,7 @@ assets/
 
 ## Testing
 
-Unit tests cover the pure-logic data layers. Run with `cargo test`. 260 tests total.
+Unit tests cover the pure-logic data layers. Run with `cargo test`. 321 tests total.
 
 | Module | Tests | What's covered |
 |--------|-------|----------------|
@@ -279,6 +286,11 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`. 260 tests to
 | `pilot::portrait::loader` | 9 | Master SVG layer parsing, PortraitParts get/get_by_label |
 | `pilot::portrait::fragments` | 16 | Color helpers, SVG assembly, per-layer color replacement |
 | `pilot::portrait::rasterize` | 7 | Solid color images, unpremultiply alpha, rasterization output |
+| `race::track_quality` | 15 | Scoring functions, edge cases, harvest, weighted sum |
+| `course::location` | 4 | Serde roundtrip, registry lookup, default locations, backward compat |
+| `league::fan_network` | 14 | Seeding, attendance, promotions, demotions, decay, capacity, spreading, determinism, multi-race |
+| `league::marketing` | 5 | Zero budgets, poster injection, highlight reel, merch, combined effects |
+| `league::recruitment` | 5 | Tier thresholds, boundaries, skill ranges |
 | `rendering::cel_material` | 4 | Hue-shift algorithm: highlight warmth, shadow coolness |
 
 Functions used by tests:

@@ -104,7 +104,7 @@ pub struct PlacedCamera {
 }
 
 /// Query filter matching any editor-placed entity (obstacle, prop, or camera).
-type PlacedFilter = Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>;
+pub(crate) type PlacedFilter = Or<(With<PlacedObstacle>, With<PlacedProp>, With<PlacedCamera>)>;
 
 /// Resets editor state to defaults: clears selection, resets course name,
 /// and disables gate-order mode.
@@ -592,6 +592,16 @@ fn respawn_after_glb_reload(
     prop_meshes: Option<Res<ui::PropEditorMeshes>>,
     camera_meshes: Option<Res<ui::CameraEditorMeshes>>,
 ) {
+    let mut ctx = crate::obstacle::spawning::SpawnObstacleContext::from_res(
+        &gltf_assets,
+        &node_assets,
+        &mesh_assets,
+        &mut cel_materials,
+        &std_materials,
+        &light_dir,
+        &gltf_handle,
+    );
+
     ui::load_course_into_editor(
         &mut commands,
         &mut selection,
@@ -599,13 +609,7 @@ fn respawn_after_glb_reload(
         &mut transform_state,
         &placed_query,
         &library,
-        &gltf_handle,
-        &gltf_assets,
-        &node_assets,
-        &mesh_assets,
-        &mut cel_materials,
-        &std_materials,
-        light_dir.0,
+        &mut ctx,
         &pending.course_data,
         prop_meshes.as_deref(),
         camera_meshes.as_deref(),

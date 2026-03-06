@@ -4,7 +4,7 @@ use crate::editor::EditorTab;
 use crate::editor::course_editor::{EditorSelection, EditorTransform, EditorUI, PlacedObstacle};
 use crate::editor::undo::{CameraSnapshot, CourseEditorAction, UndoStack};
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::ObstaclesGltfHandle;
+use crate::obstacle::spawning::{ObstaclesGltfHandle, SpawnObstacleContext};
 use crate::rendering::{CelLightDir, CelMaterial};
 use crate::states::AppState;
 use crate::ui_theme;
@@ -42,15 +42,18 @@ pub fn handle_palette_selection(
         };
 
         let transform = Transform::from_translation(Vec3::ZERO);
-        let spawned = crate::obstacle::spawning::spawn_obstacle(
-            &mut commands,
+        let mut ctx = SpawnObstacleContext::from_res(
             &gltf_assets,
             &node_assets,
             &mesh_assets,
             &mut cel_materials,
             &std_materials,
-            light_dir.0,
+            &light_dir,
             handle,
+        );
+        let spawned = crate::obstacle::spawning::spawn_obstacle(
+            &mut commands,
+            &mut ctx,
             &def.id,
             &def.glb_node_name,
             transform,

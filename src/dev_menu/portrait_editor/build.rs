@@ -10,7 +10,7 @@ use crate::states::DevMenuPage;
 use crate::dev_menu::portrait_config::PortraitPaletteConfig;
 use super::{
     AllowedGridPanel, AutoAssignAllButton, BackButton, COLOR_CELL_SIZE, COLOR_GRID_COLS,
-    ColorNameLabel, DroneWarningLabel, EditorTab, PANEL_BG, PairingPickerPanel, PartTab,
+    ColorNameLabel, DroneWarningLabel, PortraitEditorTab, PANEL_BG, PairingPickerPanel, PartTab,
     PortraitEditorState, PreviewImage, PrimaryGridPanel, PrimarySection, RADIO_ACTIVE,
     RADIO_NORMAL, ResetAllButton, ResetSlotButton, SaveButton, TAB_ACTIVE, TAB_NORMAL,
     UniqueStatusRow, VariantButton, VariantPanel, VetoedGridPanel,
@@ -157,7 +157,7 @@ pub fn build_ui(
                             ..default()
                         })
                         .with_children(|tab_row| {
-                            for tab in EditorTab::ALL {
+                            for tab in PortraitEditorTab::ALL {
                                 let is_active = tab == state.active_tab;
                                 tab_row
                                     .spawn((
@@ -469,26 +469,26 @@ pub fn spawn_variant_buttons(
 ) {
     let slot = state.active_tab.color_slot();
     match state.active_tab {
-        EditorTab::Face => {
+        PortraitEditorTab::Face => {
             for (i, shape) in ALL_FACE_SHAPES.iter().enumerate() {
                 let is_active = *shape == state.face_shape;
                 let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
-                spawn_radio_button(parent, EditorTab::Face, i, &format!("{shape:?}"), is_active, is_unique, ui_font);
+                spawn_radio_button(parent, PortraitEditorTab::Face, i, &format!("{shape:?}"), is_active, is_unique, ui_font);
             }
         }
-        EditorTab::Eyes => {
+        PortraitEditorTab::Eyes => {
             for (i, style) in ALL_EYE_STYLES.iter().enumerate() {
                 let is_active = *style == state.eye_style;
                 let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
-                spawn_radio_button(parent, EditorTab::Eyes, i, &format!("{style:?}"), is_active, is_unique, ui_font);
+                spawn_radio_button(parent, PortraitEditorTab::Eyes, i, &format!("{style:?}"), is_active, is_unique, ui_font);
             }
         }
-        EditorTab::Mouth => {
+        PortraitEditorTab::Mouth => {
             for (i, style) in ALL_MOUTH_STYLES.iter().enumerate() {
                 let is_active = *style == state.mouth_style;
                 spawn_radio_button(
                     parent,
-                    EditorTab::Mouth,
+                    PortraitEditorTab::Mouth,
                     i,
                     &format!("{style:?}"),
                     is_active,
@@ -497,20 +497,20 @@ pub fn spawn_variant_buttons(
                 );
             }
         }
-        EditorTab::Hair => {
+        PortraitEditorTab::Hair => {
             for (i, style) in ALL_HAIR_STYLES.iter().enumerate() {
                 let is_active = *style == state.hair_style;
                 let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
-                spawn_radio_button(parent, EditorTab::Hair, i, &format!("{style:?}"), is_active, is_unique, ui_font);
+                spawn_radio_button(parent, PortraitEditorTab::Hair, i, &format!("{style:?}"), is_active, is_unique, ui_font);
             }
         }
-        EditorTab::Shirt => {
+        PortraitEditorTab::Shirt => {
             for (i, style) in ALL_SHIRT_STYLES.iter().enumerate() {
                 let is_active = *style == state.shirt_style;
                 let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
                 spawn_radio_button(
                     parent,
-                    EditorTab::Shirt,
+                    PortraitEditorTab::Shirt,
                     i,
                     &format!("{style:?}"),
                     is_active,
@@ -519,11 +519,11 @@ pub fn spawn_variant_buttons(
                 );
             }
         }
-        EditorTab::Accessory => {
+        PortraitEditorTab::Accessory => {
             // "None" option (never unique)
             spawn_radio_button(
                 parent,
-                EditorTab::Accessory,
+                PortraitEditorTab::Accessory,
                 ALL_ACCESSORIES.len(),
                 "None",
                 state.accessory.is_none(),
@@ -535,7 +535,7 @@ pub fn spawn_variant_buttons(
                 let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
                 spawn_radio_button(
                     parent,
-                    EditorTab::Accessory,
+                    PortraitEditorTab::Accessory,
                     i,
                     &format!("{acc:?}"),
                     is_active,
@@ -544,7 +544,7 @@ pub fn spawn_variant_buttons(
                 );
             }
         }
-        EditorTab::Drone => {
+        PortraitEditorTab::Drone => {
             parent.spawn((
                 Text::new("Portrait background color"),
                 TextFont {
@@ -560,7 +560,7 @@ pub fn spawn_variant_buttons(
 
 fn spawn_radio_button(
     parent: &mut ChildSpawnerCommands,
-    tab: EditorTab,
+    tab: PortraitEditorTab,
     index: usize,
     label: &str,
     active: bool,

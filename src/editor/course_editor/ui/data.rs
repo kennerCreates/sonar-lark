@@ -47,6 +47,7 @@ pub fn build_course_data<'a>(
         instances,
         props,
         cameras: vec![],
+        location: "Abandoned Warehouse".to_string(),
     }
 }
 

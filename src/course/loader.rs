@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use crate::drone::fireworks::FireworkEmitter;
 use crate::persistence;
 use crate::obstacle::library::ObstacleLibrary;
-use crate::obstacle::spawning::{spawn_obstacle, ObstacleMarker, ObstaclesGltfHandle};
+use crate::obstacle::spawning::{SpawnObstacleContext, spawn_obstacle, ObstacleMarker, ObstaclesGltfHandle};
 use crate::rendering::{CelLightDir, CelMaterial};
 use crate::states::AppState;
 use super::data::CourseData;
@@ -56,6 +56,15 @@ pub fn spawn_course(
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
 ) {
+    let mut ctx = SpawnObstacleContext::from_res(
+        &gltf_assets,
+        &node_assets,
+        &mesh_assets,
+        &mut cel_materials,
+        &std_materials,
+        &light_dir,
+        &gltf_handle,
+    );
 
     for instance in &course.instances {
         let Some(def) = library.get(&instance.obstacle_id) else {
@@ -71,13 +80,7 @@ pub fn spawn_course(
 
         let spawned = spawn_obstacle(
             &mut commands,
-            &gltf_assets,
-            &node_assets,
-            &mesh_assets,
-            &mut cel_materials,
-            &std_materials,
-            light_dir.0,
-            &gltf_handle,
+            &mut ctx,
             &def.id,
             &def.glb_node_name,
             transform,
@@ -192,6 +195,7 @@ mod tests {
             ],
             props: vec![],
             cameras: vec![],
+            location: String::new(),
         }
     }
 
@@ -221,6 +225,7 @@ mod tests {
             instances: vec![],
             props: vec![],
             cameras: vec![],
+            location: String::new(),
         };
         let tmp = NamedTempFile::new().unwrap();
 
@@ -267,6 +272,7 @@ mod tests {
             instances: vec![],
             props: vec![],
             cameras: vec![],
+            location: String::new(),
         };
         save_course(&course, &path).unwrap();
         assert!(path.exists());
@@ -289,6 +295,7 @@ mod tests {
             }],
             props: vec![],
             cameras: vec![],
+            location: String::new(),
         };
         let tmp = NamedTempFile::new().unwrap();
 
@@ -339,6 +346,7 @@ mod tests {
                     label: None,
                 },
             ],
+            location: String::new(),
         };
         let tmp = NamedTempFile::new().unwrap();
         save_course(&course, tmp.path()).unwrap();
@@ -363,5 +371,18 @@ mod tests {
         write!(tmp, "{ron_content}").unwrap();
         let loaded = load_course_from_file(tmp.path()).unwrap();
         assert!(loaded.cameras.is_empty());
+    }
+
+    #[test]
+    fn backward_compat_no_location() {
+        let ron_content = r#"CourseData(
+    name: "Legacy Course",
+    instances: [],
+    props: [],
+)"#;
+        let mut tmp = NamedTempFile::new().unwrap();
+        write!(tmp, "{ron_content}").unwrap();
+        let loaded = load_course_from_file(tmp.path()).unwrap();
+        assert_eq!(loaded.location, "Abandoned Warehouse");
     }
 }

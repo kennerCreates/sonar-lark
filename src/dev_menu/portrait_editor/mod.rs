@@ -34,7 +34,7 @@ const COMPLEMENTARY_BORDER: Color = palette::SUNSHINE;
 // ── Editor tab enum ─────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum EditorTab {
+pub enum PortraitEditorTab {
     Face,
     Eyes,
     Mouth,
@@ -44,38 +44,38 @@ pub enum EditorTab {
     Drone,
 }
 
-impl EditorTab {
-    const ALL: [EditorTab; 7] = [
-        EditorTab::Face,
-        EditorTab::Eyes,
-        EditorTab::Mouth,
-        EditorTab::Hair,
-        EditorTab::Shirt,
-        EditorTab::Accessory,
-        EditorTab::Drone,
+impl PortraitEditorTab {
+    const ALL: [PortraitEditorTab; 7] = [
+        PortraitEditorTab::Face,
+        PortraitEditorTab::Eyes,
+        PortraitEditorTab::Mouth,
+        PortraitEditorTab::Hair,
+        PortraitEditorTab::Shirt,
+        PortraitEditorTab::Accessory,
+        PortraitEditorTab::Drone,
     ];
 
     fn label(self) -> &'static str {
         match self {
-            EditorTab::Face => "Face",
-            EditorTab::Eyes => "Eyes",
-            EditorTab::Mouth => "Mouth",
-            EditorTab::Hair => "Hair",
-            EditorTab::Shirt => "Shirt",
-            EditorTab::Accessory => "Acc",
-            EditorTab::Drone => "Drone",
+            PortraitEditorTab::Face => "Face",
+            PortraitEditorTab::Eyes => "Eyes",
+            PortraitEditorTab::Mouth => "Mouth",
+            PortraitEditorTab::Hair => "Hair",
+            PortraitEditorTab::Shirt => "Shirt",
+            PortraitEditorTab::Accessory => "Acc",
+            PortraitEditorTab::Drone => "Drone",
         }
     }
 
     fn color_slot(self) -> Option<PortraitColorSlot> {
         match self {
-            EditorTab::Face => Some(PortraitColorSlot::Skin),
-            EditorTab::Eyes => Some(PortraitColorSlot::Eye),
-            EditorTab::Mouth => None,
-            EditorTab::Hair => Some(PortraitColorSlot::Hair),
-            EditorTab::Shirt => Some(PortraitColorSlot::Shirt),
-            EditorTab::Accessory => Some(PortraitColorSlot::Accessory),
-            EditorTab::Drone => Some(PortraitColorSlot::Drone),
+            PortraitEditorTab::Face => Some(PortraitColorSlot::Skin),
+            PortraitEditorTab::Eyes => Some(PortraitColorSlot::Eye),
+            PortraitEditorTab::Mouth => None,
+            PortraitEditorTab::Hair => Some(PortraitColorSlot::Hair),
+            PortraitEditorTab::Shirt => Some(PortraitColorSlot::Shirt),
+            PortraitEditorTab::Accessory => Some(PortraitColorSlot::Accessory),
+            PortraitEditorTab::Drone => Some(PortraitColorSlot::Drone),
         }
     }
 }
@@ -84,7 +84,7 @@ impl EditorTab {
 
 #[derive(Resource)]
 pub struct PortraitEditorState {
-    pub active_tab: EditorTab,
+    pub active_tab: PortraitEditorTab,
     pub face_shape: FaceShape,
     pub eye_style: EyeStyle,
     pub mouth_style: MouthStyle,
@@ -108,7 +108,7 @@ impl Default for PortraitEditorState {
         primary_colors.insert(PortraitColorSlot::Drone, 33); // Neon Red
 
         Self {
-            active_tab: EditorTab::Face,
+            active_tab: PortraitEditorTab::Face,
             face_shape: FaceShape::Oval,
             eye_style: EyeStyle::Normal,
             mouth_style: MouthStyle::Neutral,
@@ -143,13 +143,13 @@ impl PortraitEditorState {
     /// None for Mouth (no color slot) and Drone (no variants).
     fn current_variant_index(&self) -> Option<usize> {
         match self.active_tab {
-            EditorTab::Face => Some(self.face_shape.index()),
-            EditorTab::Eyes => Some(self.eye_style.index()),
-            EditorTab::Mouth => None,
-            EditorTab::Hair => Some(self.hair_style.index()),
-            EditorTab::Shirt => Some(self.shirt_style.index()),
-            EditorTab::Accessory => self.accessory.map(|a| a.index()),
-            EditorTab::Drone => None,
+            PortraitEditorTab::Face => Some(self.face_shape.index()),
+            PortraitEditorTab::Eyes => Some(self.eye_style.index()),
+            PortraitEditorTab::Mouth => None,
+            PortraitEditorTab::Hair => Some(self.hair_style.index()),
+            PortraitEditorTab::Shirt => Some(self.shirt_style.index()),
+            PortraitEditorTab::Accessory => self.accessory.map(|a| a.index()),
+            PortraitEditorTab::Drone => None,
         }
     }
 
@@ -209,11 +209,11 @@ impl PortraitEditorState {
 pub struct BackButton;
 
 #[derive(Component)]
-pub struct PartTab(EditorTab);
+pub struct PartTab(PortraitEditorTab);
 
 #[derive(Component)]
 pub struct VariantButton {
-    tab: EditorTab,
+    tab: PortraitEditorTab,
     index: usize,
 }
 
@@ -309,7 +309,14 @@ pub fn cleanup_portrait_editor(mut commands: Commands) {
     commands.remove_resource::<PortraitPaletteConfig>();
 }
 
-// Re-export all public systems so dev_menu/mod.rs doesn't need to change paths.
-pub use display::*;
-pub use grid::*;
-pub use interaction::*;
+pub use display::{
+    handle_button_hover_visuals, rebuild_unique_status_row, rebuild_variant_panel,
+    update_color_name_on_hover, update_drone_warning, update_preview, update_tab_visuals,
+};
+pub use grid::{rebuild_pairing_picker, rebuild_primary_grid};
+pub use interaction::{
+    dismiss_pairing_picker, handle_auto_assign_all, handle_back_button, handle_make_unique_button,
+    handle_pairing_picker_click, handle_part_tabs, handle_primary_color_click,
+    handle_primary_color_veto, handle_reset_all_button, handle_reset_slot_button,
+    handle_save_button, handle_secondary_pairing_click, handle_variant_selection,
+};

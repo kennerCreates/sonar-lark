@@ -31,12 +31,11 @@ pub fn handle_tool_selection(
         }
 
         // Strip cursor from any active text before deselecting
-        if let Some(entity) = state.editing_text {
-            if let Ok(mut text) = text_query.get_mut(entity) {
-                if text.0.ends_with('|') {
-                    text.0.pop();
-                }
-            }
+        if let Some(entity) = state.editing_text
+            && let Ok(mut text) = text_query.get_mut(entity)
+            && text.0.ends_with('|')
+        {
+            text.0.pop();
         }
         state.editing_text = None;
         state.active_tool = marker.0;
@@ -76,10 +75,10 @@ pub fn handle_color_selection(
         ];
 
         // Update active text element color
-        if let Some(entity) = state.editing_text {
-            if let Ok(mut tc) = text_colors.get_mut(entity) {
-                tc.0 = Color::srgb(rgb[0], rgb[1], rgb[2]);
-            }
+        if let Some(entity) = state.editing_text
+            && let Ok(mut tc) = text_colors.get_mut(entity)
+        {
+            tc.0 = Color::srgb(rgb[0], rgb[1], rgb[2]);
         }
 
         // Highlight selected cell
@@ -133,10 +132,10 @@ pub fn handle_text_size(
         state.text_size = btn.0;
 
         // Update active text element size
-        if let Some(entity) = state.editing_text {
-            if let Ok(mut font) = text_query.get_mut(entity) {
-                font.font_size = btn.0;
-            }
+        if let Some(entity) = state.editing_text
+            && let Ok(mut font) = text_query.get_mut(entity)
+        {
+            font.font_size = btn.0;
         }
 
         for (b, mut bg, mut border) in &mut all_buttons {
@@ -167,10 +166,10 @@ pub fn handle_text_font(
         state.text_font_index = btn.0;
 
         // Update active text element font
-        if let Some(entity) = state.editing_text {
-            if let Ok(mut font) = text_query.get_mut(entity) {
-                font.font = asset_server.load(POSTER_FONTS[btn.0].1);
-            }
+        if let Some(entity) = state.editing_text
+            && let Ok(mut font) = text_query.get_mut(entity)
+        {
+            font.font = asset_server.load(POSTER_FONTS[btn.0].1);
         }
 
         for (b, mut bg, mut border) in &mut all_buttons {
@@ -492,11 +491,11 @@ pub fn handle_text_drag(
             drag.moved = true;
         }
 
-        if drag.moved {
-            if let Ok(mut node) = text_nodes.get_mut(entity) {
-                node.left = Val::Px(drag.start_pos[0] + dx);
-                node.top = Val::Px(drag.start_pos[1] + dy);
-            }
+        if drag.moved
+            && let Ok(mut node) = text_nodes.get_mut(entity)
+        {
+            node.left = Val::Px(drag.start_pos[0] + dx);
+            node.top = Val::Px(drag.start_pos[1] + dy);
         }
     }
 
@@ -535,10 +534,10 @@ pub fn handle_text_input(
         match &event.logical_key {
             Key::Enter | Key::Escape => {
                 // Strip cursor before finalizing
-                if let Ok(mut text) = text_query.get_mut(entity) {
-                    if text.0.ends_with('|') {
-                        text.0.pop();
-                    }
+                if let Ok(mut text) = text_query.get_mut(entity)
+                    && text.0.ends_with('|')
+                {
+                    text.0.pop();
                 }
                 state.editing_text = None;
                 return;
@@ -781,9 +780,9 @@ pub fn update_text_cursor_blink(
         return;
     };
 
-    if blink.visible {
-        if let Ok(mut text) = text_query.get_mut(editing) {
-            text.0.push('|');
-        }
+    if blink.visible
+        && let Ok(mut text) = text_query.get_mut(editing)
+    {
+        text.0.push('|');
     }
 }

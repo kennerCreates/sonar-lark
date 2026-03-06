@@ -7,6 +7,7 @@ mod dev_menu;
 mod drone;
 mod editor;
 mod hype;
+mod league;
 mod menu;
 mod obstacle;
 pub mod palette;

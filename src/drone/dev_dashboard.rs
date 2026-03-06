@@ -3,9 +3,7 @@ use bevy::prelude::*;
 use super::components::*;
 use crate::palette;
 use crate::states::AppState;
-use crate::ui_theme::UiFont;
-
-const PANEL_BG: Color = palette::SMOKY_BLACK;
+use crate::ui_theme::{PANEL_BG, UiFont};
 const ROW_BG: Color = palette::SMOKY_BLACK;
 const ROW_BG_ALT: Color = palette::INDIGO;
 const BTN_NORMAL: Color = palette::SAPPHIRE;

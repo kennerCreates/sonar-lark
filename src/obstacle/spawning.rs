@@ -2,13 +2,10 @@ use bevy::prelude::*;
 
 use super::definition::{CollisionVolumeConfig, ObstacleId, TriggerVolumeConfig};
 use crate::palette;
-use crate::rendering::{CelMaterial, cel_material_from_color};
+use crate::rendering::{CelLightDir, CelMaterial, cel_material_from_color};
 
 #[derive(Component)]
-pub struct ObstacleMarker {
-    #[allow(dead_code)]
-    pub id: ObstacleId,
-}
+pub struct ObstacleMarker;
 
 #[derive(Component)]
 pub struct TriggerVolume {
@@ -53,19 +50,49 @@ pub(crate) fn gate_color(obstacle_id: &ObstacleId) -> Option<Color> {
     }
 }
 
+/// Bundles the shared asset handles needed by `spawn_obstacle`.
+///
+/// Construct this in calling systems from their system params, then pass it
+/// to [`SpawnObstacleContext::spawn`] for each obstacle.
+pub struct SpawnObstacleContext<'a> {
+    pub gltf_assets: &'a Assets<bevy::gltf::Gltf>,
+    pub node_assets: &'a Assets<bevy::gltf::GltfNode>,
+    pub mesh_assets: &'a Assets<bevy::gltf::GltfMesh>,
+    pub cel_materials: &'a mut Assets<CelMaterial>,
+    pub std_materials: &'a Assets<StandardMaterial>,
+    pub light_dir: Vec3,
+    pub gltf_handle: &'a ObstaclesGltfHandle,
+}
+
+impl<'a> SpawnObstacleContext<'a> {
+    pub fn from_res(
+        gltf_assets: &'a Assets<bevy::gltf::Gltf>,
+        node_assets: &'a Assets<bevy::gltf::GltfNode>,
+        mesh_assets: &'a Assets<bevy::gltf::GltfMesh>,
+        cel_materials: &'a mut Assets<CelMaterial>,
+        std_materials: &'a Assets<StandardMaterial>,
+        light_dir: &'a CelLightDir,
+        gltf_handle: &'a ObstaclesGltfHandle,
+    ) -> Self {
+        Self {
+            gltf_assets,
+            node_assets,
+            mesh_assets,
+            cel_materials,
+            std_materials,
+            light_dir: light_dir.0,
+            gltf_handle,
+        }
+    }
+}
+
 /// Spawn an obstacle from a named node in the glTF file.
 ///
 /// Looks up the node by name, then spawns its mesh primitives as children
 /// of a parent entity with the given transform.
 pub fn spawn_obstacle(
     commands: &mut Commands,
-    gltf_assets: &Assets<bevy::gltf::Gltf>,
-    node_assets: &Assets<bevy::gltf::GltfNode>,
-    mesh_assets: &Assets<bevy::gltf::GltfMesh>,
-    cel_materials: &mut Assets<CelMaterial>,
-    std_materials: &Assets<StandardMaterial>,
-    light_dir: Vec3,
-    gltf_handle: &ObstaclesGltfHandle,
+    ctx: &mut SpawnObstacleContext,
     obstacle_id: &ObstacleId,
     node_name: &str,
     transform: Transform,
@@ -77,11 +104,11 @@ pub fn spawn_obstacle(
     collision_configs: &[CollisionVolumeConfig],
     color_override: Option<Color>,
 ) -> Option<Entity> {
-    let gltf = gltf_assets.get(&gltf_handle.0)?;
+    let gltf = ctx.gltf_assets.get(&ctx.gltf_handle.0)?;
     let node_handle = gltf.named_nodes.get(node_name)?;
-    let node = node_assets.get(node_handle)?;
+    let node = ctx.node_assets.get(node_handle)?;
     let gltf_mesh_handle = node.mesh.as_ref()?;
-    let gltf_mesh = mesh_assets.get(gltf_mesh_handle)?;
+    let gltf_mesh = ctx.mesh_assets.get(gltf_mesh_handle)?;
 
     // Pre-collect primitive meshes and materials before entering with_children, since
     // cel_materials is &mut and cannot be borrowed inside the closure alongside entity_commands.
@@ -92,7 +119,7 @@ pub fn spawn_obstacle(
     };
     let override_mat = color_override
         .or_else(|| gate_color(obstacle_id))
-        .map(|color| cel_materials.add(cel_material_from_color(color, light_dir)));
+        .map(|color| ctx.cel_materials.add(cel_material_from_color(color, ctx.light_dir)));
     let primitives: Vec<(Handle<Mesh>, MeshMaterial3d<CelMaterial>)> = gltf_mesh
         .primitives
         .iter()
@@ -102,10 +129,10 @@ pub fn spawn_obstacle(
                 None => {
                     let base_color = p.material
                         .as_ref()
-                        .and_then(|h| std_materials.get(h))
+                        .and_then(|h| ctx.std_materials.get(h))
                         .map(|m| m.base_color)
                         .unwrap_or(palette::CHAINMAIL);
-                    MeshMaterial3d(cel_materials.add(cel_material_from_color(base_color, light_dir)))
+                    MeshMaterial3d(ctx.cel_materials.add(cel_material_from_color(base_color, ctx.light_dir)))
                 }
             };
             (p.mesh.clone(), mat)
@@ -115,9 +142,7 @@ pub fn spawn_obstacle(
     let mut entity_commands = commands.spawn((
         transform,
         Visibility::default(),
-        ObstacleMarker {
-            id: obstacle_id.clone(),
-        },
+        ObstacleMarker,
         DespawnOnExit(crate::states::AppState::Results),
     ));
 

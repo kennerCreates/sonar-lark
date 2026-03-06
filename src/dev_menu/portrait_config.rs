@@ -207,22 +207,6 @@ impl PortraitPaletteConfig {
         self.set_complementary(slot, primary_index, secondary_index);
     }
 
-    #[allow(dead_code)]
-    pub fn clear_complementary_for(
-        &mut self,
-        slot: PortraitColorSlot,
-        variant_idx: Option<usize>,
-        primary_index: usize,
-    ) {
-        if let Some(vi) = variant_idx
-            && let Some(ovr) = self.get_override_mut(slot, vi)
-        {
-            ovr.complementary.remove(&primary_index);
-            return;
-        }
-        self.clear_complementary(slot, primary_index);
-    }
-
     pub fn auto_assign_all_for(&mut self, slot: PortraitColorSlot, variant_idx: Option<usize>) {
         let allowed = self.allowed_indices_for(slot, variant_idx);
         for &primary_idx in &allowed {
