@@ -13,8 +13,8 @@ use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH, CANVAS_HE
 use super::{
     BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
     PaintStroke, PosterAction, PosterColorCell, PosterEditorState, PosterStartRaceButton,
-    PosterTextElement, PosterTool, TextFontButton, TextFontPanel, TextSizeButton, TextSizePanel,
-    ToolButtonMarker, POSTER_FONTS,
+    PosterTextElement, PosterTool, TextDragState, TextFontButton, TextFontPanel, TextSizeButton,
+    TextSizePanel, ToolButtonMarker, POSTER_FONTS,
 };
 
 // --- Tool selection ---
@@ -375,16 +375,38 @@ pub fn handle_text_placement(
     asset_server: Res<AssetServer>,
     canvas_query: Query<(&RelativeCursorPosition, Entity), With<CanvasContainer>>,
     mut state: ResMut<PosterEditorState>,
-    text_interactions: Query<(Entity, &Interaction), (With<PosterTextElement>, Changed<Interaction>)>,
+    mut drag: ResMut<TextDragState>,
+    text_interactions: Query<
+        (Entity, &Interaction, &Node),
+        (With<PosterTextElement>, Changed<Interaction>),
+    >,
 ) {
     if state.active_tool != PosterTool::Text {
         return;
     }
 
-    // Check if an existing text element was clicked (reselect it)
-    for (entity, interaction) in &text_interactions {
+    // If a drag is in progress, don't start new placements
+    if drag.dragging.is_some() {
+        return;
+    }
+
+    let Ok((rel_cursor, container_entity)) = canvas_query.single() else {
+        return;
+    };
+
+    // Check if an existing text element was pressed — start a drag
+    for (entity, interaction, node) in &text_interactions {
         if *interaction == Interaction::Pressed {
-            state.editing_text = Some(entity);
+            if let Some(norm) = rel_cursor.normalized {
+                let cursor_x = (norm.x + 0.5) * CANVAS_DISPLAY_WIDTH;
+                let cursor_y = (norm.y + 0.5) * CANVAS_DISPLAY_HEIGHT;
+                let orig_x = if let Val::Px(v) = node.left { v } else { 0.0 };
+                let orig_y = if let Val::Px(v) = node.top { v } else { 0.0 };
+                drag.dragging = Some(entity);
+                drag.start_cursor = [cursor_x, cursor_y];
+                drag.start_pos = [orig_x, orig_y];
+                drag.moved = false;
+            }
             return;
         }
     }
@@ -392,10 +414,6 @@ pub fn handle_text_placement(
     if !mouse.just_pressed(MouseButton::Left) {
         return;
     }
-
-    let Ok((rel_cursor, container_entity)) = canvas_query.single() else {
-        return;
-    };
 
     if !rel_cursor.cursor_over {
         return;
@@ -441,6 +459,54 @@ pub fn handle_text_placement(
 
     commands.entity(container_entity).add_child(text_entity);
     state.editing_text = Some(text_entity);
+}
+
+/// Drag-to-move text elements. If the mouse barely moved, treat as click-to-edit.
+const DRAG_THRESHOLD: f32 = 4.0;
+
+pub fn handle_text_drag(
+    mouse: Res<ButtonInput<MouseButton>>,
+    canvas_query: Query<&RelativeCursorPosition, With<CanvasContainer>>,
+    mut state: ResMut<PosterEditorState>,
+    mut drag: ResMut<TextDragState>,
+    mut text_nodes: Query<&mut Node, With<PosterTextElement>>,
+) {
+    let Some(entity) = drag.dragging else {
+        return;
+    };
+
+    let Ok(rel_cursor) = canvas_query.single() else {
+        return;
+    };
+
+    if mouse.pressed(MouseButton::Left) {
+        let Some(norm) = rel_cursor.normalized else {
+            return;
+        };
+        let cursor_x = (norm.x + 0.5) * CANVAS_DISPLAY_WIDTH;
+        let cursor_y = (norm.y + 0.5) * CANVAS_DISPLAY_HEIGHT;
+        let dx = cursor_x - drag.start_cursor[0];
+        let dy = cursor_y - drag.start_cursor[1];
+
+        if !drag.moved && (dx * dx + dy * dy).sqrt() > DRAG_THRESHOLD {
+            drag.moved = true;
+        }
+
+        if drag.moved {
+            if let Ok(mut node) = text_nodes.get_mut(entity) {
+                node.left = Val::Px(drag.start_pos[0] + dx);
+                node.top = Val::Px(drag.start_pos[1] + dy);
+            }
+        }
+    }
+
+    if mouse.just_released(MouseButton::Left) {
+        if !drag.moved {
+            // Treat as click-to-edit
+            state.editing_text = Some(entity);
+        }
+        drag.dragging = None;
+    }
 }
 
 // --- Text input ---

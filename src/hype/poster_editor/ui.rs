@@ -14,8 +14,8 @@ use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH};
 use super::{
     BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
     EraseToolButton, PaintToolButton, PosterAction, PosterCanvas, PosterColorCell,
-    PosterEditorState, PosterStartRaceButton, PosterTool, TextFontButton, TextFontPanel,
-    TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker, POSTER_FONTS,
+    PosterEditorState, PosterStartRaceButton, PosterTool, TextDragState, TextFontButton,
+    TextFontPanel, TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker, POSTER_FONTS,
 };
 
 const COLOR_CELL_SIZE: f32 = 28.0;
@@ -57,6 +57,7 @@ pub fn setup_poster_editor(
         timer: Timer::from_seconds(0.5, TimerMode::Repeating),
         visible: true,
     });
+    commands.insert_resource(TextDragState::default());
 
     // Root container
     commands

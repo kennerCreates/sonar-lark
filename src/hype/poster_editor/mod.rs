@@ -22,6 +22,7 @@ impl Plugin for PosterEditorPlugin {
                     tools::handle_paint,
                     tools::handle_erase,
                     tools::handle_text_placement,
+                    tools::handle_text_drag,
                     tools::handle_text_input,
                     tools::handle_delete_text,
                     tools::handle_undo_redo,
@@ -146,8 +147,22 @@ pub struct CursorBlinkTimer {
     pub visible: bool,
 }
 
+/// Tracks an in-progress text drag operation.
+#[derive(Resource, Default)]
+pub struct TextDragState {
+    /// The text entity being dragged.
+    pub dragging: Option<Entity>,
+    /// Cursor position (in canvas-container-relative pixels) when drag started.
+    pub start_cursor: [f32; 2],
+    /// Original `left`/`top` of the text node when drag started.
+    pub start_pos: [f32; 2],
+    /// Whether the cursor has moved far enough to count as a drag (vs a click).
+    pub moved: bool,
+}
+
 fn cleanup_poster_editor(mut commands: Commands) {
     commands.remove_resource::<PosterEditorState>();
     commands.remove_resource::<crate::editor::undo::UndoStack<PosterAction>>();
     commands.remove_resource::<CursorBlinkTimer>();
+    commands.remove_resource::<TextDragState>();
 }
