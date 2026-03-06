@@ -15,6 +15,10 @@ use bevy::prelude::*;
 use crate::pilot::portrait::cache::setup_portrait_cache;
 use crate::states::AppState;
 
+fn in_race_or_results(state: Res<State<AppState>>) -> bool {
+    matches!(state.get(), AppState::Race | AppState::Results)
+}
+
 pub struct RacePlugin;
 
 impl Plugin for RacePlugin {
@@ -37,25 +41,36 @@ impl Plugin for RacePlugin {
                     .run_if(in_state(AppState::Race))
                     .run_if(not(resource_exists::<collision::ObstacleCollisionCache>)),
             )
-            // Race logic chain: ordering matters for correctness.
-            // Gate/collision detection replaced by fire_scripted_events in the choreography chain.
+            // Race setup chain (Race state only): countdown, script generation
             .add_systems(
                 Update,
                 (
                     lifecycle::tick_countdown,
                     lifecycle::generate_race_script_system,
-                    timing::tick_race_clock,
-                    progress::sync_spline_progress,
-                    lifecycle::check_winner_finished,
-                    lifecycle::check_race_finished,
                 )
                     .chain()
                     .run_if(in_state(AppState::Race)),
             )
-            // Results transition timer (runs after race logic chain)
+            // Race progress chain: clock, spline sync, finish detection.
+            // Runs in both Race and Results so late-finishing drones are tracked.
             .add_systems(
                 Update,
-                lifecycle::tick_results_transition.run_if(in_state(AppState::Race)),
+                (
+                    timing::tick_race_clock,
+                    progress::sync_spline_progress,
+                    lifecycle::check_race_finished,
+                )
+                    .chain()
+                    .run_if(in_race_or_results),
+            )
+            // Winner detection and results transition (Race state only)
+            .add_systems(
+                Update,
+                (
+                    lifecycle::check_winner_finished,
+                    lifecycle::tick_results_transition,
+                )
+                    .run_if(in_state(AppState::Race)),
             )
             // UI systems: independent, no ordering needed
             .add_systems(
@@ -83,18 +98,18 @@ fn setup_race(mut commands: Commands) {
 }
 
 fn cleanup_race(mut commands: Commands) {
-    commands.remove_resource::<lifecycle::RacePhase>();
-    commands.remove_resource::<timing::RaceClock>();
     commands.remove_resource::<lifecycle::CountdownTimer>();
     commands.remove_resource::<lifecycle::ResultsTransitionTimer>();
     commands.remove_resource::<lifecycle::RaceStartSound>();
     commands.remove_resource::<lifecycle::RaceEndSound>();
     commands.remove_resource::<gate::GatePlanes>();
     commands.remove_resource::<collision::ObstacleCollisionCache>();
-    commands.remove_resource::<script::RaceScript>();
     commands.remove_resource::<script::RaceEventLog>();
 }
 
 fn cleanup_race_progress(mut commands: Commands) {
     commands.remove_resource::<progress::RaceProgress>();
+    commands.remove_resource::<lifecycle::RacePhase>();
+    commands.remove_resource::<timing::RaceClock>();
+    commands.remove_resource::<script::RaceScript>();
 }

@@ -85,27 +85,6 @@ impl RaceProgress {
             .is_some_and(|s| !s.crashed && !s.finished)
     }
 
-    /// Build a snapshot of the final race results for the Results screen.
-    pub fn to_race_results(&self, total_time: f32, course_name: String) -> RaceResults {
-        let standings = self.standings();
-        let entries = standings
-            .iter()
-            .map(|&(drone_idx, state)| RaceResultEntry {
-                drone_index: drone_idx,
-                finished: state.finished,
-                finish_time: state.finish_time,
-                crashed: state.crashed,
-                gates_passed: state.gates_passed,
-            })
-            .collect();
-        RaceResults {
-            standings: entries,
-            total_time,
-            course_name,
-            total_gates: self.total_gates,
-        }
-    }
-
     /// Returns standings sorted: finished drones by time (ascending), then
     /// active/crashed drones by gates_passed (descending).
     pub fn standings(&self) -> Vec<(usize, &DroneRaceState)> {
@@ -147,23 +126,6 @@ pub fn sync_spline_progress(
             state.spline_t = ai.spline_t;
         }
     }
-}
-
-/// Snapshot of race results, persists into the Results state.
-#[derive(Resource)]
-pub struct RaceResults {
-    pub standings: Vec<RaceResultEntry>,
-    pub total_time: f32,
-    pub course_name: String,
-    pub total_gates: u32,
-}
-
-pub struct RaceResultEntry {
-    pub drone_index: usize,
-    pub finished: bool,
-    pub finish_time: Option<f32>,
-    pub crashed: bool,
-    pub gates_passed: u32,
 }
 
 #[cfg(test)]

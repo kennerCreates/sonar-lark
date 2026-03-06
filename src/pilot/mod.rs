@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::dev_menu::portrait_config::{self, PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS};
 use crate::drone::components::DroneConfig;
-use crate::race::progress::RaceResults;
+use crate::race::progress::RaceProgress;
 use crate::states::AppState;
 
 pub use portrait::PortraitDescriptor;
@@ -35,7 +35,7 @@ impl Plugin for PilotPlugin {
                 .chain()
                 .run_if(resource_exists::<portrait::loader::PortraitParts>),
         )
-        .add_systems(OnEnter(AppState::Results), update_pilot_stats_after_race)
+        .add_systems(OnExit(AppState::Results), update_pilot_stats_after_race)
         .add_systems(OnExit(AppState::Results), cleanup_race_pilot_resources);
 
         #[cfg(debug_assertions)]
@@ -214,18 +214,18 @@ fn pick_race_colors(
 }
 
 fn update_pilot_stats_after_race(
-    results: Option<Res<RaceResults>>,
+    progress: Option<Res<RaceProgress>>,
     selected: Option<Res<SelectedPilots>>,
     mut roster: Option<ResMut<roster::PilotRoster>>,
 ) {
-    let (Some(results), Some(selected), Some(ref mut roster)) =
-        (results, selected, roster.as_mut())
+    let (Some(progress), Some(selected), Some(ref mut roster)) =
+        (progress, selected, roster.as_mut())
     else {
         return;
     };
 
-    for entry in &results.standings {
-        let drone_idx = entry.drone_index;
+    let standings = progress.standings();
+    for &(drone_idx, state) in &standings {
         let Some(sel) = selected.pilots.get(drone_idx) else {
             continue;
         };
@@ -234,9 +234,9 @@ fn update_pilot_stats_after_race(
         };
 
         pilot.stats.races_entered += 1;
-        if entry.finished {
+        if state.finished {
             pilot.stats.finishes += 1;
-            if let Some(time) = entry.finish_time {
+            if let Some(time) = state.finish_time {
                 pilot.stats.best_time = Some(
                     pilot
                         .stats
@@ -245,15 +245,15 @@ fn update_pilot_stats_after_race(
                 );
             }
         }
-        if entry.crashed {
+        if state.crashed {
             pilot.stats.crashes += 1;
         }
     }
 
     // Check if first finisher is a win
-    if let Some(first) = results.standings.first()
-        && first.finished
-        && let Some(sel) = selected.pilots.get(first.drone_index)
+    if let Some(&(drone_idx, state)) = standings.first()
+        && state.finished
+        && let Some(sel) = selected.pilots.get(drone_idx)
         && let Some(pilot) = roster.get_mut(sel.pilot_id)
     {
         pilot.stats.wins += 1;

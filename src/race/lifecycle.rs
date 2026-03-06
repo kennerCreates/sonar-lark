@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
 use crate::camera::switching::{CameraMode, CameraState};
-use crate::course::loader::SelectedCourse;
 use crate::drone::components::{AIController, Drone, DroneConfig, DronePhase, RaceSeed};
 use crate::pilot::roster::PilotRoster;
 use crate::pilot::SelectedPilots;
@@ -276,38 +275,20 @@ pub fn check_race_finished(
     }
 }
 
-/// Ticks the results transition timer. When it expires, snapshots race results
-/// and transitions to the Results state.
+/// Ticks the results transition timer. When it expires, transitions to Results.
+/// Race resources (RaceProgress, RaceClock, RaceScript) stay alive so drones
+/// can keep finishing and the results UI updates live.
 pub fn tick_results_transition(
     time: Res<Time>,
     mut timer: Option<ResMut<ResultsTransitionTimer>>,
     mut commands: Commands,
     mut next_state: ResMut<NextState<AppState>>,
-    progress: Option<Res<RaceProgress>>,
-    clock: Option<Res<RaceClock>>,
-    selected_course: Option<Res<SelectedCourse>>,
 ) {
     let Some(ref mut timer) = timer else { return };
 
     timer.remaining -= time.delta_secs();
     if timer.remaining > 0.0 {
         return;
-    }
-
-    // Build RaceResults snapshot before leaving Race state
-    if let Some(progress) = progress {
-        let total_time = clock.map(|c| c.elapsed).unwrap_or(0.0);
-        let course_name = selected_course
-            .map(|s| {
-                std::path::Path::new(&s.path)
-                    .file_stem()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("Unknown")
-                    .trim_end_matches(".course")
-                    .to_string()
-            })
-            .unwrap_or_else(|| "Unknown".to_string());
-        commands.insert_resource(progress.to_race_results(total_time, course_name));
     }
 
     commands.remove_resource::<ResultsTransitionTimer>();
