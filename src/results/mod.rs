@@ -16,6 +16,8 @@ impl Plugin for ResultsPlugin {
                     ui::handle_replay_button,
                     ui::handle_new_race_button,
                     ui::handle_continue_button,
+                    ui::handle_view_fan_network_button,
+                    ui::handle_close_fan_network,
                 )
                     .run_if(in_state(AppState::Results)),
             );

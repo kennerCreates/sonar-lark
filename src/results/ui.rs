@@ -4,7 +4,7 @@ use crate::common::drone_identity::{resolve_drone_color, resolve_drone_name, DRO
 use crate::course::loader::SelectedCourse;
 use crate::drone::components::{Drone, DroneConfig, DroneIdentity, RaceSeed};
 use crate::drone::spawning::ReplayRequest;
-use crate::league::fan_network::RaceAttractionResult;
+use crate::league::fan_network::{FanTier, RaceAttractionResult};
 use crate::league::recruitment::accessible_tier;
 use crate::league::LeagueState;
 use crate::palette;
@@ -27,6 +27,15 @@ pub(crate) struct ContinueButton;
 
 #[derive(Component)]
 pub(crate) struct NewRaceButton;
+
+#[derive(Component)]
+pub(crate) struct ViewFanNetworkButton;
+
+#[derive(Component)]
+pub(crate) struct FanNetworkOverlay;
+
+#[derive(Component)]
+pub(crate) struct CloseFanNetworkButton;
 
 #[derive(Component)]
 pub(crate) struct ResultsRaceTime;
@@ -187,6 +196,7 @@ pub fn setup_results_ui(
                 })
                 .with_children(|row| {
                     ui_theme::spawn_menu_button(row, "REPLAY RACE", ReplayRaceButton, 220.0, &ui_font);
+                    ui_theme::spawn_menu_button(row, "VIEW FANS", ViewFanNetworkButton, 180.0, &ui_font);
                     ui_theme::spawn_menu_button(row, "NEW RACE", NewRaceButton, 180.0, &ui_font);
                     ui_theme::spawn_menu_button(row, "CONTINUE", ContinueButton, 180.0, &ui_font);
                 });
@@ -725,5 +735,302 @@ pub fn handle_continue_button(
             commands.insert_resource(SkipToLocationSelect);
             next_state.set(AppState::Menu);
         }
+    }
+}
+
+pub fn handle_view_fan_network_button(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<ViewFanNetworkButton>)>,
+    existing: Query<Entity, With<FanNetworkOverlay>>,
+    league: Option<Res<LeagueState>>,
+    font: Res<UiFont>,
+) {
+    for interaction in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        // Toggle: if overlay exists, despawn it
+        if let Ok(entity) = existing.single() {
+            commands.entity(entity).despawn();
+            return;
+        }
+        let Some(league) = &league else { return };
+        spawn_fan_network_overlay(&mut commands, &league.fan_network, &font.0);
+    }
+}
+
+pub fn handle_close_fan_network(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<CloseFanNetworkButton>)>,
+    overlay: Query<Entity, With<FanNetworkOverlay>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            if let Ok(entity) = overlay.single() {
+                commands.entity(entity).despawn();
+            }
+        }
+    }
+}
+
+fn tier_label(tier: FanTier) -> &'static str {
+    match tier {
+        FanTier::Aware => "Aware",
+        FanTier::Attendee => "Attendee",
+        FanTier::Fan => "Fan",
+        FanTier::Superfan => "Superfan",
+    }
+}
+
+fn tier_color(tier: FanTier) -> Color {
+    match tier {
+        FanTier::Aware => palette::STONE,
+        FanTier::Attendee => palette::SIDEWALK,
+        FanTier::Fan => palette::SEA_FOAM,
+        FanTier::Superfan => palette::LIMON,
+    }
+}
+
+// 35 male, 35 female, 30 gender-neutral = 100 names.
+// Deterministic pick via person_id.
+const FAN_NAMES: [&str; 100] = [
+    // Male (0..35)
+    "James", "Michael", "Robert", "David", "John", "William", "Thomas", "Daniel",
+    "Matthew", "Andrew", "Christopher", "Joseph", "Ryan", "Nathan", "Kevin", "Brian",
+    "Eric", "Mark", "Steven", "Patrick", "Jason", "Timothy", "Sean", "Kyle",
+    "Brandon", "Justin", "Aaron", "Derek", "Tyler", "Luke", "Marcus", "Grant",
+    "Ian", "Owen", "Cole",
+    // Female (35..70)
+    "Emma", "Olivia", "Sarah", "Jessica", "Ashley", "Emily", "Hannah", "Megan",
+    "Rachel", "Lauren", "Samantha", "Nicole", "Stephanie", "Amanda", "Kayla", "Brianna",
+    "Natalie", "Victoria", "Grace", "Rebecca", "Chloe", "Julia", "Sophia", "Madison",
+    "Lily", "Abigail", "Ella", "Claire", "Hailey", "Zoe", "Leah", "Nora",
+    "Violet", "Audrey", "Maya",
+    // Gender-neutral (70..100)
+    "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Avery", "Quinn",
+    "Skyler", "Dakota", "Rowan", "Sage", "Finley", "Hayden", "Jamie", "Reese",
+    "Parker", "Blake", "Charlie", "Drew", "Emery", "Kendall", "Peyton", "River",
+    "Cameron", "Frankie", "Harley", "Kai", "Remy", "Wren",
+];
+
+fn fan_name(person_id: u32) -> &'static str {
+    // Simple hash to spread IDs across the name list
+    let h = person_id.wrapping_mul(2654435761);
+    FAN_NAMES[(h as usize) % FAN_NAMES.len()]
+}
+
+fn tier_badge_size(tier: FanTier) -> (f32, f32, f32) {
+    // (dot_size, font_size, padding)
+    match tier {
+        FanTier::Superfan => (12.0, 13.0, 6.0),
+        FanTier::Fan => (10.0, 12.0, 5.0),
+        FanTier::Attendee => (8.0, 11.0, 4.0),
+        FanTier::Aware => (6.0, 10.0, 3.0),
+    }
+}
+
+fn spawn_fan_network_overlay(
+    commands: &mut Commands,
+    network: &crate::league::fan_network::FanNetwork,
+    ui_font: &Handle<Font>,
+) {
+    let mut counts = [0u32; 4];
+    for person in &network.people {
+        let idx = match person.tier {
+            FanTier::Aware => 0,
+            FanTier::Attendee => 1,
+            FanTier::Fan => 2,
+            FanTier::Superfan => 3,
+        };
+        counts[idx] += 1;
+    }
+
+    commands
+        .spawn((
+            FanNetworkOverlay,
+            DespawnOnExit(AppState::Results),
+            Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+            ZIndex(10),
+        ))
+        .with_children(|backdrop| {
+            backdrop
+                .spawn((
+                    Node {
+                        width: Val::Px(620.0),
+                        max_height: Val::Percent(85.0),
+                        flex_direction: FlexDirection::Column,
+                        padding: UiRect::all(Val::Px(16.0)),
+                        row_gap: Val::Px(8.0),
+                        border_radius: BorderRadius::all(Val::Px(8.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.02, 0.04, 0.08, 0.95)),
+                ))
+                .with_children(|panel| {
+                    // Header
+                    panel
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            justify_content: JustifyContent::SpaceBetween,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        })
+                        .with_children(|header| {
+                            header.spawn((
+                                Text::new("FAN NETWORK"),
+                                TextFont {
+                                    font: ui_font.clone(),
+                                    font_size: 24.0,
+                                    ..default()
+                                },
+                                TextColor(palette::VANILLA),
+                            ));
+                            ui_theme::spawn_menu_button(
+                                header,
+                                "CLOSE",
+                                CloseFanNetworkButton,
+                                80.0,
+                                ui_font,
+                            );
+                        });
+
+                    // Tier legend row
+                    let tiers = [
+                        (FanTier::Superfan, counts[3]),
+                        (FanTier::Fan, counts[2]),
+                        (FanTier::Attendee, counts[1]),
+                        (FanTier::Aware, counts[0]),
+                    ];
+                    panel
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(16.0),
+                            align_items: AlignItems::Center,
+                            ..default()
+                        })
+                        .with_children(|row| {
+                            for (tier, count) in tiers {
+                                let (dot, _, _) = tier_badge_size(tier);
+                                row.spawn(Node {
+                                    flex_direction: FlexDirection::Row,
+                                    column_gap: Val::Px(4.0),
+                                    align_items: AlignItems::Center,
+                                    ..default()
+                                })
+                                .with_children(|item| {
+                                    // Color dot
+                                    item.spawn((
+                                        Node {
+                                            width: Val::Px(dot),
+                                            height: Val::Px(dot),
+                                            border_radius: BorderRadius::MAX,
+                                            ..default()
+                                        },
+                                        BackgroundColor(tier_color(tier)),
+                                    ));
+                                    item.spawn((
+                                        Text::new(format!("{}: {count}", tier_label(tier))),
+                                        TextFont {
+                                            font: ui_font.clone(),
+                                            font_size: 12.0,
+                                            ..default()
+                                        },
+                                        TextColor(tier_color(tier)),
+                                    ));
+                                });
+                            }
+                        });
+
+                    panel.spawn((
+                        Text::new(format!("{} people in network", network.people.len())),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 11.0,
+                            ..default()
+                        },
+                        TextColor(palette::STONE),
+                    ));
+
+                    // Flowing badge grid (scrollable)
+                    panel
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            flex_wrap: FlexWrap::Wrap,
+                            column_gap: Val::Px(6.0),
+                            row_gap: Val::Px(6.0),
+                            overflow: Overflow::scroll_y(),
+                            padding: UiRect::all(Val::Px(8.0)),
+                            ..default()
+                        })
+                        .with_children(|grid| {
+                            // Sort: highest tier first, then by id
+                            let mut sorted: Vec<_> = network.people.iter().collect();
+                            sorted.sort_by(|a, b| {
+                                let ta = tier_sort_key(a.tier);
+                                let tb = tier_sort_key(b.tier);
+                                tb.cmp(&ta).then(a.id.cmp(&b.id))
+                            });
+
+                            for person in &sorted {
+                                let color = tier_color(person.tier);
+                                let (dot_sz, font_sz, pad) = tier_badge_size(person.tier);
+                                let name = fan_name(person.id);
+
+                                grid.spawn((
+                                    Node {
+                                        flex_direction: FlexDirection::Row,
+                                        align_items: AlignItems::Center,
+                                        column_gap: Val::Px(3.0),
+                                        padding: UiRect::axes(
+                                            Val::Px(pad + 2.0),
+                                            Val::Px(pad),
+                                        ),
+                                        border_radius: BorderRadius::all(Val::Px(12.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgba(0.08, 0.1, 0.15, 0.8)),
+                                ))
+                                .with_children(|badge| {
+                                    // Color dot
+                                    badge.spawn((
+                                        Node {
+                                            width: Val::Px(dot_sz),
+                                            height: Val::Px(dot_sz),
+                                            border_radius: BorderRadius::MAX,
+                                            ..default()
+                                        },
+                                        BackgroundColor(color),
+                                    ));
+                                    // Name
+                                    badge.spawn((
+                                        Text::new(name),
+                                        TextFont {
+                                            font: ui_font.clone(),
+                                            font_size: font_sz,
+                                            ..default()
+                                        },
+                                        TextColor(color),
+                                    ));
+                                });
+                            }
+                        });
+                });
+        });
+}
+
+fn tier_sort_key(tier: FanTier) -> u8 {
+    match tier {
+        FanTier::Aware => 0,
+        FanTier::Attendee => 1,
+        FanTier::Fan => 2,
+        FanTier::Superfan => 3,
     }
 }
