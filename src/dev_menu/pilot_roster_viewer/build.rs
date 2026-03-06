@@ -7,17 +7,20 @@ use crate::states::DevMenuPage;
 use crate::ui_theme::ThemedButton;
 
 use super::{
-    DeletePilotButton, ObstacleWorkshopButton, PaletteEditorButton, PilotGeneratorButton,
-    PilotRow, RosterBackButton, RosterCountLabel, RosterListContainer,
-    format_skill,
+    ClearRosterButton, DeletePilotButton, ObstacleWorkshopButton, PaletteEditorButton,
+    PilotGeneratorButton, PilotRow, RosterBackButton, RosterCountLabel, RosterListContainer,
+    RosterPortraitCache, format_skill,
 };
 
 const PANEL_BG: Color = Color::srgba(0.02, 0.04, 0.08, 0.95);
+const CARD_BG: Color = Color::srgba(0.05, 0.07, 0.12, 0.8);
+const PORTRAIT_PX: f32 = 48.0;
 
 pub fn build_ui(
     commands: &mut Commands,
     roster: &PilotRoster,
     ui_font: &Handle<Font>,
+    portraits: &RosterPortraitCache,
 ) {
     let ui_font = ui_font.clone();
     commands
@@ -63,44 +66,28 @@ pub fn build_ui(
                         spawn_header_button(btns, "PILOT GENERATOR", PilotGeneratorButton, &ui_font);
                         spawn_header_button(btns, "OBSTACLE WORKSHOP", ObstacleWorkshopButton, &ui_font);
                         spawn_header_button(btns, "PALETTE EDITOR", PaletteEditorButton, &ui_font);
+                        spawn_header_button(btns, "CLEAR", ClearRosterButton, &ui_font);
                         spawn_header_button(btns, "BACK", RosterBackButton, &ui_font);
                     });
             });
 
-            // ── Column headers ─────────────────────────────────────────
-            root.spawn(Node {
-                flex_direction: FlexDirection::Row,
-                width: Val::Percent(100.0),
-                padding: UiRect::horizontal(Val::Px(8.0)),
-                column_gap: Val::Px(8.0),
-                align_items: AlignItems::Center,
-                ..default()
-            })
-            .with_children(|row| {
-                spawn_column_header(row, "", 32.0, &ui_font);   // color swatch
-                spawn_column_header(row, "GAMERTAG", 180.0, &ui_font);
-                spawn_column_header(row, "SKILL", 120.0, &ui_font);
-                spawn_column_header(row, "PERSONALITY", 160.0, &ui_font);
-                spawn_column_header(row, "RACES", 50.0, &ui_font);
-                spawn_column_header(row, "WINS", 50.0, &ui_font);
-                spawn_column_header(row, "CRASHES", 60.0, &ui_font);
-                spawn_column_header(row, "", 80.0, &ui_font);   // delete button
-            });
-
-            // ── Scrollable list ────────────────────────────────────────
+            // ── Scrollable 2-column grid ────────────────────────────────
             root.spawn((
                 RosterListContainer,
                 Node {
                     width: Val::Percent(100.0),
                     flex_grow: 1.0,
-                    flex_direction: FlexDirection::Column,
+                    flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
                     overflow: Overflow::scroll_y(),
-                    row_gap: Val::Px(2.0),
+                    row_gap: Val::Px(4.0),
+                    column_gap: Val::Px(4.0),
+                    align_content: AlignContent::FlexStart,
                     ..default()
                 },
             ))
             .with_children(|container| {
-                build_pilot_rows(container, roster, &ui_font);
+                build_pilot_rows(container, roster, &ui_font, portraits);
             });
 
             // ── Footer ─────────────────────────────────────────────────
@@ -121,16 +108,18 @@ pub fn build_pilot_rows(
     parent: &mut ChildSpawnerCommands,
     roster: &PilotRoster,
     ui_font: &Handle<Font>,
+    portraits: &RosterPortraitCache,
 ) {
     for pilot in &roster.pilots {
-        spawn_pilot_row(parent, pilot, ui_font);
+        spawn_pilot_card(parent, pilot, ui_font, portraits);
     }
 }
 
-fn spawn_pilot_row(
+fn spawn_pilot_card(
     parent: &mut ChildSpawnerCommands,
     pilot: &Pilot,
     ui_font: &Handle<Font>,
+    portraits: &RosterPortraitCache,
 ) {
     let pilot_id = pilot.id;
     let [r, g, b] = pilot.color_scheme.primary;
@@ -140,139 +129,128 @@ fn spawn_pilot_row(
             PilotRow,
             Node {
                 flex_direction: FlexDirection::Row,
-                width: Val::Percent(100.0),
-                padding: UiRect::all(Val::Px(8.0)),
+                // ~49.5% width to get 2 columns with gap
+                width: Val::Percent(49.5),
+                padding: UiRect::all(Val::Px(6.0)),
                 column_gap: Val::Px(8.0),
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.05, 0.07, 0.12, 0.8)),
+            BackgroundColor(CARD_BG),
         ))
-        .with_children(|row| {
-            // Color swatch
-            row.spawn((
-                Node {
-                    width: Val::Px(24.0),
-                    height: Val::Px(24.0),
-                    border: UiRect::all(Val::Px(1.0)),
-                    flex_shrink: 0.0,
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(r, g, b)),
-                BorderColor::all(palette::STEEL),
-            ));
-
-            // Gamertag
-            row.spawn((
-                Node {
-                    width: Val::Px(180.0),
-                    ..default()
-                },
-                Text::new(&pilot.gamertag),
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 14.0,
-                    ..default()
-                },
-                TextColor(palette::VANILLA),
-            ));
-
-            // Skill
-            row.spawn((
-                Node {
-                    width: Val::Px(120.0),
-                    ..default()
-                },
-                Text::new(format_skill(&pilot.skill)),
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette::SAND),
-            ));
-
-            // Personality
-            let personality_str = if pilot.personality.is_empty() {
-                "None".to_string()
+        .with_children(|card| {
+            // Portrait thumbnail
+            if let Some(handle) = portraits.portraits.get(&pilot_id) {
+                card.spawn((
+                    ImageNode::new(handle.clone()),
+                    Node {
+                        width: Val::Px(PORTRAIT_PX),
+                        height: Val::Px(PORTRAIT_PX),
+                        flex_shrink: 0.0,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BorderColor::all(palette::STEEL),
+                ));
             } else {
-                pilot
-                    .personality
-                    .iter()
-                    .map(|t| format!("{t:?}"))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            };
-            row.spawn((
-                Node {
-                    width: Val::Px(160.0),
-                    ..default()
-                },
-                Text::new(personality_str),
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette::SAND),
-            ));
+                // Fallback: color swatch
+                card.spawn((
+                    Node {
+                        width: Val::Px(PORTRAIT_PX),
+                        height: Val::Px(PORTRAIT_PX),
+                        flex_shrink: 0.0,
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(r, g, b)),
+                    BorderColor::all(palette::STEEL),
+                ));
+            }
 
-            // Races
-            row.spawn((
-                Node {
-                    width: Val::Px(50.0),
+            // Info column
+            card.spawn(Node {
+                flex_direction: FlexDirection::Column,
+                flex_grow: 1.0,
+                row_gap: Val::Px(2.0),
+                ..default()
+            })
+            .with_children(|info| {
+                // Gamertag + color swatch row
+                info.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(6.0),
                     ..default()
-                },
-                Text::new(pilot.stats.races_entered.to_string()),
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette::SIDEWALK),
-            ));
+                })
+                .with_children(|row| {
+                    row.spawn((
+                        Node {
+                            width: Val::Px(12.0),
+                            height: Val::Px(12.0),
+                            flex_shrink: 0.0,
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(r, g, b)),
+                    ));
+                    row.spawn((
+                        Text::new(&pilot.gamertag),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(palette::VANILLA),
+                    ));
+                });
 
-            // Wins
-            row.spawn((
-                Node {
-                    width: Val::Px(50.0),
-                    ..default()
-                },
-                Text::new(pilot.stats.wins.to_string()),
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette::SIDEWALK),
-            ));
+                // Skill + personality
+                let personality_str = if pilot.personality.is_empty() {
+                    "None".to_string()
+                } else {
+                    pilot
+                        .personality
+                        .iter()
+                        .map(|t| format!("{t:?}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                info.spawn((
+                    Text::new(format!("{} | {}", format_skill(&pilot.skill), personality_str)),
+                    TextFont {
+                        font: ui_font.clone(),
+                        font_size: 11.0,
+                        ..default()
+                    },
+                    TextColor(palette::SAND),
+                ));
 
-            // Crashes
-            row.spawn((
-                Node {
-                    width: Val::Px(60.0),
-                    ..default()
-                },
-                Text::new(pilot.stats.crashes.to_string()),
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette::SIDEWALK),
-            ));
+                // Stats row
+                info.spawn((
+                    Text::new(format!(
+                        "R:{} W:{} C:{}",
+                        pilot.stats.races_entered, pilot.stats.wins, pilot.stats.crashes,
+                    )),
+                    TextFont {
+                        font: ui_font.clone(),
+                        font_size: 11.0,
+                        ..default()
+                    },
+                    TextColor(palette::SIDEWALK),
+                ));
+            });
 
             // Delete button
-            row.spawn((
+            card.spawn((
                 Button,
                 ThemedButton,
                 DeletePilotButton(pilot_id),
                 Node {
-                    width: Val::Px(80.0),
-                    height: Val::Px(28.0),
+                    width: Val::Px(24.0),
+                    height: Val::Px(24.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     border: UiRect::all(Val::Px(1.0)),
+                    flex_shrink: 0.0,
                     ..default()
                 },
                 BackgroundColor(palette::BURGUNDY),
@@ -280,7 +258,7 @@ fn spawn_pilot_row(
             ))
             .with_children(|btn| {
                 btn.spawn((
-                    Text::new("DELETE"),
+                    Text::new("X"),
                     TextFont {
                         font: ui_font.clone(),
                         font_size: 12.0,
@@ -325,25 +303,4 @@ fn spawn_header_button(
                 TextColor(palette::VANILLA),
             ));
         });
-}
-
-fn spawn_column_header(
-    parent: &mut ChildSpawnerCommands,
-    label: &str,
-    width: f32,
-    ui_font: &Handle<Font>,
-) {
-    parent.spawn((
-        Node {
-            width: Val::Px(width),
-            ..default()
-        },
-        Text::new(label),
-        TextFont {
-            font: ui_font.clone(),
-            font_size: 11.0,
-            ..default()
-        },
-        TextColor(palette::CHAINMAIL),
-    ));
 }

@@ -77,7 +77,15 @@ impl Plugin for DevMenuPlugin {
                 pilot_roster_viewer::handle_palette_editor_button,
                 pilot_roster_viewer::handle_obstacle_workshop_button,
                 pilot_roster_viewer::handle_delete_button,
+                pilot_roster_viewer::handle_clear_button,
+            )
+                .run_if(in_state(DevMenuPage::PilotRosterViewer)),
+        )
+        .add_systems(
+            Update,
+            (
                 pilot_roster_viewer::rebuild_roster_list,
+                pilot_roster_viewer::mouse_wheel_scroll,
             )
                 .run_if(in_state(DevMenuPage::PilotRosterViewer)),
         );
