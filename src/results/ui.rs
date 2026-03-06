@@ -4,12 +4,17 @@ use crate::common::drone_identity::{resolve_drone_color, resolve_drone_name, DRO
 use crate::course::loader::SelectedCourse;
 use crate::drone::components::{Drone, DroneConfig, DroneIdentity, RaceSeed};
 use crate::drone::spawning::ReplayRequest;
+use crate::league::fan_network::RaceAttractionResult;
+use crate::league::recruitment::accessible_tier;
+use crate::league::LeagueState;
 use crate::palette;
 use crate::pilot::{PilotConfigs, SelectedPilots};
 use crate::pilot::portrait::cache::PortraitCache;
 use crate::race::progress::RaceProgress;
 use crate::race::timing::RaceClock;
-use crate::menu::ui::SkipToLocationSelect;
+use crate::race::track_quality::TrackQuality;
+use crate::course::data::CourseData;
+use crate::course::location::LocationRegistry;
 use crate::states::AppState;
 use crate::ui_theme::{self, UiFont};
 
@@ -17,7 +22,7 @@ use crate::ui_theme::{self, UiFont};
 pub(crate) struct ReplayRaceButton;
 
 #[derive(Component)]
-pub(crate) struct NewRaceButton;
+pub(crate) struct ContinueButton;
 
 #[derive(Component)]
 pub(crate) struct ResultsRaceTime;
@@ -52,6 +57,11 @@ pub fn setup_results_ui(
     portrait_cache: Option<Res<PortraitCache>>,
     drones: Query<(&Drone, &DroneIdentity)>,
     font: Res<UiFont>,
+    track_quality: Option<Res<TrackQuality>>,
+    attraction: Option<Res<RaceAttractionResult>>,
+    league: Option<Res<LeagueState>>,
+    course_data: Option<Res<CourseData>>,
+    location_registry: Res<LocationRegistry>,
 ) {
     if progress.is_none() {
         warn!("No RaceProgress resource found, skipping results UI.");
@@ -149,6 +159,20 @@ pub fn setup_results_ui(
                     }
                 });
 
+            // League stats panel
+            {
+                let ui_font_stats = ui_font.clone();
+                spawn_league_stats_panel(
+                    parent,
+                    &ui_font_stats,
+                    track_quality.as_deref(),
+                    attraction.as_deref(),
+                    league.as_deref(),
+                    course_data.as_deref(),
+                    &location_registry,
+                );
+            }
+
             // Button row
             parent
                 .spawn(Node {
@@ -159,7 +183,7 @@ pub fn setup_results_ui(
                 })
                 .with_children(|row| {
                     ui_theme::spawn_menu_button(row, "REPLAY RACE", ReplayRaceButton, 220.0, &ui_font);
-                    ui_theme::spawn_menu_button(row, "NEW RACE", NewRaceButton, 180.0, &ui_font);
+                    ui_theme::spawn_menu_button(row, "CONTINUE", ContinueButton, 180.0, &ui_font);
                 });
         });
 }
@@ -270,6 +294,248 @@ fn spawn_result_row(
                 TextColor(palette::STONE),
             ));
         });
+}
+
+const TICKET_PRICE: f32 = 2.0;
+
+fn spawn_league_stats_panel(
+    parent: &mut ChildSpawnerCommands,
+    ui_font: &Handle<Font>,
+    track_quality: Option<&TrackQuality>,
+    attraction: Option<&RaceAttractionResult>,
+    league: Option<&LeagueState>,
+    course_data: Option<&CourseData>,
+    location_registry: &LocationRegistry,
+) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(24.0),
+            margin: UiRect::vertical(Val::Px(4.0)),
+            ..default()
+        })
+        .with_children(|row| {
+            // Track Quality column
+            if let Some(tq) = track_quality {
+                spawn_stat_column(row, ui_font, "TRACK QUALITY", &[
+                    ("Gates", tq.gate_count_score),
+                    ("Variety", tq.obstacle_variety_score),
+                    ("Turn Mix", tq.turn_mix_score),
+                    ("Elevation", tq.elevation_score),
+                    ("Overtakes", tq.overtake_score),
+                    ("Crashes", tq.crash_score),
+                    ("Photo Finish", tq.photo_finish_score),
+                ], Some(("Overall", tq.overall)));
+            }
+
+            // Venue & Attendance column
+            {
+                let location_name = course_data
+                    .map(|c| c.location.as_str())
+                    .unwrap_or("Abandoned Warehouse");
+                let location = location_registry.get(location_name);
+                let attractiveness = location.map(|l| l.base_attractiveness).unwrap_or(0.2);
+                let capacity = location.map(|l| l.capacity).unwrap_or(40);
+
+                let mut lines: Vec<String> = vec![
+                    format!("Venue: {location_name}"),
+                    format!("Appeal: {:.0}%", attractiveness * 100.0),
+                    format!("Capacity: {capacity}"),
+                ];
+
+                if let Some(att) = attraction {
+                    lines.push(format!(
+                        "Attended: {} / {} wanted",
+                        att.actual_attendance, att.demand
+                    ));
+                    if att.turned_away > 0 {
+                        lines.push(format!("Turned away: {}", att.turned_away));
+                    }
+                    let ticket_revenue = att.actual_attendance as f32 * TICKET_PRICE;
+                    lines.push(format!("Tickets: +${ticket_revenue:.0}"));
+                }
+
+                spawn_text_column(row, ui_font, "VENUE", &lines);
+            }
+
+            // Fan Network column
+            if let Some(att) = attraction {
+                let tier = league
+                    .map(|l| accessible_tier(l.fan_network.fan_count()).label)
+                    .unwrap_or("Amateur");
+                let total_money = league.map(|l| l.money).unwrap_or(0.0);
+
+                let mut lines = vec![
+                    format!("Network: {} people", att.network_size),
+                    format!("Fans: {}", att.fan_count),
+                    format!("League Tier: {tier}"),
+                    format!("New spreads: {}", att.new_aware_from_spread),
+                    format!("Promotions: {} / Demotions: {}", att.promotions, att.demotions),
+                ];
+                if att.removed > 0 {
+                    lines.push(format!("Lost interest: {}", att.removed));
+                }
+                lines.push(format!("Total Money: ${total_money:.0}"));
+
+                spawn_text_column(row, ui_font, "FAN NETWORK", &lines);
+            }
+        });
+}
+
+fn spawn_stat_column(
+    parent: &mut ChildSpawnerCommands,
+    ui_font: &Handle<Font>,
+    title: &str,
+    scores: &[(&str, f32)],
+    overall: Option<(&str, f32)>,
+) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(2.0),
+            ..default()
+        })
+        .with_children(|col| {
+            col.spawn((
+                Text::new(title),
+                TextFont {
+                    font: ui_font.clone(),
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(palette::SIDEWALK),
+            ));
+
+            for &(label, score) in scores {
+                let bar_width = (score * 60.0).round();
+                col.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(4.0),
+                    ..default()
+                })
+                .with_children(|row| {
+                    row.spawn((
+                        Text::new(format!("{label:>12}")),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 11.0,
+                            ..default()
+                        },
+                        TextColor(palette::SAND),
+                        Node {
+                            width: Val::Px(80.0),
+                            ..default()
+                        },
+                    ));
+                    // Bar background
+                    row.spawn(Node {
+                        width: Val::Px(62.0),
+                        height: Val::Px(8.0),
+                        ..default()
+                    })
+                    .with_children(|bar_bg| {
+                        bar_bg.spawn((
+                            Node {
+                                width: Val::Px(60.0),
+                                height: Val::Px(8.0),
+                                ..default()
+                            },
+                            BackgroundColor(palette::INDIGO),
+                        ));
+                        bar_bg.spawn((
+                            Node {
+                                width: Val::Px(bar_width),
+                                height: Val::Px(8.0),
+                                position_type: PositionType::Absolute,
+                                ..default()
+                            },
+                            BackgroundColor(score_color(score)),
+                        ));
+                    });
+                });
+            }
+
+            if let Some((label, score)) = overall {
+                col.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(4.0),
+                    margin: UiRect::top(Val::Px(2.0)),
+                    ..default()
+                })
+                .with_children(|row| {
+                    row.spawn((
+                        Text::new(format!("{label:>12}")),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 12.0,
+                            ..default()
+                        },
+                        TextColor(palette::VANILLA),
+                        Node {
+                            width: Val::Px(80.0),
+                            ..default()
+                        },
+                    ));
+                    row.spawn((
+                        Text::new(format!("{:.0}%", score * 100.0)),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 12.0,
+                            ..default()
+                        },
+                        TextColor(score_color(score)),
+                    ));
+                });
+            }
+        });
+}
+
+fn spawn_text_column(
+    parent: &mut ChildSpawnerCommands,
+    ui_font: &Handle<Font>,
+    title: &str,
+    lines: &[String],
+) {
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(2.0),
+            ..default()
+        })
+        .with_children(|col| {
+            col.spawn((
+                Text::new(title),
+                TextFont {
+                    font: ui_font.clone(),
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(palette::SIDEWALK),
+            ));
+            for line in lines {
+                col.spawn((
+                    Text::new(line.as_str()),
+                    TextFont {
+                        font: ui_font.clone(),
+                        font_size: 11.0,
+                        ..default()
+                    },
+                    TextColor(palette::SAND),
+                ));
+            }
+        });
+}
+
+fn score_color(score: f32) -> Color {
+    if score >= 0.7 {
+        palette::SEA_FOAM
+    } else if score >= 0.4 {
+        palette::SUNSHINE
+    } else {
+        palette::NEON_RED
+    }
 }
 
 /// Updates the results UI every frame from live RaceProgress data.
@@ -436,15 +702,13 @@ pub fn handle_replay_button(
     }
 }
 
-pub fn handle_new_race_button(
-    mut commands: Commands,
-    query: Query<&Interaction, (Changed<Interaction>, With<NewRaceButton>)>,
+pub fn handle_continue_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            commands.insert_resource(SkipToLocationSelect);
-            next_state.set(AppState::Menu);
+            next_state.set(AppState::HypeSetup);
         }
     }
 }

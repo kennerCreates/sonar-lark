@@ -4,7 +4,7 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::editor::undo::UndoStack;
 use crate::palette;
-use crate::states::AppState;
+use crate::states::HypeMode;
 use crate::ui_theme;
 
 use crate::dev_menu::color_picker_data::PALETTE_COLORS;
@@ -652,11 +652,11 @@ pub fn handle_undo_redo(
 
 pub fn handle_start_race(
     query: Query<&Interaction, (Changed<Interaction>, With<PosterStartRaceButton>)>,
-    mut next_state: ResMut<NextState<AppState>>,
+    mut next_hype: ResMut<NextState<HypeMode>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            next_state.set(AppState::Race);
+            next_hype.set(HypeMode::CampaignSelector);
         }
     }
 }

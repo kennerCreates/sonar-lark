@@ -12,42 +12,15 @@ pub enum AppState {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[allow(dead_code)] // HighlightReel/Merch used in Step 6 (recruitment integration)
 pub enum AdCampaign {
     Posters,
     HighlightReel,
     Merch,
 }
 
-impl AdCampaign {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Posters => "Posters",
-            Self::HighlightReel => "Highlight\nReel",
-            Self::Merch => "Merch",
-        }
-    }
-
-    pub fn is_enabled(self) -> bool {
-        matches!(self, Self::Posters)
-    }
-
-    pub fn cost_label(self) -> &'static str {
-        match self {
-            Self::Posters => "$5+",
-            Self::HighlightReel => "$50+",
-            Self::Merch => "$20+",
-        }
-    }
-}
-
-pub const AD_CAMPAIGNS: [AdCampaign; 3] = [
-    AdCampaign::Posters,
-    AdCampaign::HighlightReel,
-    AdCampaign::Merch,
-];
-
 #[derive(Resource)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Field read by poster editor systems
 pub struct SelectedAdCampaign(pub AdCampaign);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default, SubStates)]

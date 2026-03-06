@@ -18,7 +18,6 @@ pub struct RaceSummary {
 }
 
 #[derive(Resource)]
-#[allow(dead_code)] // Sub-scores consumed by results UI in Step 5
 pub struct TrackQuality {
     pub gate_count_score: f32,
     pub obstacle_variety_score: f32,
