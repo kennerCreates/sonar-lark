@@ -12,9 +12,10 @@ use crate::dev_menu::color_picker_data::PALETTE_COLORS;
 use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH, CANVAS_HEIGHT, CANVAS_WIDTH};
 use super::{
     BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
-    PaintStroke, PosterAction, PosterColorCell, PosterEditorState, PosterStartRaceButton,
-    PosterTextElement, PosterTool, TextDragState, TextFontButton, TextFontPanel, TextSizeButton,
-    TextSizePanel, ToolButtonMarker, POSTER_FONTS,
+    PaintStroke, PosterAction, PosterColorCell, PosterCountDownButton, PosterCountText,
+    PosterCountUpButton, PosterEditorState, PosterOrder, PosterStartRaceButton, PosterTextElement,
+    PosterTool, TextDragState, TextFontButton, TextFontPanel, TextSizeButton, TextSizePanel,
+    ToolButtonMarker, POSTER_FONTS,
 };
 
 // --- Tool selection ---
@@ -749,6 +750,42 @@ pub fn update_text_panel_visibility(
     }
     if let Ok(mut vis) = font_query.single_mut() {
         *vis = v;
+    }
+}
+
+// --- Poster count ---
+
+const POSTER_INCREMENT: u32 = 25;
+const POSTER_MIN: u32 = 25;
+const POSTER_MAX: u32 = 500;
+
+pub fn handle_poster_count(
+    up_query: Query<&Interaction, (Changed<Interaction>, With<PosterCountUpButton>)>,
+    down_query: Query<&Interaction, (Changed<Interaction>, With<PosterCountDownButton>)>,
+    mut order: ResMut<PosterOrder>,
+    mut text_query: Query<&mut Text, With<PosterCountText>>,
+) {
+    let mut changed = false;
+
+    for interaction in &up_query {
+        if *interaction == Interaction::Pressed && order.count < POSTER_MAX {
+            order.count += POSTER_INCREMENT;
+            changed = true;
+        }
+    }
+
+    for interaction in &down_query {
+        if *interaction == Interaction::Pressed && order.count > POSTER_MIN {
+            order.count -= POSTER_INCREMENT;
+            changed = true;
+        }
+    }
+
+    if changed {
+        let cost = order.count as f32 / 25.0 * 5.0;
+        if let Ok(mut text) = text_query.single_mut() {
+            text.0 = format!("{} posters  ${cost:.0}", order.count);
+        }
     }
 }
 

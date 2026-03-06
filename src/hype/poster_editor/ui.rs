@@ -14,8 +14,9 @@ use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH};
 use super::{
     BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
     EraseToolButton, PaintToolButton, PosterAction, PosterCanvas, PosterColorCell,
-    PosterEditorState, PosterStartRaceButton, PosterTool, TextDragState, TextFontButton,
-    TextFontPanel, TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker, POSTER_FONTS,
+    PosterCountDownButton, PosterCountText, PosterCountUpButton, PosterEditorState, PosterOrder,
+    PosterStartRaceButton, PosterTool, TextDragState, TextFontButton, TextFontPanel,
+    TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker, POSTER_FONTS,
 };
 
 const COLOR_CELL_SIZE: f32 = 28.0;
@@ -36,6 +37,7 @@ pub fn setup_poster_editor(
     mut images: ResMut<Assets<Image>>,
     asset_server: Res<AssetServer>,
     font: Res<UiFont>,
+    poster_order: Option<Res<PosterOrder>>,
 ) {
     let ui_font = font.0.clone();
     let canvas_image = canvas::create_blank_canvas();
@@ -58,6 +60,9 @@ pub fn setup_poster_editor(
         visible: true,
     });
     commands.insert_resource(TextDragState::default());
+    commands.init_resource::<PosterOrder>();
+
+    let poster_count = poster_order.map(|o| o.count).unwrap_or(25);
 
     // Root container
     commands
@@ -81,8 +86,8 @@ pub fn setup_poster_editor(
             // Right panel — color palette
             spawn_right_panel(root);
 
-            // Start Race button (absolute positioned)
-            spawn_start_race_button(root, ui_font.clone());
+            // Poster count + Done button (absolute positioned)
+            spawn_start_race_button(root, ui_font.clone(), poster_count);
         });
 }
 
@@ -507,15 +512,102 @@ fn spawn_right_panel(parent: &mut ChildSpawnerCommands) {
         });
 }
 
-fn spawn_start_race_button(parent: &mut ChildSpawnerCommands, ui_font: Handle<Font>) {
+fn spawn_start_race_button(
+    parent: &mut ChildSpawnerCommands,
+    ui_font: Handle<Font>,
+    poster_count: u32,
+) {
     parent
         .spawn(Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(40.0),
             right: Val::Px(60.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(12.0),
             ..default()
         })
         .with_children(|anchor| {
+            // Poster count row
+            anchor
+                .spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(10.0),
+                    ..default()
+                })
+                .with_children(|row| {
+                    // Down button
+                    row.spawn((
+                        Button,
+                        ui_theme::ThemedButton,
+                        PosterCountDownButton,
+                        Node {
+                            width: Val::Px(36.0),
+                            height: Val::Px(36.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border: UiRect::all(Val::Px(2.0)),
+                            ..default()
+                        },
+                        BackgroundColor(ui_theme::BUTTON_NORMAL),
+                        BorderColor::all(ui_theme::BORDER_NORMAL),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("-"),
+                            TextFont {
+                                font: ui_font.clone(),
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(palette::VANILLA),
+                        ));
+                    });
+
+                    // Count + cost text
+                    let cost = poster_count as f32 / 25.0 * 5.0;
+                    row.spawn((
+                        PosterCountText,
+                        Text::new(format!("{poster_count} posters  ${cost:.0}")),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 18.0,
+                            ..default()
+                        },
+                        TextColor(palette::VANILLA),
+                    ));
+
+                    // Up button
+                    row.spawn((
+                        Button,
+                        ui_theme::ThemedButton,
+                        PosterCountUpButton,
+                        Node {
+                            width: Val::Px(36.0),
+                            height: Val::Px(36.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border: UiRect::all(Val::Px(2.0)),
+                            ..default()
+                        },
+                        BackgroundColor(ui_theme::BUTTON_NORMAL),
+                        BorderColor::all(ui_theme::BORDER_NORMAL),
+                    ))
+                    .with_children(|btn| {
+                        btn.spawn((
+                            Text::new("+"),
+                            TextFont {
+                                font: ui_font.clone(),
+                                font_size: 20.0,
+                                ..default()
+                            },
+                            TextColor(palette::VANILLA),
+                        ));
+                    });
+                });
+
+            // START RACE button
             anchor
                 .spawn((
                     Button,
@@ -534,7 +626,7 @@ fn spawn_start_race_button(parent: &mut ChildSpawnerCommands, ui_font: Handle<Fo
                 ))
                 .with_children(|btn| {
                     btn.spawn((
-                        Text::new("START RACE"),
+                        Text::new("DONE"),
                         TextFont {
                             font: ui_font.clone(),
                             font_size: 24.0,

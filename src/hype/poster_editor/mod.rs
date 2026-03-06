@@ -33,6 +33,7 @@ impl Plugin for PosterEditorPlugin {
                     tools::update_brush_panel_visibility,
                     tools::update_text_panel_visibility,
                     tools::update_text_cursor_blink,
+                    tools::handle_poster_count,
                 )
                     .run_if(in_state(HypeMode::PosterEditor)),
             );
@@ -146,6 +147,27 @@ pub struct CursorBlinkTimer {
     pub timer: Timer,
     pub visible: bool,
 }
+
+/// Poster print order: count in multiples of 25, $5 per 25.
+#[derive(Resource)]
+pub struct PosterOrder {
+    pub count: u32,
+}
+
+impl Default for PosterOrder {
+    fn default() -> Self {
+        Self { count: 25 }
+    }
+}
+
+#[derive(Component)]
+pub struct PosterCountText;
+
+#[derive(Component)]
+pub struct PosterCountUpButton;
+
+#[derive(Component)]
+pub struct PosterCountDownButton;
 
 /// Tracks an in-progress text drag operation.
 #[derive(Resource, Default)]
