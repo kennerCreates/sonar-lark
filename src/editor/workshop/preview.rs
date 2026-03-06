@@ -7,6 +7,7 @@ use crate::camera::settings::CameraSettings;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, FOG_END, FOG_START, cel_material_from_color, fog_color};
+use crate::ui_theme::UiFont;
 
 use super::{PreviewObstacle, WorkshopState};
 
@@ -150,7 +151,8 @@ pub(super) fn spawn_placeholder_preview(
     state.preview_entity = Some(entity);
 }
 
-pub(super) fn setup_camera_view(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+pub(super) fn setup_camera_view(mut commands: Commands, mut images: ResMut<Assets<Image>>, font: Res<UiFont>) {
+    let ui_font = font.0.clone();
     let image = Image::new_target_texture(
         VIEW_WIDTH,
         VIEW_HEIGHT,
@@ -219,6 +221,7 @@ pub(super) fn setup_camera_view(mut commands: Commands, mut images: ResMut<Asset
             parent.spawn((
                 Text::new("Camera View"),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 12.0,
                     ..default()
                 },

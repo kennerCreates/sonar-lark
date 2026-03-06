@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::palette;
-use crate::ui_theme;
+use crate::ui_theme::{self, UiFont};
 use crate::pilot::portrait::loader::PortraitParts;
 use crate::pilot::portrait::rasterize::rasterize_portrait;
 
@@ -71,6 +71,7 @@ pub fn rebuild_variant_panel(
     config: Res<PortraitPaletteConfig>,
     mut commands: Commands,
     variant_panel: Query<Entity, With<VariantPanel>>,
+    font: Res<UiFont>,
 ) {
     if !state.is_changed() && !config.is_changed() {
         return;
@@ -78,7 +79,7 @@ pub fn rebuild_variant_panel(
     for entity in &variant_panel {
         commands.entity(entity).despawn_children();
         commands.entity(entity).with_children(|parent| {
-            super::build::spawn_variant_buttons(parent, &state, &config);
+            super::build::spawn_variant_buttons(parent, &state, &config, &font.0);
         });
     }
 }
@@ -88,6 +89,7 @@ pub fn rebuild_unique_status_row(
     config: Res<PortraitPaletteConfig>,
     mut commands: Commands,
     row_query: Query<Entity, With<UniqueStatusRow>>,
+    font: Res<UiFont>,
 ) {
     if !state.is_changed() && !config.is_changed() {
         return;
@@ -130,6 +132,7 @@ pub fn rebuild_unique_status_row(
                     btn.spawn((
                         Text::new(label),
                         TextFont {
+                            font: font.0.clone(),
                             font_size: 11.0,
                             ..default()
                         },
@@ -140,6 +143,7 @@ pub fn rebuild_unique_status_row(
                     row.spawn((
                         Text::new("(variant has its own veto set)"),
                         TextFont {
+                            font: font.0.clone(),
                             font_size: 11.0,
                             ..default()
                         },

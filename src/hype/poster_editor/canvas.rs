@@ -2,7 +2,7 @@ use bevy::prelude::default;
 use bevy::image::Image;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
-use super::PaintStroke;
+use super::{PaintStroke, PosterAction};
 
 pub const CANVAS_WIDTH: u32 = 400;
 pub const CANVAS_HEIGHT: u32 = 600;
@@ -85,12 +85,44 @@ pub fn paint_stroke(data: &mut [u8], width: u32, height: u32, stroke: &PaintStro
     }
 }
 
-/// Replay all strokes onto a fresh white canvas. Returns the new pixel data.
-pub fn replay_strokes(strokes: &[PaintStroke], width: u32, height: u32) -> Vec<u8> {
+/// Flood fill from (start_x, start_y) with the given color.
+/// Replaces all connected pixels matching the target color.
+pub fn flood_fill(data: &mut [u8], width: u32, height: u32, start_x: u32, start_y: u32, color: [u8; 4]) {
+    if start_x >= width || start_y >= height {
+        return;
+    }
+
+    let idx = ((start_y * width + start_x) * 4) as usize;
+    let target = [data[idx], data[idx + 1], data[idx + 2], data[idx + 3]];
+
+    if target == color {
+        return;
+    }
+
+    let mut stack = vec![(start_x, start_y)];
+    while let Some((x, y)) = stack.pop() {
+        let i = ((y * width + x) * 4) as usize;
+        if data[i..i + 4] != target {
+            continue;
+        }
+        data[i..i + 4].copy_from_slice(&color);
+
+        if x > 0 { stack.push((x - 1, y)); }
+        if x + 1 < width { stack.push((x + 1, y)); }
+        if y > 0 { stack.push((x, y - 1)); }
+        if y + 1 < height { stack.push((x, y + 1)); }
+    }
+}
+
+/// Replay all actions onto a fresh white canvas. Returns the new pixel data.
+pub fn replay_actions(actions: &[PosterAction], width: u32, height: u32) -> Vec<u8> {
     let pixel_count = (width * height) as usize;
     let mut data = vec![255u8; pixel_count * 4];
-    for stroke in strokes {
-        paint_stroke(&mut data, width, height, stroke);
+    for action in actions {
+        match action {
+            PosterAction::Stroke(stroke) => paint_stroke(&mut data, width, height, stroke),
+            PosterAction::Fill { x, y, color } => flood_fill(&mut data, width, height, *x, *y, *color),
+        }
     }
     data
 }
@@ -135,7 +167,7 @@ mod tests {
 
     #[test]
     fn replay_empty_is_white() {
-        let data = replay_strokes(&[], 8, 8);
+        let data = replay_actions(&[], 8, 8);
         assert!(data.iter().all(|&b| b == 255));
     }
 
@@ -156,6 +188,8 @@ mod tests {
             },
         ];
 
+        let actions: Vec<PosterAction> = strokes.iter().cloned().map(PosterAction::Stroke).collect();
+
         // Sequential painting
         let mut sequential = vec![255u8; (w * h * 4) as usize];
         for s in &strokes {
@@ -163,7 +197,46 @@ mod tests {
         }
 
         // Replay
-        let replayed = replay_strokes(&strokes, w, h);
+        let replayed = replay_actions(&actions, w, h);
         assert_eq!(sequential, replayed);
+    }
+
+    #[test]
+    fn flood_fill_basic() {
+        let w = 8;
+        let h = 8;
+        let mut data = vec![255u8; (w * h * 4) as usize];
+        flood_fill(&mut data, w, h, 0, 0, [255, 0, 0, 255]);
+        // All pixels should be red
+        for y in 0..h {
+            for x in 0..w {
+                let i = ((y * w + x) * 4) as usize;
+                assert_eq!(data[i], 255);
+                assert_eq!(data[i + 1], 0);
+                assert_eq!(data[i + 2], 0);
+            }
+        }
+    }
+
+    #[test]
+    fn flood_fill_respects_boundary() {
+        let w = 8;
+        let h = 8;
+        let mut data = vec![255u8; (w * h * 4) as usize];
+        // Draw a black horizontal line at y=4
+        for x in 0..w {
+            let i = ((4 * w + x) * 4) as usize;
+            data[i..i + 4].copy_from_slice(&[0, 0, 0, 255]);
+        }
+        // Fill top half with red
+        flood_fill(&mut data, w, h, 0, 0, [255, 0, 0, 255]);
+        // Pixel above the line should be red
+        let above = ((3 * w + 0) * 4) as usize;
+        assert_eq!(data[above], 255);
+        assert_eq!(data[above + 1], 0);
+        // Pixel below the line should still be white
+        let below = ((5 * w + 0) * 4) as usize;
+        assert_eq!(data[below], 255);
+        assert_eq!(data[below + 1], 255);
     }
 }

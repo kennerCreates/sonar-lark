@@ -6,7 +6,7 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use crate::course::discovery::{discover_courses, CourseEntry};
 use crate::palette;
 use crate::states::{AppState, PendingEditorCourse};
-use crate::ui_theme;
+use crate::ui_theme::{self, UiFont};
 
 const THUMBNAIL_DISPLAY_WIDTH: f32 = 192.0;
 const THUMBNAIL_DISPLAY_HEIGHT: f32 = 108.0;
@@ -58,13 +58,14 @@ const LOCATIONS: &[LocationDef] = &[
 #[derive(Resource)]
 pub struct SkipToLocationSelect;
 
-pub fn setup_menu(mut commands: Commands, skip: Option<Res<SkipToLocationSelect>>) {
+pub fn setup_menu(mut commands: Commands, skip: Option<Res<SkipToLocationSelect>>, font: Res<UiFont>) {
     if skip.is_some() {
         commands.remove_resource::<SkipToLocationSelect>();
-        spawn_location_select(&mut commands);
+        spawn_location_select(&mut commands, &font.0);
         return;
     }
 
+    let ui_font = font.0.clone();
     commands
         .spawn((
             Node {
@@ -82,16 +83,17 @@ pub fn setup_menu(mut commands: Commands, skip: Option<Res<SkipToLocationSelect>
         .with_children(|parent| {
             parent.spawn((
                 Text::new("SONAR LARK"),
-                TextFont { font_size: 64.0, ..default() },
+                TextFont { font: ui_font.clone(), font_size: 64.0, ..default() },
                 TextColor(palette::VANILLA),
             ));
 
             parent.spawn((
                 Text::new("Drone Racing Simulator"),
-                TextFont { font_size: 24.0, ..default() },
+                TextFont { font: ui_font.clone(), font_size: 24.0, ..default() },
                 TextColor(palette::SIDEWALK),
             ));
 
+            let ui_font2 = ui_font.clone();
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Column,
@@ -101,10 +103,10 @@ pub fn setup_menu(mut commands: Commands, skip: Option<Res<SkipToLocationSelect>
                     ..default()
                 })
                 .with_children(|col| {
-                    ui_theme::spawn_menu_button(col, "Start Game", StartGameButton, 260.0);
-                    ui_theme::spawn_disabled_menu_button(col, "Sandbox", 260.0);
-                    ui_theme::spawn_disabled_menu_button(col, "Settings", 260.0);
-                    ui_theme::spawn_menu_button(col, "Dev Mode", DevModeButton, 260.0);
+                    ui_theme::spawn_menu_button(col, "Start Game", StartGameButton, 260.0, &ui_font2);
+                    ui_theme::spawn_disabled_menu_button(col, "Sandbox", 260.0, &ui_font2);
+                    ui_theme::spawn_disabled_menu_button(col, "Settings", 260.0, &ui_font2);
+                    ui_theme::spawn_menu_button(col, "Dev Mode", DevModeButton, 260.0, &ui_font2);
                 });
         });
 }
@@ -113,13 +115,14 @@ pub fn handle_start_game_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<StartGameButton>)>,
     landing_query: Query<Entity, With<LandingRoot>>,
+    font: Res<UiFont>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             for entity in &landing_query {
                 commands.entity(entity).despawn();
             }
-            spawn_location_select(&mut commands);
+            spawn_location_select(&mut commands, &font.0);
         }
     }
 }
@@ -135,7 +138,8 @@ pub fn handle_dev_mode_button(
     }
 }
 
-fn spawn_location_select(commands: &mut Commands) {
+fn spawn_location_select(commands: &mut Commands, font: &Handle<Font>) {
+    let ui_font = font.clone();
     commands
         .spawn((
             Node {
@@ -153,10 +157,11 @@ fn spawn_location_select(commands: &mut Commands) {
         .with_children(|parent| {
             parent.spawn((
                 Text::new("Choose your Location..."),
-                TextFont { font_size: 48.0, ..default() },
+                TextFont { font: ui_font.clone(), font_size: 48.0, ..default() },
                 TextColor(palette::VANILLA),
             ));
 
+            let ui_font2 = ui_font.clone();
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Row,
@@ -166,10 +171,11 @@ fn spawn_location_select(commands: &mut Commands) {
                 })
                 .with_children(|row| {
                     for loc in LOCATIONS {
-                        spawn_location_card(row, loc);
+                        spawn_location_card(row, loc, &ui_font2);
                     }
                 });
 
+            let ui_font3 = ui_font.clone();
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Row,
@@ -180,13 +186,14 @@ fn spawn_location_select(commands: &mut Commands) {
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "Course Library", CourseLibraryButton, 220.0);
-                    ui_theme::spawn_disabled_menu_button(row, "SELECT", 200.0);
+                    ui_theme::spawn_menu_button(row, "Course Library", CourseLibraryButton, 220.0, &ui_font3);
+                    ui_theme::spawn_disabled_menu_button(row, "SELECT", 200.0, &ui_font3);
                 });
         });
 }
 
-fn spawn_location_card(parent: &mut ChildSpawnerCommands, loc: &LocationDef) {
+fn spawn_location_card(parent: &mut ChildSpawnerCommands, loc: &LocationDef, font: &Handle<Font>) {
+    let ui_font = font.clone();
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Column,
@@ -197,11 +204,12 @@ fn spawn_location_card(parent: &mut ChildSpawnerCommands, loc: &LocationDef) {
         .with_children(|col| {
             col.spawn((
                 Text::new(format!("${}", loc.cost)),
-                TextFont { font_size: 20.0, ..default() },
+                TextFont { font: ui_font.clone(), font_size: 20.0, ..default() },
                 TextColor(if loc.enabled { palette::VANILLA } else { palette::CHAINMAIL }),
             ));
 
             if loc.enabled {
+                let ui_font2 = ui_font.clone();
                 col.spawn((
                     Button,
                     ui_theme::ThemedButton,
@@ -220,12 +228,13 @@ fn spawn_location_card(parent: &mut ChildSpawnerCommands, loc: &LocationDef) {
                 .with_children(|btn| {
                     btn.spawn((
                         Text::new(loc.name),
-                        TextFont { font_size: 22.0, ..default() },
+                        TextFont { font: ui_font2.clone(), font_size: 22.0, ..default() },
                         TextColor(palette::VANILLA),
                         TextLayout::new_with_justify(Justify::Center),
                     ));
                 });
             } else {
+                let ui_font2 = ui_font.clone();
                 col.spawn((
                     Node {
                         width: Val::Px(220.0),
@@ -241,7 +250,7 @@ fn spawn_location_card(parent: &mut ChildSpawnerCommands, loc: &LocationDef) {
                 .with_children(|card| {
                     card.spawn((
                         Text::new(loc.name),
-                        TextFont { font_size: 22.0, ..default() },
+                        TextFont { font: ui_font2.clone(), font_size: 22.0, ..default() },
                         TextColor(palette::CHAINMAIL),
                         TextLayout::new_with_justify(Justify::Center),
                     ));
@@ -266,19 +275,21 @@ pub fn handle_course_library_button(
     query: Query<&Interaction, (Changed<Interaction>, With<CourseLibraryButton>)>,
     location_root: Query<Entity, With<LocationSelectRoot>>,
     mut images: ResMut<Assets<Image>>,
+    font: Res<UiFont>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             for entity in &location_root {
                 commands.entity(entity).despawn();
             }
-            spawn_course_library(&mut commands, &mut images);
+            spawn_course_library(&mut commands, &mut images, &font.0);
         }
     }
 }
 
-fn spawn_course_library(commands: &mut Commands, images: &mut Assets<Image>) {
+fn spawn_course_library(commands: &mut Commands, images: &mut Assets<Image>, font: &Handle<Font>) {
     let courses = discover_courses();
+    let ui_font = font.clone();
 
     commands
         .spawn((
@@ -297,10 +308,11 @@ fn spawn_course_library(commands: &mut Commands, images: &mut Assets<Image>) {
         .with_children(|parent| {
             parent.spawn((
                 Text::new("Course Library"),
-                TextFont { font_size: 48.0, ..default() },
+                TextFont { font: ui_font.clone(), font_size: 48.0, ..default() },
                 TextColor(palette::VANILLA),
             ));
 
+            let ui_font2 = ui_font.clone();
             parent
                 .spawn(Node {
                     flex_direction: FlexDirection::Row,
@@ -318,23 +330,24 @@ fn spawn_course_library(commands: &mut Commands, images: &mut Assets<Image>) {
                     if courses.is_empty() {
                         list.spawn((
                             Text::new("No courses found"),
-                            TextFont { font_size: 18.0, ..default() },
+                            TextFont { font: ui_font2.clone(), font_size: 18.0, ..default() },
                             TextColor(palette::CHAINMAIL),
                         ));
                     } else {
                         for course in &courses {
-                            spawn_course_list_item(list, course, images);
+                            spawn_course_list_item(list, course, images, &ui_font2);
                         }
                     }
                 });
 
+            let ui_font3 = ui_font.clone();
             parent
                 .spawn(Node {
                     margin: UiRect::top(Val::Px(20.0)),
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "Back", CourseLibraryBackButton, 200.0);
+                    ui_theme::spawn_menu_button(row, "Back", CourseLibraryBackButton, 200.0, &ui_font3);
                 });
         });
 }
@@ -343,12 +356,14 @@ fn spawn_course_list_item(
     parent: &mut ChildSpawnerCommands,
     course: &CourseEntry,
     images: &mut Assets<Image>,
+    font: &Handle<Font>,
 ) {
     let thumbnail_handle = course
         .thumbnail_path
         .as_ref()
         .and_then(|path| load_thumbnail_image(path, images));
 
+    let ui_font = font.clone();
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Column,
@@ -358,6 +373,7 @@ fn spawn_course_list_item(
         })
         .with_children(|col| {
             // Thumbnail or placeholder as the clickable button
+            let ui_font2 = ui_font.clone();
             col.spawn((
                 Button,
                 ui_theme::ThemedButton,
@@ -386,13 +402,14 @@ fn spawn_course_list_item(
                 } else {
                     btn.spawn((
                         Text::new(&course.name),
-                        TextFont { font_size: 16.0, ..default() },
+                        TextFont { font: ui_font2.clone(), font_size: 16.0, ..default() },
                         TextColor(palette::CHAINMAIL),
                     ));
                 }
             });
 
             // Delete button below thumbnail
+            let ui_font3 = ui_font.clone();
             col.spawn((
                 Button,
                 ui_theme::ThemedButton,
@@ -411,7 +428,7 @@ fn spawn_course_list_item(
             .with_children(|btn| {
                 btn.spawn((
                     Text::new("Delete"),
-                    TextFont { font_size: 12.0, ..default() },
+                    TextFont { font: ui_font3.clone(), font_size: 12.0, ..default() },
                     TextColor(palette::CHAINMAIL),
                 ));
             });
@@ -457,6 +474,7 @@ pub fn handle_course_delete_item(
     query: Query<(&Interaction, &CourseDeleteItem), Changed<Interaction>>,
     library_root: Query<Entity, With<CourseLibraryRoot>>,
     mut images: ResMut<Assets<Image>>,
+    font: Res<UiFont>,
 ) {
     for (interaction, item) in &query {
         if *interaction == Interaction::Pressed {
@@ -478,7 +496,7 @@ pub fn handle_course_delete_item(
             for entity in &library_root {
                 commands.entity(entity).despawn();
             }
-            spawn_course_library(&mut commands, &mut images);
+            spawn_course_library(&mut commands, &mut images, &font.0);
             return;
         }
     }
@@ -488,13 +506,14 @@ pub fn handle_course_library_back(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<CourseLibraryBackButton>)>,
     library_root: Query<Entity, With<CourseLibraryRoot>>,
+    font: Res<UiFont>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             for entity in &library_root {
                 commands.entity(entity).despawn();
             }
-            spawn_location_select(&mut commands);
+            spawn_location_select(&mut commands, &font.0);
         }
     }
 }

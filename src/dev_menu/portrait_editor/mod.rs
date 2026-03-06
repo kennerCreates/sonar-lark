@@ -10,6 +10,7 @@ use bevy::prelude::*;
 use crate::palette;
 use crate::pilot::portrait::loader::PortraitParts;
 use crate::pilot::portrait::rasterize::rasterize_portrait;
+use crate::ui_theme::UiFont;
 use crate::pilot::portrait::{
     Accessory, EarringKind, EyeStyle, FaceShape, HairStyle, MouthStyle, PortraitDescriptor,
     SecondaryColor, ShirtStyle,
@@ -281,6 +282,7 @@ pub fn setup_portrait_editor(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     portrait_parts: Option<Res<PortraitParts>>,
+    font: Res<UiFont>,
 ) {
     let config = super::portrait_config::load_config();
     let mut state = PortraitEditorState::default();
@@ -293,9 +295,9 @@ pub fn setup_portrait_editor(
         let handle = images.add(image);
         state.preview_handle = Some(handle.clone());
 
-        build::build_ui(&mut commands, &state, &config, Some(handle));
+        build::build_ui(&mut commands, &state, &config, Some(handle), &font.0);
     } else {
-        build::build_ui(&mut commands, &state, &config, None);
+        build::build_ui(&mut commands, &state, &config, None, &font.0);
     }
 
     commands.insert_resource(state);

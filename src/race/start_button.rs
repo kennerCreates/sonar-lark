@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::palette;
 use crate::states::AppState;
-use crate::ui_theme;
+use crate::ui_theme::{self, UiFont};
 
 use super::lifecycle::RacePhase;
 
@@ -15,7 +15,8 @@ pub(crate) struct CountdownText;
 #[derive(Component)]
 pub(crate) struct CountdownTextContent;
 
-pub fn setup_race_ui(mut commands: Commands) {
+pub fn setup_race_ui(mut commands: Commands, font: Res<UiFont>) {
+    let ui_font = font.0.clone();
     commands
         .spawn((
             Node {
@@ -49,6 +50,7 @@ pub fn setup_race_ui(mut commands: Commands) {
                     btn.spawn((
                         Text::new("START RACE"),
                         TextFont {
+                            font: ui_font.clone(),
                             font_size: 24.0,
                             ..default()
                         },

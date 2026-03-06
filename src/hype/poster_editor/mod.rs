@@ -27,6 +27,10 @@ impl Plugin for PosterEditorPlugin {
                     tools::handle_undo_redo,
                     tools::handle_start_race,
                     tools::update_brush_cursor,
+                    tools::handle_text_size,
+                    tools::handle_text_font,
+                    tools::update_brush_panel_visibility,
+                    tools::update_text_panel_visibility,
                     tools::update_text_cursor_blink,
                 )
                     .run_if(in_state(HypeMode::PosterEditor)),
@@ -44,6 +48,9 @@ pub enum PosterTool {
     Erase,
 }
 
+/// Sentinel value for `brush_radius` indicating flood-fill mode.
+pub const BRUSH_FILL: f32 = -1.0;
+
 // --- Stroke data ---
 
 #[derive(Clone)]
@@ -58,6 +65,7 @@ pub struct PaintStroke {
 #[derive(Clone)]
 pub enum PosterAction {
     Stroke(PaintStroke),
+    Fill { x: u32, y: u32, color: [u8; 4] },
 }
 
 // --- Editor state ---
@@ -68,10 +76,19 @@ pub struct PosterEditorState {
     pub brush_color: [u8; 4],
     pub brush_radius: f32,
     pub canvas_handle: Handle<Image>,
-    pub strokes: Vec<PaintStroke>,
+    pub actions: Vec<PosterAction>,
     pub current_stroke: Option<PaintStroke>,
     pub editing_text: Option<Entity>,
+    pub text_size: f32,
+    pub text_font_index: usize,
 }
+
+/// Font entries available in the poster editor: (display name, asset path).
+pub const POSTER_FONTS: &[(&str, &str)] = &[
+    ("Asimovian", "fonts/Asimovian/Asimovian-Regular.ttf"),
+    ("Megrim", "fonts/Megrim/Megrim-Regular.ttf"),
+    ("Syne Mono", "fonts/Syne_Mono/SyneMono-Regular.ttf"),
+];
 
 // --- Component markers ---
 
@@ -107,6 +124,21 @@ pub struct ToolButtonMarker(pub PosterTool);
 
 #[derive(Component)]
 pub struct BrushCursorPreview;
+
+#[derive(Component)]
+pub struct BrushSizePanel;
+
+#[derive(Component)]
+pub struct TextSizeButton(pub f32);
+
+#[derive(Component)]
+pub struct TextSizePanel;
+
+#[derive(Component)]
+pub struct TextFontButton(pub usize);
+
+#[derive(Component)]
+pub struct TextFontPanel;
 
 #[derive(Resource)]
 pub struct CursorBlinkTimer {

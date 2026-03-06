@@ -15,6 +15,7 @@ use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
 use crate::palette;
 use crate::states::DevMenuPage;
+use crate::ui_theme::UiFont;
 
 use super::gizmos::{Axis, Sign};
 use super::undo::ctrl_held;
@@ -276,9 +277,10 @@ fn setup_workshop(
     mut commands: Commands,
     library: Res<ObstacleLibrary>,
     mut config_store: ResMut<GizmoConfigStore>,
+    font: Res<UiFont>,
 ) {
     let state = WorkshopState::default();
-    ui::build_workshop_ui(&mut commands, &library);
+    ui::build_workshop_ui(&mut commands, &library, &font);
     commands.insert_resource(state);
     commands.insert_resource(MoveWidgetState::default());
     commands.insert_resource(RotateWidgetState::default());
@@ -334,6 +336,7 @@ fn populate_node_list(
     gltf_handle: Res<ObstaclesGltfHandle>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
     container_query: Query<Entity, With<ui::NodeListContainer>>,
+    font: Res<UiFont>,
 ) {
     let gltf = gltf_assets.get(&gltf_handle.0).expect("run condition guarantees loaded");
 
@@ -346,12 +349,14 @@ fn populate_node_list(
     state.available_nodes = nodes.clone();
     state.nodes_loaded = true;
 
+    let ui_font = font.0.clone();
     commands.entity(container).despawn_related::<Children>();
     commands.entity(container).with_children(|parent| {
         if nodes.is_empty() {
             parent.spawn((
                 Text::new("No objects found in glb"),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -359,7 +364,7 @@ fn populate_node_list(
             ));
         } else {
             for node in &nodes {
-                ui::spawn_node_button(parent, node);
+                ui::spawn_node_button(parent, node, &ui_font);
             }
         }
     });

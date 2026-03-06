@@ -9,7 +9,7 @@ use crate::pilot::portrait::cache::PortraitCache;
 use crate::race::progress::RaceResults;
 use crate::menu::ui::SkipToLocationSelect;
 use crate::states::AppState;
-use crate::ui_theme;
+use crate::ui_theme::{self, UiFont};
 
 #[derive(Component)]
 pub(crate) struct ReplayRaceButton;
@@ -23,12 +23,14 @@ pub fn setup_results_ui(
     selected: Option<Res<SelectedPilots>>,
     portrait_cache: Option<Res<PortraitCache>>,
     drones: Query<(&Drone, &DroneIdentity)>,
+    font: Res<UiFont>,
 ) {
     let Some(results) = results else {
         warn!("No RaceResults resource found, skipping results UI.");
         return;
     };
 
+    let ui_font = font.0.clone();
     commands
         .spawn((
             Node {
@@ -47,6 +49,7 @@ pub fn setup_results_ui(
             parent.spawn((
                 Text::new("RACE RESULTS"),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 48.0,
                     ..default()
                 },
@@ -57,6 +60,7 @@ pub fn setup_results_ui(
             parent.spawn((
                 Text::new(&results.course_name),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 20.0,
                     ..default()
                 },
@@ -69,6 +73,7 @@ pub fn setup_results_ui(
             parent.spawn((
                 Text::new(format!("Race Time: {:01}:{:05.2}", mins, secs)),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 16.0,
                     ..default()
                 },
@@ -165,6 +170,7 @@ pub fn setup_results_ui(
                                             row.spawn((
                                                 Text::new(format!("{:>2}  {}", pos + 1, name)),
                                                 TextFont {
+                                                    font: ui_font.clone(),
                                                     font_size: 15.0,
                                                     ..default()
                                                 },
@@ -187,6 +193,7 @@ pub fn setup_results_ui(
                                             row.spawn((
                                                 Text::new(time_text),
                                                 TextFont {
+                                                    font: ui_font.clone(),
                                                     font_size: 15.0,
                                                     ..default()
                                                 },
@@ -204,6 +211,7 @@ pub fn setup_results_ui(
                                                     entry.gates_passed, results.total_gates
                                                 )),
                                                 TextFont {
+                                                    font: ui_font.clone(),
                                                     font_size: 15.0,
                                                     ..default()
                                                 },
@@ -224,8 +232,8 @@ pub fn setup_results_ui(
                     ..default()
                 })
                 .with_children(|row| {
-                    ui_theme::spawn_menu_button(row, "REPLAY RACE", ReplayRaceButton, 220.0);
-                    ui_theme::spawn_menu_button(row, "NEW RACE", NewRaceButton, 180.0);
+                    ui_theme::spawn_menu_button(row, "REPLAY RACE", ReplayRaceButton, 220.0, &ui_font);
+                    ui_theme::spawn_menu_button(row, "NEW RACE", NewRaceButton, 180.0, &ui_font);
                 });
         });
 }

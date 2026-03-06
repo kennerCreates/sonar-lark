@@ -9,6 +9,7 @@ use crate::camera::settings::CameraSettings;
 use crate::palette;
 use crate::rendering::{FOG_END, FOG_START, fog_color};
 use crate::states::EditorMode;
+use crate::ui_theme::UiFont;
 
 use super::PlacedCamera;
 use super::ui::{PendingThumbnailSave, ThumbnailCamera, ThumbnailRenderTarget};
@@ -38,7 +39,8 @@ pub struct PreviewOverlay;
 #[derive(Component)]
 pub struct PreviewLabel;
 
-pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Image>>, font: Res<UiFont>) {
+    let ui_font = font.0.clone();
     // --- Gate camera preview ---
     let image = Image::new_target_texture(
         PREVIEW_WIDTH,
@@ -112,6 +114,7 @@ pub fn setup_camera_preview(mut commands: Commands, mut images: ResMut<Assets<Im
                 PreviewLabel,
                 Text::new("Camera Preview"),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 12.0,
                     ..default()
                 },

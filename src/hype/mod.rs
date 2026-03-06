@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use crate::palette;
 use crate::states::{AdCampaign, HypeMode, SelectedAdCampaign, AD_CAMPAIGNS};
 use crate::ui_theme;
+use crate::ui_theme::UiFont;
 
 pub struct HypePlugin;
 
@@ -32,7 +33,9 @@ struct SelectButton;
 #[derive(Component)]
 struct SelectButtonText;
 
-fn setup_ui(mut commands: Commands) {
+fn setup_ui(mut commands: Commands, font: Res<UiFont>) {
+    let ui_font = font.0.clone();
+
     commands
         .spawn((
             Node {
@@ -52,12 +55,14 @@ fn setup_ui(mut commands: Commands) {
             parent.spawn((
                 Text::new("Choose your Ad Campaign..."),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 48.0,
                     ..default()
                 },
                 TextColor(palette::VANILLA),
             ));
 
+            let ui_font_inner = ui_font.clone();
             // Card row
             parent
                 .spawn(Node {
@@ -68,10 +73,11 @@ fn setup_ui(mut commands: Commands) {
                 })
                 .with_children(|row| {
                     for campaign in AD_CAMPAIGNS {
-                        spawn_campaign_card(row, campaign);
+                        spawn_campaign_card(row, campaign, ui_font_inner.clone());
                     }
                 });
 
+            let ui_font_btn = ui_font.clone();
             // SELECT button (bottom-right)
             parent
                 .spawn(Node {
@@ -101,6 +107,7 @@ fn setup_ui(mut commands: Commands) {
                             btn.spawn((
                                 Text::new("SELECT"),
                                 TextFont {
+                                    font: ui_font_btn.clone(),
                                     font_size: 24.0,
                                     ..default()
                                 },
@@ -112,7 +119,7 @@ fn setup_ui(mut commands: Commands) {
         });
 }
 
-fn spawn_campaign_card(parent: &mut ChildSpawnerCommands, campaign: AdCampaign) {
+fn spawn_campaign_card(parent: &mut ChildSpawnerCommands, campaign: AdCampaign, ui_font: Handle<Font>) {
     let enabled = campaign.is_enabled();
     let (bg, border, text_color) = if enabled {
         (
@@ -154,10 +161,12 @@ fn spawn_campaign_card(parent: &mut ChildSpawnerCommands, campaign: AdCampaign) 
             if enabled {
                 card.insert(ui_theme::ThemedButton);
             }
+            let ui_font_card = ui_font.clone();
             card.with_children(|btn| {
                 btn.spawn((
                     Text::new(campaign.label()),
                     TextFont {
+                        font: ui_font_card.clone(),
                         font_size: 28.0,
                         ..default()
                     },
@@ -170,6 +179,7 @@ fn spawn_campaign_card(parent: &mut ChildSpawnerCommands, campaign: AdCampaign) 
             col.spawn((
                 Text::new(campaign.cost_label()),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 24.0,
                     ..default()
                 },

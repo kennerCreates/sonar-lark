@@ -13,6 +13,7 @@ use crate::pilot::roster::{PilotRoster, pick_personality_traits, save_roster_to_
 use crate::pilot::skill::SkillProfile;
 use crate::pilot::{ColorScheme, DroneBuildDescriptor, Pilot, PilotId, PilotStats};
 use crate::states::{AppState, DevMenuPage};
+use crate::ui_theme::UiFont;
 
 use super::portrait_config::{
     PortraitColorSlot, PortraitPaletteConfig, PALETTE_COLORS, load_config,
@@ -128,6 +129,7 @@ pub fn setup_pilot_generator(
     mut images: ResMut<Assets<Image>>,
     portrait_parts: Option<Res<PortraitParts>>,
     roster: Option<Res<PilotRoster>>,
+    font: Res<UiFont>,
 ) {
     let config = load_config();
     let roster_snapshot = roster
@@ -157,7 +159,7 @@ pub fn setup_pilot_generator(
     };
 
     let roster_count = roster_snapshot.pilots.len();
-    build::build_ui(&mut commands, &state, roster_count, preview_handle);
+    build::build_ui(&mut commands, &state, roster_count, preview_handle, &font.0);
     commands.insert_resource(state);
     commands.insert_resource(config);
 }

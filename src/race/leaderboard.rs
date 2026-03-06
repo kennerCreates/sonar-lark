@@ -6,7 +6,7 @@ use crate::palette;
 use crate::pilot::SelectedPilots;
 use crate::pilot::portrait::cache::PortraitCache;
 use crate::states::AppState;
-use crate::ui_theme;
+use crate::ui_theme::{self, UiFont};
 
 use super::lifecycle::RacePhase;
 use super::progress::RaceProgress;
@@ -36,7 +36,9 @@ pub fn setup_leaderboard(
     selected: Option<Res<SelectedPilots>>,
     portrait_cache: Option<Res<PortraitCache>>,
     drones: Query<(&Drone, &DroneIdentity)>,
+    font: Res<UiFont>,
 ) {
+    let ui_font = font.0.clone();
     commands
         .spawn((
             LeaderboardRoot,
@@ -111,6 +113,7 @@ pub fn setup_leaderboard(
                             LbNameText(i),
                             Text::new(format!("{:>2}  {}", i + 1, init_name)),
                             TextFont {
+                                font: ui_font.clone(),
                                 font_size: LB_FONT,
                                 ..default()
                             },
@@ -125,6 +128,7 @@ pub fn setup_leaderboard(
                             LbTimeText(i),
                             Text::new("--:--.--"),
                             TextFont {
+                                font: ui_font.clone(),
                                 font_size: LB_FONT,
                                 ..default()
                             },

@@ -4,7 +4,7 @@ use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
 use crate::states::DevMenuPage;
-use crate::ui_theme;
+use crate::ui_theme::{self, UiFont};
 
 pub(super) const RADIO_ACTIVE: Color = palette::TEAL;
 pub(super) const RADIO_INACTIVE: Color = palette::INDIGO;
@@ -85,7 +85,8 @@ pub struct NextCollisionShapeButton;
 #[derive(Component)]
 pub struct CollisionShapeLabel;
 
-pub fn build_workshop_ui(commands: &mut Commands, library: &ObstacleLibrary) {
+pub fn build_workshop_ui(commands: &mut Commands, library: &ObstacleLibrary, font: &UiFont) {
+    let ui_font = font.0.clone();
     commands
         .spawn((
             Node {
@@ -98,12 +99,13 @@ pub fn build_workshop_ui(commands: &mut Commands, library: &ObstacleLibrary) {
             DespawnOnExit(DevMenuPage::ObstacleWorkshop),
         ))
         .with_children(|root| {
-            build_left_panel(root, library);
-            build_right_panel(root);
+            build_left_panel(root, library, &ui_font);
+            build_right_panel(root, &ui_font);
         });
 }
 
-fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary) {
+fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary, font: &Handle<Font>) {
+    let font = font.clone();
     parent
         .spawn((
             Node {
@@ -121,6 +123,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
             panel.spawn((
                 Text::new("Obstacle Workshop"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 22.0,
                     ..default()
                 },
@@ -130,6 +133,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
             panel.spawn((
                 Text::new("Imported Objects"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 16.0,
                     ..default()
                 },
@@ -154,6 +158,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     container.spawn((
                         Text::new("Loading glTF..."),
                         TextFont {
+                            font: font.clone(),
                             font_size: 14.0,
                             ..default()
                         },
@@ -166,6 +171,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
             panel.spawn((
                 Text::new("Obstacle Library"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 16.0,
                     ..default()
                 },
@@ -186,6 +192,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                         container.spawn((
                             Text::new("No obstacles defined"),
                             TextFont {
+                                font: font.clone(),
                                 font_size: 14.0,
                                 ..default()
                             },
@@ -195,7 +202,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                         let mut ids: Vec<&ObstacleId> = library.definitions.keys().collect();
                         ids.sort_by(|a, b| a.0.cmp(&b.0));
                         for id in ids {
-                            spawn_library_button(container, &id.0);
+                            spawn_library_button(container, &id.0, &font);
                         }
                     }
                 });
@@ -205,11 +212,12 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                 ..default()
             });
 
-            ui_theme::spawn_panel_button(panel, "Back", BackButton);
+            ui_theme::spawn_panel_button(panel, "Back", BackButton, &font);
         });
 }
 
-fn build_right_panel(parent: &mut ChildSpawnerCommands) {
+fn build_right_panel(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
+    let font = font.clone();
     parent
         .spawn((
             Node {
@@ -228,6 +236,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Obstacle Name"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -253,6 +262,7 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                     field.spawn((
                         Text::new("(type a name)"),
                         TextFont {
+                            font: font.clone(),
                             font_size: 14.0,
                             ..default()
                         },
@@ -264,16 +274,16 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             ui_theme::spawn_divider(panel);
 
             // Edit target toggle
-            spawn_edit_target_row(panel);
+            spawn_edit_target_row(panel, &font);
 
             ui_theme::spawn_divider(panel);
 
-            spawn_toggle_row(panel, "Trigger Volume", HasTriggerToggle, HasTriggerText, true);
-            spawn_toggle_row(panel, "Collision Volume", HasCollisionToggle, HasCollisionText, false);
-            spawn_toggle_row(panel, "Default Camera", HasCameraToggle, HasCameraText, false);
+            spawn_toggle_row(panel, "Trigger Volume", HasTriggerToggle, HasTriggerText, true, &font);
+            spawn_toggle_row(panel, "Collision Volume", HasCollisionToggle, HasCollisionText, false, &font);
+            spawn_toggle_row(panel, "Default Camera", HasCameraToggle, HasCameraText, false, &font);
 
             // Collision shape navigation: [<] Shape 1/1 [>] [+] [-]
-            spawn_collision_shape_row(panel);
+            spawn_collision_shape_row(panel, &font);
 
             panel.spawn(Node {
                 flex_grow: 1.0,
@@ -281,13 +291,13 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             });
 
             ui_theme::spawn_divider(panel);
-            ui_theme::spawn_action_button(panel, "Save Obstacle", SaveButton, palette::JUNGLE);
-            ui_theme::spawn_action_button(panel, "New / Clear", NewButton, ui_theme::BUTTON_NORMAL);
-            ui_theme::spawn_action_button(panel, "Delete", DeleteButton, palette::MAROON);
+            ui_theme::spawn_action_button(panel, "Save Obstacle", SaveButton, palette::JUNGLE, &font);
+            ui_theme::spawn_action_button(panel, "New / Clear", NewButton, ui_theme::BUTTON_NORMAL, &font);
+            ui_theme::spawn_action_button(panel, "Delete", DeleteButton, palette::MAROON, &font);
         });
 }
 
-pub fn spawn_node_button(parent: &mut ChildSpawnerCommands, name: &str) {
+pub fn spawn_node_button(parent: &mut ChildSpawnerCommands, name: &str, font: &Handle<Font>) {
     parent
         .spawn((
             Button,
@@ -307,6 +317,7 @@ pub fn spawn_node_button(parent: &mut ChildSpawnerCommands, name: &str) {
             btn.spawn((
                 Text::new(name),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },
@@ -315,7 +326,7 @@ pub fn spawn_node_button(parent: &mut ChildSpawnerCommands, name: &str) {
         });
 }
 
-pub(super) fn spawn_library_button(parent: &mut ChildSpawnerCommands, id: &str) {
+pub(super) fn spawn_library_button(parent: &mut ChildSpawnerCommands, id: &str, font: &Handle<Font>) {
     parent
         .spawn((
             Button,
@@ -335,6 +346,7 @@ pub(super) fn spawn_library_button(parent: &mut ChildSpawnerCommands, id: &str) 
             btn.spawn((
                 Text::new(id),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },
@@ -349,7 +361,9 @@ fn spawn_toggle_row(
     toggle_marker: impl Component,
     text_marker: impl Component,
     initial: bool,
+    font: &Handle<Font>,
 ) {
+    let font = font.clone();
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -376,6 +390,7 @@ fn spawn_toggle_row(
                 btn.spawn((
                     Text::new(if initial { "ON" } else { "OFF" }),
                     TextFont {
+                        font: font.clone(),
                         font_size: 12.0,
                         ..default()
                     },
@@ -387,6 +402,7 @@ fn spawn_toggle_row(
             row.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -395,7 +411,8 @@ fn spawn_toggle_row(
         });
 }
 
-fn spawn_edit_target_row(parent: &mut ChildSpawnerCommands) {
+fn spawn_edit_target_row(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
+    let font = font.clone();
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -404,10 +421,10 @@ fn spawn_edit_target_row(parent: &mut ChildSpawnerCommands) {
             ..default()
         })
         .with_children(|row| {
-            spawn_radio_option(row, "Model", EditTargetRadioModel, true);
-            spawn_radio_option(row, "Trigger", EditTargetRadioTrigger, false);
-            spawn_radio_option(row, "Collision", EditTargetRadioCollision, false);
-            spawn_radio_option(row, "Camera", EditTargetRadioCamera, false);
+            spawn_radio_option(row, "Model", EditTargetRadioModel, true, &font);
+            spawn_radio_option(row, "Trigger", EditTargetRadioTrigger, false, &font);
+            spawn_radio_option(row, "Collision", EditTargetRadioCollision, false, &font);
+            spawn_radio_option(row, "Camera", EditTargetRadioCamera, false, &font);
         });
 }
 
@@ -416,6 +433,7 @@ fn spawn_radio_option(
     label: &str,
     marker: impl Component,
     active: bool,
+    font: &Handle<Font>,
 ) {
     let bg = if active { RADIO_ACTIVE } else { RADIO_INACTIVE };
     parent
@@ -437,6 +455,7 @@ fn spawn_radio_option(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },
@@ -445,7 +464,8 @@ fn spawn_radio_option(
         });
 }
 
-fn spawn_collision_shape_row(parent: &mut ChildSpawnerCommands) {
+fn spawn_collision_shape_row(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
+    let font = font.clone();
     parent
         .spawn(Node {
             flex_direction: FlexDirection::Row,
@@ -455,12 +475,13 @@ fn spawn_collision_shape_row(parent: &mut ChildSpawnerCommands) {
         })
         .with_children(|row| {
             // Prev button
-            spawn_small_button(row, "<", PrevCollisionShapeButton);
+            spawn_small_button(row, "<", PrevCollisionShapeButton, &font);
 
             // "Shape 0/0" label
             row.spawn((
                 Text::new("Shape 0/0"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -469,17 +490,17 @@ fn spawn_collision_shape_row(parent: &mut ChildSpawnerCommands) {
             ));
 
             // Next button
-            spawn_small_button(row, ">", NextCollisionShapeButton);
+            spawn_small_button(row, ">", NextCollisionShapeButton, &font);
 
             // Add button
-            spawn_small_button(row, "+", AddCollisionShapeButton);
+            spawn_small_button(row, "+", AddCollisionShapeButton, &font);
 
             // Remove button
-            spawn_small_button(row, "-", RemoveCollisionShapeButton);
+            spawn_small_button(row, "-", RemoveCollisionShapeButton, &font);
         });
 }
 
-fn spawn_small_button(parent: &mut ChildSpawnerCommands, label: &str, marker: impl Component) {
+fn spawn_small_button(parent: &mut ChildSpawnerCommands, label: &str, marker: impl Component, font: &Handle<Font>) {
     parent
         .spawn((
             Button,
@@ -499,6 +520,7 @@ fn spawn_small_button(parent: &mut ChildSpawnerCommands, label: &str, marker: im
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },

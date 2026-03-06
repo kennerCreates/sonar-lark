@@ -11,9 +11,10 @@ use crate::dev_menu::color_picker_data::PALETTE_COLORS;
 
 use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH, CANVAS_HEIGHT, CANVAS_WIDTH};
 use super::{
-    BrushCursorPreview, BrushSizeButton, CanvasContainer, CursorBlinkTimer, PaintStroke,
-    PosterAction, PosterColorCell, PosterEditorState, PosterStartRaceButton, PosterTextElement,
-    PosterTool, ToolButtonMarker,
+    BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
+    PaintStroke, PosterAction, PosterColorCell, PosterEditorState, PosterStartRaceButton,
+    PosterTextElement, PosterTool, TextFontButton, TextFontPanel, TextSizeButton, TextSizePanel,
+    ToolButtonMarker, POSTER_FONTS,
 };
 
 // --- Tool selection ---
@@ -117,6 +118,73 @@ pub fn handle_brush_size(
     }
 }
 
+// --- Text size ---
+
+pub fn handle_text_size(
+    mut state: ResMut<PosterEditorState>,
+    query: Query<(&Interaction, &TextSizeButton), Changed<Interaction>>,
+    mut all_buttons: Query<(&TextSizeButton, &mut BackgroundColor, &mut BorderColor)>,
+    mut text_query: Query<&mut TextFont, With<PosterTextElement>>,
+) {
+    for (interaction, btn) in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        state.text_size = btn.0;
+
+        // Update active text element size
+        if let Some(entity) = state.editing_text {
+            if let Ok(mut font) = text_query.get_mut(entity) {
+                font.font_size = btn.0;
+            }
+        }
+
+        for (b, mut bg, mut border) in &mut all_buttons {
+            if (b.0 - btn.0).abs() < 0.1 {
+                *bg = BackgroundColor(ui_theme::BUTTON_SELECTED);
+                *border = BorderColor::all(palette::VANILLA);
+            } else {
+                *bg = BackgroundColor(ui_theme::BUTTON_NORMAL);
+                *border = BorderColor::all(ui_theme::BORDER_NORMAL);
+            }
+        }
+    }
+}
+
+// --- Text font ---
+
+pub fn handle_text_font(
+    mut state: ResMut<PosterEditorState>,
+    asset_server: Res<AssetServer>,
+    query: Query<(&Interaction, &TextFontButton), Changed<Interaction>>,
+    mut all_buttons: Query<(&TextFontButton, &mut BackgroundColor, &mut BorderColor)>,
+    mut text_query: Query<&mut TextFont, With<PosterTextElement>>,
+) {
+    for (interaction, btn) in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        state.text_font_index = btn.0;
+
+        // Update active text element font
+        if let Some(entity) = state.editing_text {
+            if let Ok(mut font) = text_query.get_mut(entity) {
+                font.font = asset_server.load(POSTER_FONTS[btn.0].1);
+            }
+        }
+
+        for (b, mut bg, mut border) in &mut all_buttons {
+            if b.0 == btn.0 {
+                *bg = BackgroundColor(ui_theme::BUTTON_SELECTED);
+                *border = BorderColor::all(palette::VANILLA);
+            } else {
+                *bg = BackgroundColor(ui_theme::BUTTON_NORMAL);
+                *border = BorderColor::all(ui_theme::BORDER_NORMAL);
+            }
+        }
+    }
+}
+
 // --- Painting ---
 
 pub fn handle_paint(
@@ -127,6 +195,30 @@ pub fn handle_paint(
     mut undo_stack: ResMut<UndoStack<PosterAction>>,
 ) {
     if state.active_tool != PosterTool::Paint {
+        return;
+    }
+
+    // Fill mode: single click floods the region
+    if state.brush_radius == super::BRUSH_FILL {
+        if !mouse.just_pressed(MouseButton::Left) {
+            return;
+        }
+        let Ok(rel_cursor) = container_query.single() else {
+            return;
+        };
+        let Some((img_x, img_y)) = cursor_to_canvas_image(rel_cursor) else {
+            return;
+        };
+        let px = img_x as u32;
+        let py = img_y as u32;
+        let color = state.brush_color;
+        if let Some(image) = images.get_mut(&state.canvas_handle) {
+            let data = image.data.as_mut().unwrap();
+            canvas::flood_fill(data, CANVAS_WIDTH, CANVAS_HEIGHT, px, py, color);
+        }
+        let action = PosterAction::Fill { x: px, y: py, color };
+        state.actions.push(action.clone());
+        undo_stack.push(action);
         return;
     }
 
@@ -147,8 +239,29 @@ pub fn handle_erase(
     container_query: Query<&RelativeCursorPosition, With<CanvasContainer>>,
     mut state: ResMut<PosterEditorState>,
     mut images: ResMut<Assets<Image>>,
+    mut undo_stack: ResMut<UndoStack<PosterAction>>,
 ) {
     if state.active_tool != PosterTool::Erase {
+        return;
+    }
+
+    // Fill + Erase = clear canvas (only when clicking on the canvas)
+    if state.brush_radius == super::BRUSH_FILL {
+        if !mouse.just_pressed(MouseButton::Left) {
+            return;
+        }
+        let Ok(rel_cursor) = container_query.single() else {
+            return;
+        };
+        if !rel_cursor.cursor_over {
+            return;
+        }
+        state.actions.clear();
+        undo_stack.clear();
+        if let Some(image) = images.get_mut(&state.canvas_handle) {
+            let data = image.data.as_mut().unwrap();
+            data.fill(255);
+        }
         return;
     }
 
@@ -236,7 +349,7 @@ fn finalize_stroke(
     if let Some(stroke) = state.current_stroke.take()
         && let Some(undo) = undo_stack
     {
-        state.strokes.push(stroke.clone());
+        state.actions.push(PosterAction::Stroke(stroke.clone()));
         undo.push(PosterAction::Stroke(stroke));
     }
 }
@@ -259,6 +372,7 @@ fn cursor_to_canvas_image(rel: &RelativeCursorPosition) -> Option<(f32, f32)> {
 pub fn handle_text_placement(
     mut commands: Commands,
     mouse: Res<ButtonInput<MouseButton>>,
+    asset_server: Res<AssetServer>,
     canvas_query: Query<(&RelativeCursorPosition, Entity), With<CanvasContainer>>,
     mut state: ResMut<PosterEditorState>,
     text_interactions: Query<(Entity, &Interaction), (With<PosterTextElement>, Changed<Interaction>)>,
@@ -303,13 +417,15 @@ pub fn handle_text_placement(
 
     // Spawn a new text entity as child of the canvas container
     // ZIndex(1) ensures text renders above the canvas ImageNode
+    let font_handle: Handle<Font> = asset_server.load(POSTER_FONTS[state.text_font_index].1);
     let text_entity = commands
         .spawn((
             PosterTextElement,
             Interaction::default(),
             Text::new(""),
             TextFont {
-                font_size: 32.0,
+                font: font_handle,
+                font_size: state.text_size,
                 ..default()
             },
             TextColor(text_color),
@@ -452,19 +568,16 @@ pub fn handle_undo_redo(
 
     if is_undo {
         if let Some(action) = undo_stack.pop_undo() {
-            // Remove last stroke from state
-            state.strokes.pop();
+            state.actions.pop();
             undo_stack.push_redo(action);
         }
     } else if let Some(action) = undo_stack.pop_redo() {
-        // Re-add the stroke
-        let PosterAction::Stroke(ref stroke) = action;
-        state.strokes.push(stroke.clone());
+        state.actions.push(action.clone());
         undo_stack.push_undo_only(action);
     }
 
     // Replay all strokes onto fresh canvas
-    let new_data = canvas::replay_strokes(&state.strokes, CANVAS_WIDTH, CANVAS_HEIGHT);
+    let new_data = canvas::replay_actions(&state.actions, CANVAS_WIDTH, CANVAS_HEIGHT);
     if let Some(image) = images.get_mut(&state.canvas_handle) {
         *image.data.as_mut().unwrap() = new_data;
     }
@@ -503,7 +616,8 @@ pub fn update_brush_cursor(
     };
 
     let show = matches!(state.active_tool, PosterTool::Paint | PosterTool::Erase)
-        && rel_cursor.cursor_over;
+        && rel_cursor.cursor_over
+        && state.brush_radius != super::BRUSH_FILL;
 
     if !show {
         *vis = Visibility::Hidden;
@@ -534,6 +648,43 @@ pub fn update_brush_cursor(
         Color::srgba_u8(r, g, b, 200)
     };
     *border = BorderColor::all(color);
+}
+
+// --- Brush panel visibility ---
+
+pub fn update_brush_panel_visibility(
+    state: Res<PosterEditorState>,
+    mut query: Query<&mut Visibility, With<BrushSizePanel>>,
+) {
+    let Ok(mut vis) = query.single_mut() else {
+        return;
+    };
+    *vis = if matches!(state.active_tool, PosterTool::Paint | PosterTool::Erase) {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+}
+
+// --- Text panel visibility ---
+
+pub fn update_text_panel_visibility(
+    state: Res<PosterEditorState>,
+    mut size_query: Query<&mut Visibility, (With<TextSizePanel>, Without<TextFontPanel>)>,
+    mut font_query: Query<&mut Visibility, (With<TextFontPanel>, Without<TextSizePanel>)>,
+) {
+    let show = state.active_tool == PosterTool::Text;
+    let v = if show {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    if let Ok(mut vis) = size_query.single_mut() {
+        *vis = v;
+    }
+    if let Ok(mut vis) = font_query.single_mut() {
+        *vis = v;
+    }
 }
 
 // --- Text cursor blink ---

@@ -4,7 +4,7 @@ use crate::course::loader::SelectedCourse;
 use crate::drone::spawning::NoGatesCourse;
 use crate::palette;
 use crate::states::{AppState, PendingEditorCourse};
-use crate::ui_theme;
+use crate::ui_theme::{self, UiFont};
 
 use super::lifecycle::{CountdownTimer, RacePhase};
 use super::start_button::{CountdownText, CountdownTextContent, StartRaceButton};
@@ -29,6 +29,7 @@ pub fn manage_countdown_text(
     timer: Option<Res<CountdownTimer>>,
     wrapper_query: Query<Entity, With<CountdownText>>,
     mut inner_query: Query<&mut Text, With<CountdownTextContent>>,
+    font: Res<UiFont>,
 ) {
     match *phase {
         RacePhase::Converging => {
@@ -36,6 +37,7 @@ pub fn manage_countdown_text(
             if let Ok(mut text) = inner_query.single_mut() {
                 text.0 = display;
             } else if wrapper_query.is_empty() {
+                let ui_font = font.0.clone();
                 commands
                     .spawn((
                         Node {
@@ -53,6 +55,7 @@ pub fn manage_countdown_text(
                         parent.spawn((
                             Text::new(display),
                             TextFont {
+                                font: ui_font.clone(),
                                 font_size: 120.0,
                                 ..default()
                             },
@@ -77,6 +80,7 @@ pub fn manage_countdown_text(
             if let Ok(mut text) = inner_query.single_mut() {
                 text.0 = display;
             } else if wrapper_query.is_empty() {
+                let ui_font = font.0.clone();
                 commands
                     .spawn((
                         Node {
@@ -94,6 +98,7 @@ pub fn manage_countdown_text(
                         parent.spawn((
                             Text::new(display),
                             TextFont {
+                                font: ui_font.clone(),
                                 font_size: 120.0,
                                 ..default()
                             },
@@ -118,6 +123,7 @@ pub fn update_race_clock_display(
     clock: Option<Res<RaceClock>>,
     wrapper_query: Query<Entity, With<RaceClockText>>,
     mut inner_query: Query<&mut Text, With<RaceClockTextContent>>,
+    font: Res<UiFont>,
 ) {
     let show_clock = matches!(*phase, RacePhase::Racing | RacePhase::Finished);
 
@@ -128,6 +134,7 @@ pub fn update_race_clock_display(
         if let Ok(mut text) = inner_query.single_mut() {
             text.0 = display;
         } else if wrapper_query.is_empty() {
+            let ui_font = font.0.clone();
             commands
                 .spawn((
                     Node {
@@ -144,6 +151,7 @@ pub fn update_race_clock_display(
                     parent.spawn((
                         Text::new(display),
                         TextFont {
+                            font: ui_font.clone(),
                             font_size: 36.0,
                             ..default()
                         },
@@ -166,6 +174,7 @@ pub fn show_no_gates_banner(
     no_gates: Option<Res<NoGatesCourse>>,
     existing: Query<(), With<NoGatesBanner>>,
     mut start_btn: Query<&mut Node, With<StartRaceButton>>,
+    font: Res<UiFont>,
 ) {
     if no_gates.is_none() || !existing.is_empty() {
         return;
@@ -176,6 +185,7 @@ pub fn show_no_gates_banner(
         node.display = Display::None;
     }
 
+    let ui_font = font.0.clone();
     commands
         .spawn((
             Node {
@@ -207,6 +217,7 @@ pub fn show_no_gates_banner(
                     banner.spawn((
                         Text::new("No gates on this course — add gates in the editor to race"),
                         TextFont {
+                            font: ui_font.clone(),
                             font_size: 20.0,
                             ..default()
                         },
@@ -215,7 +226,7 @@ pub fn show_no_gates_banner(
                 });
 
             // "OPEN EDITOR" button
-            ui_theme::spawn_menu_button(parent, "OPEN EDITOR", OpenEditorButton, 220.0);
+            ui_theme::spawn_menu_button(parent, "OPEN EDITOR", OpenEditorButton, 220.0, &ui_font);
         });
 }
 

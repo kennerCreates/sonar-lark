@@ -6,6 +6,7 @@ use crate::drone::components::{Drone, DroneIdentity};
 use crate::palette;
 use crate::pilot::SelectedPilots;
 use crate::states::AppState;
+use crate::ui_theme::UiFont;
 
 use super::progress::RaceProgress;
 
@@ -18,7 +19,8 @@ pub(crate) struct CameraHudModeText;
 #[derive(Component)]
 pub(crate) struct CameraHudHintText;
 
-pub fn setup_camera_hud(mut commands: Commands) {
+pub fn setup_camera_hud(mut commands: Commands, font: Res<UiFont>) {
+    let ui_font = font.0.clone();
     commands
         .spawn((
             CameraHudRoot,
@@ -38,6 +40,7 @@ pub fn setup_camera_hud(mut commands: Commands) {
                 CameraHudModeText,
                 Text::new("CHASE CAM"),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -47,6 +50,7 @@ pub fn setup_camera_hud(mut commands: Commands) {
                 CameraHudHintText,
                 Text::new("[1] Chase  [2] Spectator  [3] FPV"),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 11.0,
                     ..default()
                 },

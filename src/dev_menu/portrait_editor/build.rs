@@ -21,7 +21,9 @@ pub fn build_ui(
     state: &PortraitEditorState,
     config: &PortraitPaletteConfig,
     preview_handle: Option<Handle<Image>>,
+    ui_font: &Handle<Font>,
 ) {
+    let ui_font = ui_font.clone();
     commands
         .spawn((
             Node {
@@ -48,6 +50,7 @@ pub fn build_ui(
                 header.spawn((
                     Text::new("PORTRAIT PALETTE EDITOR"),
                     TextFont {
+                        font: ui_font.clone(),
                         font_size: 24.0,
                         ..default()
                     },
@@ -72,6 +75,7 @@ pub fn build_ui(
                         btn.spawn((
                             Text::new("BACK"),
                             TextFont {
+                                font: ui_font.clone(),
                                 font_size: 16.0,
                                 ..default()
                             },
@@ -101,6 +105,7 @@ pub fn build_ui(
                     left.spawn((
                         Text::new("Preview"),
                         TextFont {
+                            font: ui_font.clone(),
                             font_size: 14.0,
                             ..default()
                         },
@@ -128,6 +133,7 @@ pub fn build_ui(
                         ColorNameLabel,
                         Text::new(""),
                         TextFont {
+                            font: ui_font.clone(),
                             font_size: 12.0,
                             ..default()
                         },
@@ -180,6 +186,7 @@ pub fn build_ui(
                                         btn.spawn((
                                             Text::new(tab.label()),
                                             TextFont {
+                                                font: ui_font.clone(),
                                                 font_size: 13.0,
                                                 ..default()
                                             },
@@ -202,7 +209,7 @@ pub fn build_ui(
                             },
                         ))
                         .with_children(|variant_area| {
-                            spawn_variant_buttons(variant_area, state, config);
+                            spawn_variant_buttons(variant_area, state, config, &ui_font);
                         });
 
                     // Unique variant toggle row
@@ -256,6 +263,7 @@ pub fn build_ui(
                                                     "Primary Color (left-click = select, right-click = move)",
                                                 ),
                                                 TextFont {
+                                                    font: ui_font.clone(),
                                                     font_size: 12.0,
                                                     ..default()
                                                 },
@@ -284,6 +292,7 @@ pub fn build_ui(
                                                 btn.spawn((
                                                     Text::new("Auto-pair"),
                                                     TextFont {
+                                                        font: ui_font.clone(),
                                                         font_size: 11.0,
                                                         ..default()
                                                     },
@@ -312,6 +321,7 @@ pub fn build_ui(
                                                     col.spawn((
                                                         Text::new("Allowed"),
                                                         TextFont {
+                                                            font: ui_font.clone(),
                                                             font_size: 11.0,
                                                             ..default()
                                                         },
@@ -343,6 +353,7 @@ pub fn build_ui(
                                                     col.spawn((
                                                         Text::new("Vetoed"),
                                                         TextFont {
+                                                            font: ui_font.clone(),
                                                             font_size: 11.0,
                                                             ..default()
                                                         },
@@ -395,6 +406,7 @@ pub fn build_ui(
                         DroneWarningLabel,
                         Text::new(""),
                         TextFont {
+                            font: ui_font.clone(),
                             font_size: 12.0,
                             ..default()
                         },
@@ -411,16 +423,16 @@ pub fn build_ui(
                             ..default()
                         })
                         .with_children(|actions| {
-                            spawn_action_button(actions, "SAVE", SaveButton);
-                            spawn_action_button(actions, "RESET SLOT", ResetSlotButton);
-                            spawn_action_button(actions, "RESET ALL", ResetAllButton);
+                            spawn_action_button(actions, "SAVE", SaveButton, &ui_font);
+                            spawn_action_button(actions, "RESET SLOT", ResetSlotButton, &ui_font);
+                            spawn_action_button(actions, "RESET ALL", ResetAllButton, &ui_font);
                         });
                 });
             });
         });
 }
 
-fn spawn_action_button(parent: &mut ChildSpawnerCommands, label: &str, marker: impl Component) {
+fn spawn_action_button(parent: &mut ChildSpawnerCommands, label: &str, marker: impl Component, ui_font: &Handle<Font>) {
     parent
         .spawn((
             Button,
@@ -440,6 +452,7 @@ fn spawn_action_button(parent: &mut ChildSpawnerCommands, label: &str, marker: i
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -452,6 +465,7 @@ pub fn spawn_variant_buttons(
     parent: &mut ChildSpawnerCommands,
     state: &PortraitEditorState,
     config: &PortraitPaletteConfig,
+    ui_font: &Handle<Font>,
 ) {
     let slot = state.active_tab.color_slot();
     match state.active_tab {
@@ -459,14 +473,14 @@ pub fn spawn_variant_buttons(
             for (i, shape) in ALL_FACE_SHAPES.iter().enumerate() {
                 let is_active = *shape == state.face_shape;
                 let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
-                spawn_radio_button(parent, EditorTab::Face, i, &format!("{shape:?}"), is_active, is_unique);
+                spawn_radio_button(parent, EditorTab::Face, i, &format!("{shape:?}"), is_active, is_unique, ui_font);
             }
         }
         EditorTab::Eyes => {
             for (i, style) in ALL_EYE_STYLES.iter().enumerate() {
                 let is_active = *style == state.eye_style;
                 let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
-                spawn_radio_button(parent, EditorTab::Eyes, i, &format!("{style:?}"), is_active, is_unique);
+                spawn_radio_button(parent, EditorTab::Eyes, i, &format!("{style:?}"), is_active, is_unique, ui_font);
             }
         }
         EditorTab::Mouth => {
@@ -479,6 +493,7 @@ pub fn spawn_variant_buttons(
                     &format!("{style:?}"),
                     is_active,
                     false,
+                    ui_font,
                 );
             }
         }
@@ -486,7 +501,7 @@ pub fn spawn_variant_buttons(
             for (i, style) in ALL_HAIR_STYLES.iter().enumerate() {
                 let is_active = *style == state.hair_style;
                 let is_unique = slot.is_some_and(|s| config.is_variant_unique(s, i));
-                spawn_radio_button(parent, EditorTab::Hair, i, &format!("{style:?}"), is_active, is_unique);
+                spawn_radio_button(parent, EditorTab::Hair, i, &format!("{style:?}"), is_active, is_unique, ui_font);
             }
         }
         EditorTab::Shirt => {
@@ -500,6 +515,7 @@ pub fn spawn_variant_buttons(
                     &format!("{style:?}"),
                     is_active,
                     is_unique,
+                    ui_font,
                 );
             }
         }
@@ -512,6 +528,7 @@ pub fn spawn_variant_buttons(
                 "None",
                 state.accessory.is_none(),
                 false,
+                ui_font,
             );
             for (i, acc) in ALL_ACCESSORIES.iter().enumerate() {
                 let is_active = state.accessory == Some(*acc);
@@ -523,6 +540,7 @@ pub fn spawn_variant_buttons(
                     &format!("{acc:?}"),
                     is_active,
                     is_unique,
+                    ui_font,
                 );
             }
         }
@@ -530,6 +548,7 @@ pub fn spawn_variant_buttons(
             parent.spawn((
                 Text::new("Portrait background color"),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -546,6 +565,7 @@ fn spawn_radio_button(
     label: &str,
     active: bool,
     is_unique: bool,
+    ui_font: &Handle<Font>,
 ) {
     let border_color = if active {
         palette::SKY
@@ -573,6 +593,7 @@ fn spawn_radio_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 12.0,
                     ..default()
                 },

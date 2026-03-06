@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use super::components::*;
 use crate::palette;
 use crate::states::AppState;
+use crate::ui_theme::UiFont;
 
 const PANEL_BG: Color = palette::SMOKY_BLACK;
 const ROW_BG: Color = palette::SMOKY_BLACK;
@@ -43,6 +44,7 @@ pub fn toggle_dev_dashboard(
     mut commands: Commands,
     existing: Query<Entity, With<DevDashboardRoot>>,
     tuning: Res<AiTuningParams>,
+    font: Res<UiFont>,
 ) {
     if !keyboard.just_pressed(KeyCode::F4) {
         return;
@@ -55,10 +57,10 @@ pub fn toggle_dev_dashboard(
     }
 
     info!("Dev dashboard: ON");
-    spawn_dashboard(&mut commands, &tuning);
+    spawn_dashboard(&mut commands, &tuning, font.0.clone());
 }
 
-fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
+fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams, ui_font: Handle<Font>) {
     let defaults = AiTuningParams::default();
 
     commands
@@ -83,6 +85,7 @@ fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
             panel.spawn((
                 Text::new("AI TUNING (F4)"),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 16.0,
                     ..default()
                 },
@@ -117,6 +120,7 @@ fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
                         row.spawn((
                             Text::new(meta.name),
                             TextFont {
+                                font: ui_font.clone(),
                                 font_size: 13.0,
                                 ..default()
                             },
@@ -136,6 +140,7 @@ fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
                         row.spawn((
                             Text::new(format_value(value, meta.step)),
                             TextFont {
+                                font: ui_font.clone(),
                                 font_size: 13.0,
                                 ..default()
                             },
@@ -149,10 +154,10 @@ fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
                         ));
 
                         // Minus button
-                        spawn_param_button(row, i, -meta.step, "-");
+                        spawn_param_button(row, i, -meta.step, "-", ui_font.clone());
 
                         // Plus button
-                        spawn_param_button(row, i, meta.step, "+");
+                        spawn_param_button(row, i, meta.step, "+", ui_font.clone());
                     });
             }
 
@@ -177,6 +182,7 @@ fn spawn_dashboard(commands: &mut Commands, tuning: &AiTuningParams) {
                     btn.spawn((
                         Text::new("RESET ALL"),
                         TextFont {
+                            font: ui_font.clone(),
                             font_size: 14.0,
                             ..default()
                         },
@@ -191,6 +197,7 @@ fn spawn_param_button(
     index: usize,
     delta: f32,
     label: &str,
+    ui_font: Handle<Font>,
 ) {
     parent
         .spawn((
@@ -211,6 +218,7 @@ fn spawn_param_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 14.0,
                     ..default()
                 },

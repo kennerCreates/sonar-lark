@@ -18,7 +18,9 @@ pub fn build_ui(
     state: &PilotGeneratorState,
     roster_count: usize,
     preview_handle: Option<Handle<Image>>,
+    ui_font: &Handle<Font>,
 ) {
+    let ui_font = ui_font.clone();
     commands
         .spawn((
             Node {
@@ -45,6 +47,7 @@ pub fn build_ui(
                 header.spawn((
                     Text::new("PILOT GENERATOR"),
                     TextFont {
+                        font: ui_font.clone(),
                         font_size: 24.0,
                         ..default()
                     },
@@ -59,9 +62,9 @@ pub fn build_ui(
                         ..default()
                     })
                     .with_children(|btns| {
-                        spawn_header_button(btns, "OBSTACLE WORKSHOP", ObstacleWorkshopButton);
-                        spawn_header_button(btns, "PALETTE EDITOR", PaletteEditorButton);
-                        spawn_header_button(btns, "BACK", GenBackButton);
+                        spawn_header_button(btns, "OBSTACLE WORKSHOP", ObstacleWorkshopButton, &ui_font);
+                        spawn_header_button(btns, "PALETTE EDITOR", PaletteEditorButton, &ui_font);
+                        spawn_header_button(btns, "BACK", GenBackButton, &ui_font);
                     });
             });
 
@@ -119,6 +122,7 @@ pub fn build_ui(
                             row.spawn((
                                 Text::new("Gamertag:"),
                                 TextFont {
+                                    font: ui_font.clone(),
                                     font_size: 14.0,
                                     ..default()
                                 },
@@ -128,6 +132,7 @@ pub fn build_ui(
                                 GamertagLabel,
                                 Text::new(state.candidate.gamertag.clone()),
                                 TextFont {
+                                    font: ui_font.clone(),
                                     font_size: 20.0,
                                     ..default()
                                 },
@@ -147,6 +152,7 @@ pub fn build_ui(
                             row.spawn((
                                 Text::new("Personality:"),
                                 TextFont {
+                                    font: ui_font.clone(),
                                     font_size: 14.0,
                                     ..default()
                                 },
@@ -156,6 +162,7 @@ pub fn build_ui(
                                 PersonalityLabel,
                                 Text::new(format_personality(&state.candidate.personality)),
                                 TextFont {
+                                    font: ui_font.clone(),
                                     font_size: 14.0,
                                     ..default()
                                 },
@@ -175,6 +182,7 @@ pub fn build_ui(
                             row.spawn((
                                 Text::new("Drone Color:"),
                                 TextFont {
+                                    font: ui_font.clone(),
                                     font_size: 14.0,
                                     ..default()
                                 },
@@ -206,20 +214,23 @@ pub fn build_ui(
                         "REROLL PORTRAIT",
                         RerollPortraitButton,
                         palette::INDIGO,
+                        &ui_font,
                     );
                     spawn_action_button(
                         right,
                         "REROLL NAME",
                         RerollGamertagButton,
                         palette::INDIGO,
+                        &ui_font,
                     );
                     spawn_action_button(
                         right,
                         "REROLL PERSONALITY",
                         RerollPersonalityButton,
                         palette::INDIGO,
+                        &ui_font,
                     );
-                    spawn_action_button(right, "ACCEPT", AcceptButton, palette::FROG);
+                    spawn_action_button(right, "ACCEPT", AcceptButton, palette::FROG, &ui_font);
                 });
             });
 
@@ -228,6 +239,7 @@ pub fn build_ui(
                 RosterCountLabel,
                 Text::new(format!("Roster: {} pilots", roster_count)),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -240,6 +252,7 @@ fn spawn_header_button(
     parent: &mut ChildSpawnerCommands,
     label: &str,
     marker: impl Component,
+    ui_font: &Handle<Font>,
 ) {
     parent
         .spawn((
@@ -261,6 +274,7 @@ fn spawn_header_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -274,6 +288,7 @@ fn spawn_action_button(
     label: &str,
     marker: impl Component,
     bg: Color,
+    ui_font: &Handle<Font>,
 ) {
     parent
         .spawn((
@@ -295,6 +310,7 @@ fn spawn_action_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: ui_font.clone(),
                     font_size: 15.0,
                     ..default()
                 },

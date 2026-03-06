@@ -21,6 +21,7 @@ use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
 use crate::editor::types::EditorTab;
 use crate::states::{EditorMode, PendingEditorCourse};
+use crate::ui_theme::UiFont;
 
 use crate::editor::undo::{CourseEditorAction, UndoStack};
 use transform_gizmos::{MoveWidgetState, RotateWidgetState, ScaleWidgetState};
@@ -270,9 +271,10 @@ fn ensure_gltf_loaded(
 fn setup_course_editor(
     mut commands: Commands,
     library: Res<ObstacleLibrary>,
+    font: Res<UiFont>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
-    ui::build_course_editor_ui(&mut commands, &library);
+    ui::build_course_editor_ui(&mut commands, &library, &font.0);
     commands.insert_resource(EditorSelection::default());
     commands.insert_resource(EditorTransform::default());
     commands.insert_resource(EditorCourse::default());

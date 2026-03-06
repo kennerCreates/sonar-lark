@@ -12,6 +12,7 @@ use super::types::*;
 pub fn build_course_editor_ui(
     commands: &mut Commands,
     library: &ObstacleLibrary,
+    font: &Handle<Font>,
 ) {
     commands
         .spawn((
@@ -25,12 +26,12 @@ pub fn build_course_editor_ui(
             DespawnOnExit(EditorMode::CourseEditor),
         ))
         .with_children(|root| {
-            build_left_panel(root, library);
-            build_right_panel(root);
+            build_left_panel(root, library, font);
+            build_right_panel(root, font);
         });
 }
 
-fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary) {
+fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary, font: &Handle<Font>) {
     parent
         .spawn((
             Node {
@@ -48,6 +49,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
             panel.spawn((
                 Text::new("Course Editor"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 22.0,
                     ..default()
                 },
@@ -64,8 +66,8 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     ..default()
                 })
                 .with_children(|row| {
-                    spawn_tab_button(row, "Obstacles", ObstacleTabButton, true);
-                    spawn_tab_button(row, "Props", PropsTabButton, false);
+                    spawn_tab_button(row, "Obstacles", ObstacleTabButton, true, font);
+                    spawn_tab_button(row, "Props", PropsTabButton, false, font);
                 });
 
             // --- Obstacle palette content (visible by default) ---
@@ -95,6 +97,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                         "No obstacles in library.\nGo to Obstacle Workshop first.",
                                     ),
                                     TextFont {
+                                        font: font.clone(),
                                         font_size: 13.0,
                                         ..default()
                                     },
@@ -104,7 +107,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 let mut ids: Vec<_> = library.definitions.keys().collect();
                                 ids.sort_by(|a, b| a.0.cmp(&b.0));
                                 for id in ids {
-                                    spawn_palette_button(container, id);
+                                    spawn_palette_button(container, id, font);
                                 }
                             }
                         });
@@ -122,11 +125,12 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     },
                 ))
                 .with_children(|content| {
-                    spawn_prop_palette_button(content, "Confetti Emitter", PropKind::ConfettiEmitter);
+                    spawn_prop_palette_button(content, "Confetti Emitter", PropKind::ConfettiEmitter, font);
                     spawn_prop_palette_button(
                         content,
                         "Shell Burst Emitter",
                         PropKind::ShellBurstEmitter,
+                        font,
                     );
 
                     ui_theme::spawn_divider(content);
@@ -134,6 +138,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                     content.spawn((
                         Text::new("Color: Auto"),
                         TextFont {
+                            font: font.clone(),
                             font_size: 13.0,
                             ..default()
                         },
@@ -160,6 +165,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                             btn.spawn((
                                 Text::new("Cycle Color"),
                                 TextFont {
+                                    font: font.clone(),
                                     font_size: 12.0,
                                     ..default()
                                 },
@@ -174,7 +180,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
             });
 
             ui_theme::spawn_divider(panel);
-            ui_theme::spawn_panel_button(panel, "Back to Menu", BackToMenuButton);
+            ui_theme::spawn_panel_button(panel, "Back to Menu", BackToMenuButton, font);
         });
 }
 
@@ -183,6 +189,7 @@ fn spawn_tab_button(
     label: &str,
     marker: impl Component,
     active: bool,
+    font: &Handle<Font>,
 ) {
     parent
         .spawn((
@@ -203,6 +210,7 @@ fn spawn_tab_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },
@@ -215,6 +223,7 @@ fn spawn_prop_palette_button(
     parent: &mut ChildSpawnerCommands,
     label: &str,
     kind: PropKind,
+    font: &Handle<Font>,
 ) {
     let accent = match kind {
         PropKind::ConfettiEmitter => palette::SUNSHINE,
@@ -239,6 +248,7 @@ fn spawn_prop_palette_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },

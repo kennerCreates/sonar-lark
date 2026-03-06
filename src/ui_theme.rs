@@ -2,6 +2,12 @@ use bevy::prelude::*;
 
 use crate::palette;
 
+/// Global UI font resource. Loaded once at startup; all UI text should use this.
+#[derive(Resource, Clone)]
+pub struct UiFont(pub Handle<Font>);
+
+pub const FONT_PATH: &str = "fonts/Asimovian/Asimovian-Regular.ttf";
+
 // Standard button background colors (used across all UI modules).
 pub const BUTTON_NORMAL: Color = palette::INDIGO;
 pub const BUTTON_HOVERED: Color = palette::SAPPHIRE;
@@ -30,6 +36,8 @@ pub struct UiThemePlugin;
 
 impl Plugin for UiThemePlugin {
     fn build(&self, app: &mut App) {
+        let asset_server = app.world().resource::<AssetServer>().clone();
+        app.insert_resource(UiFont(asset_server.load(FONT_PATH)));
         app.add_systems(Update, update_themed_button_visuals);
     }
 }
@@ -88,7 +96,9 @@ pub fn spawn_panel_button(
     parent: &mut ChildSpawnerCommands,
     label: &str,
     marker: impl Component,
+    font: &Handle<Font>,
 ) {
+    let font = font.clone();
     parent
         .spawn((
             Button,
@@ -108,6 +118,7 @@ pub fn spawn_panel_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },
@@ -122,7 +133,9 @@ pub fn spawn_action_button(
     label: &str,
     marker: impl Component,
     bg: Color,
+    font: &Handle<Font>,
 ) {
+    let font = font.clone();
     parent
         .spawn((
             Button,
@@ -143,6 +156,7 @@ pub fn spawn_action_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 15.0,
                     ..default()
                 },
@@ -158,7 +172,9 @@ pub fn spawn_menu_button(
     label: &str,
     marker: impl Component,
     width: f32,
+    font: &Handle<Font>,
 ) {
+    let font = font.clone();
     parent
         .spawn((
             Button,
@@ -179,6 +195,7 @@ pub fn spawn_menu_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 24.0,
                     ..default()
                 },
@@ -192,7 +209,9 @@ pub fn spawn_disabled_menu_button(
     parent: &mut ChildSpawnerCommands,
     label: &str,
     width: f32,
+    font: &Handle<Font>,
 ) {
+    let font = font.clone();
     parent
         .spawn((
             Node {
@@ -210,6 +229,7 @@ pub fn spawn_disabled_menu_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 24.0,
                     ..default()
                 },

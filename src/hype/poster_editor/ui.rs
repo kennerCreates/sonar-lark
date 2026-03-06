@@ -8,12 +8,14 @@ use crate::editor::undo::UndoStack;
 use crate::palette;
 use crate::states::HypeMode;
 use crate::ui_theme;
+use crate::ui_theme::UiFont;
 
 use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH};
 use super::{
-    BrushCursorPreview, BrushSizeButton, CanvasContainer, CursorBlinkTimer, EraseToolButton,
-    PaintToolButton, PosterAction, PosterCanvas, PosterColorCell, PosterEditorState,
-    PosterStartRaceButton, PosterTool, TextToolButton, ToolButtonMarker,
+    BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
+    EraseToolButton, PaintToolButton, PosterAction, PosterCanvas, PosterColorCell,
+    PosterEditorState, PosterStartRaceButton, PosterTool, TextFontButton, TextFontPanel,
+    TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker, POSTER_FONTS,
 };
 
 const COLOR_CELL_SIZE: f32 = 28.0;
@@ -24,7 +26,18 @@ const BRUSH_SMALL: f32 = 4.0;
 const BRUSH_MEDIUM: f32 = 10.0;
 const BRUSH_LARGE: f32 = 20.0;
 
-pub fn setup_poster_editor(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+const TEXT_SMALL: f32 = 18.0;
+const TEXT_MEDIUM: f32 = 28.0;
+const TEXT_LARGE: f32 = 40.0;
+const TEXT_XLARGE: f32 = 56.0;
+
+pub fn setup_poster_editor(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    asset_server: Res<AssetServer>,
+    font: Res<UiFont>,
+) {
+    let ui_font = font.0.clone();
     let canvas_image = canvas::create_blank_canvas();
     let canvas_handle = images.add(canvas_image);
 
@@ -33,9 +46,11 @@ pub fn setup_poster_editor(mut commands: Commands, mut images: ResMut<Assets<Ima
         brush_color: [0, 0, 0, 255],
         brush_radius: BRUSH_MEDIUM,
         canvas_handle: canvas_handle.clone(),
-        strokes: Vec::new(),
+        actions: Vec::new(),
         current_stroke: None,
         editing_text: None,
+        text_size: TEXT_MEDIUM,
+        text_font_index: 0,
     });
     commands.insert_resource(UndoStack::<PosterAction>::default());
     commands.insert_resource(CursorBlinkTimer {
@@ -57,7 +72,7 @@ pub fn setup_poster_editor(mut commands: Commands, mut images: ResMut<Assets<Ima
         ))
         .with_children(|root| {
             // Left panel — tools
-            spawn_left_panel(root);
+            spawn_left_panel(root, &asset_server, ui_font.clone());
 
             // Center — canvas
             spawn_canvas_area(root, canvas_handle);
@@ -66,14 +81,14 @@ pub fn setup_poster_editor(mut commands: Commands, mut images: ResMut<Assets<Ima
             spawn_right_panel(root);
 
             // Start Race button (absolute positioned)
-            spawn_start_race_button(root);
+            spawn_start_race_button(root, ui_font.clone());
         });
 }
 
-fn spawn_left_panel(parent: &mut ChildSpawnerCommands) {
+fn spawn_left_panel(parent: &mut ChildSpawnerCommands, asset_server: &AssetServer, ui_font: Handle<Font>) {
     parent
         .spawn(Node {
-            width: Val::Px(180.0),
+            width: Val::Px(220.0),
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
             padding: UiRect::all(Val::Px(20.0)),
@@ -82,37 +97,123 @@ fn spawn_left_panel(parent: &mut ChildSpawnerCommands) {
         })
         .with_children(|panel| {
             // Paint button (selected by default)
-            spawn_tool_button(panel, "Paint", PosterTool::Paint, true);
-            spawn_tool_button(panel, "Text", PosterTool::Text, false);
-            spawn_tool_button(panel, "Erase", PosterTool::Erase, false);
+            spawn_tool_button(panel, "Paint", PosterTool::Paint, true, ui_font.clone());
+            spawn_tool_button(panel, "Text", PosterTool::Text, false, ui_font.clone());
+            spawn_tool_button(panel, "Erase", PosterTool::Erase, false, ui_font.clone());
 
-            // Spacer
-            panel.spawn(Node {
-                height: Val::Px(20.0),
-                ..default()
-            });
-
-            // Brush size label
-            panel.spawn((
-                Text::new("Brush Size"),
-                TextFont {
-                    font_size: 16.0,
-                    ..default()
-                },
-                TextColor(palette::VANILLA),
-            ));
-
-            // Brush size buttons
+            // Brush size section (hidden when not in paint/erase mode)
             panel
-                .spawn(Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(8.0),
-                    ..default()
-                })
-                .with_children(|row| {
-                    spawn_brush_size_button(row, "S", BRUSH_SMALL, false);
-                    spawn_brush_size_button(row, "M", BRUSH_MEDIUM, true);
-                    spawn_brush_size_button(row, "L", BRUSH_LARGE, false);
+                .spawn((
+                    BrushSizePanel,
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        row_gap: Val::Px(10.0),
+                        margin: UiRect::top(Val::Px(20.0)),
+                        ..default()
+                    },
+                ))
+                .with_children(|section| {
+                    section.spawn((
+                        Text::new("Brush Size"),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(palette::VANILLA),
+                    ));
+
+                    let ui_font_brush = ui_font.clone();
+                    section
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(6.0),
+                            ..default()
+                        })
+                        .with_children(|row| {
+                            spawn_brush_size_button(row, "S", BRUSH_SMALL, false, ui_font_brush.clone());
+                            spawn_brush_size_button(row, "M", BRUSH_MEDIUM, true, ui_font_brush.clone());
+                            spawn_brush_size_button(row, "L", BRUSH_LARGE, false, ui_font_brush.clone());
+                            spawn_brush_size_button(row, "Fill", super::BRUSH_FILL, false, ui_font_brush.clone());
+                        });
+                });
+
+            // Text size section (hidden when not in text mode)
+            panel
+                .spawn((
+                    TextSizePanel,
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        row_gap: Val::Px(10.0),
+                        margin: UiRect::top(Val::Px(20.0)),
+                        ..default()
+                    },
+                    Visibility::Hidden,
+                ))
+                .with_children(|section| {
+                    section.spawn((
+                        Text::new("Text Size"),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(palette::VANILLA),
+                    ));
+
+                    let ui_font_text = ui_font.clone();
+                    section
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            column_gap: Val::Px(6.0),
+                            ..default()
+                        })
+                        .with_children(|row| {
+                            spawn_text_size_button(row, "S", TEXT_SMALL, false, ui_font_text.clone());
+                            spawn_text_size_button(row, "M", TEXT_MEDIUM, true, ui_font_text.clone());
+                            spawn_text_size_button(row, "L", TEXT_LARGE, false, ui_font_text.clone());
+                            spawn_text_size_button(row, "XL", TEXT_XLARGE, false, ui_font_text.clone());
+                        });
+                });
+
+            // Font section (hidden when not in text mode)
+            panel
+                .spawn((
+                    TextFontPanel,
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Center,
+                        row_gap: Val::Px(10.0),
+                        margin: UiRect::top(Val::Px(10.0)),
+                        ..default()
+                    },
+                    Visibility::Hidden,
+                ))
+                .with_children(|section| {
+                    section.spawn((
+                        Text::new("Font"),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(palette::VANILLA),
+                    ));
+
+                    section
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(4.0),
+                            ..default()
+                        })
+                        .with_children(|col| {
+                            for (i, (name, path)) in POSTER_FONTS.iter().enumerate() {
+                                let font_handle: Handle<Font> = asset_server.load(*path);
+                                spawn_font_button(col, name, font_handle, i, i == 0);
+                            }
+                        });
                 });
         });
 }
@@ -122,6 +223,7 @@ fn spawn_tool_button(
     label: &str,
     tool: PosterTool,
     selected: bool,
+    ui_font: Handle<Font>,
 ) {
     let bg = if selected {
         ui_theme::BUTTON_SELECTED
@@ -162,6 +264,7 @@ fn spawn_tool_button(
         btn.spawn((
             Text::new(label),
             TextFont {
+                font: ui_font.clone(),
                 font_size: 22.0,
                 ..default()
             },
@@ -175,13 +278,14 @@ fn spawn_brush_size_button(
     label: &str,
     size: f32,
     selected: bool,
+    ui_font: Handle<Font>,
 ) {
     parent
         .spawn((
             Button,
             BrushSizeButton(size),
             Node {
-                width: Val::Px(40.0),
+                width: Val::Px(44.0),
                 height: Val::Px(40.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
@@ -203,6 +307,93 @@ fn spawn_brush_size_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: ui_font.clone(),
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(palette::VANILLA),
+            ));
+        });
+}
+
+fn spawn_text_size_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    size: f32,
+    selected: bool,
+    ui_font: Handle<Font>,
+) {
+    parent
+        .spawn((
+            Button,
+            TextSizeButton(size),
+            Node {
+                width: Val::Px(44.0),
+                height: Val::Px(40.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(if selected {
+                ui_theme::BUTTON_SELECTED
+            } else {
+                ui_theme::BUTTON_NORMAL
+            }),
+            BorderColor::all(if selected {
+                palette::VANILLA
+            } else {
+                ui_theme::BORDER_NORMAL
+            }),
+        ))
+        .with_children(|btn| {
+            btn.spawn((
+                Text::new(label),
+                TextFont {
+                    font: ui_font.clone(),
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(palette::VANILLA),
+            ));
+        });
+}
+
+fn spawn_font_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    font_handle: Handle<Font>,
+    index: usize,
+    selected: bool,
+) {
+    parent
+        .spawn((
+            Button,
+            TextFontButton(index),
+            Node {
+                width: Val::Px(190.0),
+                height: Val::Px(36.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(if selected {
+                ui_theme::BUTTON_SELECTED
+            } else {
+                ui_theme::BUTTON_NORMAL
+            }),
+            BorderColor::all(if selected {
+                palette::VANILLA
+            } else {
+                ui_theme::BORDER_NORMAL
+            }),
+        ))
+        .with_children(|btn| {
+            btn.spawn((
+                Text::new(label),
+                TextFont {
+                    font: font_handle,
                     font_size: 18.0,
                     ..default()
                 },
@@ -315,7 +506,7 @@ fn spawn_right_panel(parent: &mut ChildSpawnerCommands) {
         });
 }
 
-fn spawn_start_race_button(parent: &mut ChildSpawnerCommands) {
+fn spawn_start_race_button(parent: &mut ChildSpawnerCommands, ui_font: Handle<Font>) {
     parent
         .spawn(Node {
             position_type: PositionType::Absolute,
@@ -344,6 +535,7 @@ fn spawn_start_race_button(parent: &mut ChildSpawnerCommands) {
                     btn.spawn((
                         Text::new("START RACE"),
                         TextFont {
+                            font: ui_font.clone(),
                             font_size: 24.0,
                             ..default()
                         },

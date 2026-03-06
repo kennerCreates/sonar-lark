@@ -8,7 +8,7 @@ use crate::ui_theme;
 
 use super::types::*;
 
-pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
+pub fn build_right_panel(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
     parent
         .spawn((
             Node {
@@ -28,6 +28,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                 "Save Course",
                 SaveCourseButton,
                 palette::JUNGLE,
+                font,
             );
 
             ui_theme::spawn_action_button(
@@ -35,6 +36,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                 "Hype Race",
                 StartRaceButton,
                 palette::TANGERINE,
+                font,
             );
 
             ui_theme::spawn_divider(panel);
@@ -42,6 +44,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Gate Ordering"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -51,6 +54,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Gates: 0 (loop)"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },
@@ -77,6 +81,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                     btn.spawn((
                         Text::new("Gate Mode: OFF"),
                         TextFont {
+                            font: font.clone(),
                             font_size: 13.0,
                             ..default()
                         },
@@ -85,7 +90,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                     ));
                 });
 
-            ui_theme::spawn_panel_button(panel, "Clear Gate Orders", ClearGateOrdersButton);
+            ui_theme::spawn_panel_button(panel, "Clear Gate Orders", ClearGateOrdersButton, font);
 
             ui_theme::spawn_divider(panel);
 
@@ -93,6 +98,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Gate Color"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -102,6 +108,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Color: (select a gate)"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },
@@ -137,13 +144,14 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                     }
                 });
 
-            ui_theme::spawn_panel_button(panel, "Default Color", GateColorDefaultButton);
+            ui_theme::spawn_panel_button(panel, "Default Color", GateColorDefaultButton, font);
 
             ui_theme::spawn_divider(panel);
 
             panel.spawn((
                 Text::new("Transform Mode"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -158,9 +166,9 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
                     ..default()
                 },))
                 .with_children(|row| {
-                    spawn_transform_mode_button(row, "Move (1)", TransformMode::Move);
-                    spawn_transform_mode_button(row, "Rotate (2)", TransformMode::Rotate);
-                    spawn_transform_mode_button(row, "Scale (3)", TransformMode::Scale);
+                    spawn_transform_mode_button(row, "Move (1)", TransformMode::Move, font);
+                    spawn_transform_mode_button(row, "Rotate (2)", TransformMode::Rotate, font);
+                    spawn_transform_mode_button(row, "Scale (3)", TransformMode::Scale, font);
                 });
 
             ui_theme::spawn_divider(panel);
@@ -168,6 +176,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Del  →  delete selected"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -177,6 +186,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("LMB obstacle  →  select"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -186,6 +196,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("LMB palette + empty  →  place"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -195,6 +206,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Gate mode: LMB to assign order"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -204,6 +216,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("F  →  flip gate direction"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -213,6 +226,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Shift  →  Y-move / axis-scale / Z-rotate"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -222,6 +236,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
             panel.spawn((
                 Text::new("Ctrl  →  X-rotate"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 12.0,
                     ..default()
                 },
@@ -230,7 +245,7 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands) {
         });
 }
 
-pub fn spawn_palette_button(parent: &mut ChildSpawnerCommands, id: &ObstacleId) {
+pub fn spawn_palette_button(parent: &mut ChildSpawnerCommands, id: &ObstacleId, font: &Handle<Font>) {
     parent
         .spawn((
             Button,
@@ -250,6 +265,7 @@ pub fn spawn_palette_button(parent: &mut ChildSpawnerCommands, id: &ObstacleId) 
             btn.spawn((
                 Text::new(&id.0),
                 TextFont {
+                    font: font.clone(),
                     font_size: 13.0,
                     ..default()
                 },
@@ -262,6 +278,7 @@ fn spawn_transform_mode_button(
     parent: &mut ChildSpawnerCommands,
     label: &str,
     mode: TransformMode,
+    font: &Handle<Font>,
 ) {
     parent
         .spawn((
@@ -282,6 +299,7 @@ fn spawn_transform_mode_button(
             btn.spawn((
                 Text::new(label),
                 TextFont {
+                    font: font.clone(),
                     font_size: 11.0,
                     ..default()
                 },

@@ -5,6 +5,7 @@ use crate::obstacle::definition::{CameraPlacement, CollisionVolumeConfig, Obstac
 use crate::obstacle::library::{save_obstacle_library, ObstacleLibrary};
 use crate::palette;
 use crate::states::DevMenuPage;
+use crate::ui_theme::UiFont;
 
 use super::build::*;
 use crate::editor::workshop::{PreviewObstacle, WorkshopState};
@@ -15,6 +16,7 @@ pub fn handle_save_button(
     query: Query<&Interaction, (Changed<Interaction>, With<SaveButton>)>,
     mut library: ResMut<ObstacleLibrary>,
     library_container: Query<Entity, With<LibraryListContainer>>,
+    font: Res<UiFont>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -84,7 +86,7 @@ pub fn handle_save_button(
         save_obstacle_library(&library);
         info!("Saved obstacle '{}'", state.obstacle_name);
 
-        rebuild_library_list(&mut commands, &library, &library_container);
+        rebuild_library_list(&mut commands, &library, &library_container, &font.0);
     }
 }
 
@@ -122,6 +124,7 @@ pub fn handle_delete_button(
     mut library: ResMut<ObstacleLibrary>,
     preview_query: Query<Entity, With<PreviewObstacle>>,
     library_container: Query<Entity, With<LibraryListContainer>>,
+    font: Res<UiFont>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
@@ -149,7 +152,7 @@ pub fn handle_delete_button(
                 ..default()
             };
 
-            rebuild_library_list(&mut commands, &library, &library_container);
+            rebuild_library_list(&mut commands, &library, &library_container, &font.0);
         }
     }
 }
@@ -169,17 +172,20 @@ fn rebuild_library_list(
     commands: &mut Commands,
     library: &ObstacleLibrary,
     container_query: &Query<Entity, With<LibraryListContainer>>,
+    font: &Handle<Font>,
 ) {
     let Ok(container) = container_query.single() else {
         return;
     };
 
+    let font = font.clone();
     commands.entity(container).despawn_related::<Children>();
     commands.entity(container).with_children(|parent| {
         if library.definitions.is_empty() {
             parent.spawn((
                 Text::new("No obstacles defined"),
                 TextFont {
+                    font: font.clone(),
                     font_size: 14.0,
                     ..default()
                 },
@@ -189,7 +195,7 @@ fn rebuild_library_list(
             let mut ids: Vec<&ObstacleId> = library.definitions.keys().collect();
             ids.sort_by(|a, b| a.0.cmp(&b.0));
             for id in ids {
-                spawn_library_button(parent, &id.0);
+                spawn_library_button(parent, &id.0, &font);
             }
         }
     });
