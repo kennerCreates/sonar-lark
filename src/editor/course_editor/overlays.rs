@@ -28,22 +28,6 @@ pub(super) fn draw_gate_sequence_lines(
 
     gates.sort_by_key(|(order, _)| *order);
 
-    let line_color = palette::SUNSHINE;
-
-    for pair in gates.windows(2) {
-        let (_, from) = pair[0];
-        let (_, to) = pair[1];
-        gizmos.line(from, to, line_color);
-    }
-
-    // Draw loop-closing line from last gate back to first gate
-    if gates.len() >= 2 {
-        let (_, first) = gates[0];
-        let (_, last) = gates[gates.len() - 1];
-        let loop_color = palette::SKY;
-        gizmos.line(last, first, loop_color);
-    }
-
     let Color::Srgba(gate_start) = palette::GREEN else { unreachable!() };
     let Color::Srgba(gate_end) = palette::SUNFLOWER else { unreachable!() };
     let count = gates.len();
