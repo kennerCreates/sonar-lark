@@ -194,6 +194,14 @@ pub fn handle_paint(
     mut images: ResMut<Assets<Image>>,
     mut undo_stack: ResMut<UndoStack<PosterAction>>,
 ) {
+    // Skip the click that opened the editor.
+    if state.skip_initial_click {
+        if !mouse.pressed(MouseButton::Left) {
+            state.skip_initial_click = false;
+        }
+        return;
+    }
+
     if state.active_tool != PosterTool::Paint {
         return;
     }

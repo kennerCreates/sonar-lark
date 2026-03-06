@@ -83,6 +83,9 @@ pub struct PosterEditorState {
     pub editing_text: Option<Entity>,
     pub text_size: f32,
     pub text_font_index: usize,
+    /// When true, ignore mouse input until the button is released (prevents the
+    /// click that opened the editor from painting on the canvas).
+    pub skip_initial_click: bool,
 }
 
 /// Font entries available in the poster editor: (display name, asset path).

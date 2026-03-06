@@ -62,6 +62,7 @@ pub fn setup_poster_editor(
         editing_text: None,
         text_size: TEXT_MEDIUM,
         text_font_index: 0,
+        skip_initial_click: true,
     });
     commands.insert_resource(UndoStack::<PosterAction>::default());
     commands.insert_resource(CursorBlinkTimer {

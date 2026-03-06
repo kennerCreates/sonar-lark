@@ -35,6 +35,8 @@ pub struct RaceAttractionInputs {
     pub location_attractiveness: f32,
     pub capacity: u32,
     pub marketing: MarketingEffects,
+    /// Ticket price in whole dollars. 0 = free entry.
+    pub ticket_price: u32,
     pub seed: u32,
 }
 
@@ -133,6 +135,7 @@ pub fn simulate_race(
 
     // Step 2: Attendance roll
     let location_mod = 0.5 + 0.5 * inputs.location_attractiveness;
+    let hype = inputs.track_quality * 0.5 + inputs.location_attractiveness * 0.5;
     let mut wants_to_attend: Vec<usize> = Vec::new();
 
     for (idx, person) in network.people.iter().enumerate() {
@@ -146,6 +149,21 @@ pub fn simulate_race(
         if person.tier == FanTier::Aware {
             prob += inputs.marketing.aware_attendance_nudge;
         }
+
+        // Price sensitivity: higher tiers tolerate higher prices, high hype mitigates cost.
+        // Each dollar reduces attendance prob, scaled by (1 - hype * 0.7).
+        if inputs.ticket_price > 0 {
+            let sensitivity = match person.tier {
+                FanTier::Aware => 0.04,
+                FanTier::Attendee => 0.03,
+                FanTier::Fan => 0.02,
+                FanTier::Superfan => 0.01,
+            };
+            let price_penalty =
+                inputs.ticket_price as f32 * sensitivity * (1.0 - hype * 0.7);
+            prob -= price_penalty;
+        }
+
         prob = prob.clamp(0.0, 1.0);
 
         let roll = det_f32(inputs.seed, person.id, 0);
@@ -325,6 +343,7 @@ mod tests {
             location_attractiveness: 0.5,
             capacity: 1000,
             marketing: default_marketing(),
+            ticket_price: 0,
             seed,
         }
     }
@@ -391,6 +410,7 @@ mod tests {
                     aware_attendance_nudge: 0.85, // push prob to ~1.0
                     ..default_marketing()
                 },
+                ticket_price: 0,
                 seed,
             };
             simulate_race(&mut net, &inputs);
@@ -427,6 +447,7 @@ mod tests {
                 location_attractiveness: 1.0,
                 capacity: 1000,
                 marketing: default_marketing(),
+                ticket_price: 0,
                 seed,
             };
             simulate_race(&mut net, &inputs);
@@ -467,6 +488,7 @@ mod tests {
                 location_attractiveness: 1.0,
                 capacity: 1000,
                 marketing: default_marketing(),
+                ticket_price: 0,
                 seed,
             };
             simulate_race(&mut net, &inputs);
@@ -506,6 +528,7 @@ mod tests {
                 location_attractiveness: 0.0,
                 capacity: 0,
                 marketing: default_marketing(),
+                ticket_price: 0,
                 seed: 500 + seed,
             };
             simulate_race(&mut net, &inputs);
@@ -550,6 +573,7 @@ mod tests {
                 location_attractiveness: 0.0,
                 capacity: 0,
                 marketing: default_marketing(),
+                ticket_price: 0,
                 seed: 800 + seed,
             };
             simulate_race(&mut net, &inputs);
@@ -608,6 +632,7 @@ mod tests {
             location_attractiveness: 1.0,
             capacity: 1,
             marketing: default_marketing(),
+            ticket_price: 0,
             seed,
         };
 
@@ -639,6 +664,7 @@ mod tests {
                 aware_attendance_nudge: 0.85,
                 ..default_marketing()
             },
+            ticket_price: 0,
             seed: 42,
         };
 
@@ -694,6 +720,7 @@ mod tests {
                 aware_attendance_nudge: 0.85,
                 ..default_marketing()
             },
+            ticket_price: 0,
             seed,
         };
 
@@ -731,6 +758,7 @@ mod tests {
                     spread_volume_bonus: 5,
                     ..default_marketing()
                 },
+                ticket_price: 0,
                 seed,
             };
             simulate_race(&mut net, &inputs);
@@ -787,6 +815,7 @@ mod tests {
                     aware_attendance_nudge: 0.05,
                     decay_slowdown: false,
                 },
+                ticket_price: 0,
                 seed: 1000 + race_num,
             };
             let result = simulate_race(&mut net, &inputs);
@@ -797,6 +826,105 @@ mod tests {
         assert!(
             net.network_size() > initial_size,
             "Network should grow over 10 races with marketing"
+        );
+    }
+
+    #[test]
+    fn test_high_ticket_price_reduces_attendance() {
+        // Same network, same seed — only difference is ticket price.
+        let make_net = || FanNetwork {
+            people: vec![
+                Person { id: 0, recruited_by: None, tier: FanTier::Aware, races_attended: 0, races_since_attended: 0, spread_count: 0 },
+                Person { id: 1, recruited_by: None, tier: FanTier::Attendee, races_attended: 2, races_since_attended: 0, spread_count: 0 },
+                Person { id: 2, recruited_by: None, tier: FanTier::Fan, races_attended: 5, races_since_attended: 0, spread_count: 0 },
+                Person { id: 3, recruited_by: None, tier: FanTier::Superfan, races_attended: 10, races_since_attended: 0, spread_count: 0 },
+            ],
+            next_id: 4,
+        };
+
+        // Accumulate demand across many seeds to smooth out randomness
+        let mut total_demand_free = 0u32;
+        let mut total_demand_expensive = 0u32;
+
+        for seed in 0..100 {
+            let mut net_free = make_net();
+            let mut net_expensive = make_net();
+
+            let free_inputs = RaceAttractionInputs {
+                track_quality: 0.5,
+                location_attractiveness: 0.5,
+                capacity: 1000,
+                marketing: default_marketing(),
+                ticket_price: 0,
+                seed,
+            };
+            let expensive_inputs = RaceAttractionInputs {
+                track_quality: 0.5,
+                location_attractiveness: 0.5,
+                capacity: 1000,
+                marketing: default_marketing(),
+                ticket_price: 15,
+                seed,
+            };
+
+            total_demand_free += simulate_race(&mut net_free, &free_inputs).demand;
+            total_demand_expensive += simulate_race(&mut net_expensive, &expensive_inputs).demand;
+        }
+
+        assert!(
+            total_demand_expensive < total_demand_free,
+            "Expensive tickets (${}) should reduce demand: free={}, expensive={}",
+            15, total_demand_free, total_demand_expensive
+        );
+    }
+
+    #[test]
+    fn test_high_hype_mitigates_price_penalty() {
+        // With high hype, price penalty is smaller, so demand gap narrows
+        let make_net = || FanNetwork {
+            people: vec![
+                Person { id: 0, recruited_by: None, tier: FanTier::Attendee, races_attended: 2, races_since_attended: 0, spread_count: 0 },
+                Person { id: 1, recruited_by: None, tier: FanTier::Fan, races_attended: 5, races_since_attended: 0, spread_count: 0 },
+                Person { id: 2, recruited_by: None, tier: FanTier::Superfan, races_attended: 10, races_since_attended: 0, spread_count: 0 },
+            ],
+            next_id: 3,
+        };
+
+        let ticket_price = 10;
+        let mut demand_gap_low_hype = 0i32;
+        let mut demand_gap_high_hype = 0i32;
+
+        for seed in 0..200 {
+            let mut net_free_low = make_net();
+            let mut net_paid_low = make_net();
+            let mut net_free_high = make_net();
+            let mut net_paid_high = make_net();
+
+            let free_low = simulate_race(&mut net_free_low, &RaceAttractionInputs {
+                track_quality: 0.1, location_attractiveness: 0.1, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 0, seed,
+            });
+            let paid_low = simulate_race(&mut net_paid_low, &RaceAttractionInputs {
+                track_quality: 0.1, location_attractiveness: 0.1, capacity: 1000,
+                marketing: default_marketing(), ticket_price, seed,
+            });
+            let free_high = simulate_race(&mut net_free_high, &RaceAttractionInputs {
+                track_quality: 1.0, location_attractiveness: 1.0, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 0, seed,
+            });
+            let paid_high = simulate_race(&mut net_paid_high, &RaceAttractionInputs {
+                track_quality: 1.0, location_attractiveness: 1.0, capacity: 1000,
+                marketing: default_marketing(), ticket_price, seed,
+            });
+
+            demand_gap_low_hype += free_low.demand as i32 - paid_low.demand as i32;
+            demand_gap_high_hype += free_high.demand as i32 - paid_high.demand as i32;
+        }
+
+        assert!(
+            demand_gap_low_hype > demand_gap_high_hype,
+            "Price penalty should hurt more at low hype: low_hype_gap={}, high_hype_gap={}",
+            demand_gap_low_hype, demand_gap_high_hype
         );
     }
 }

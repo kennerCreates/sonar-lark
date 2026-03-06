@@ -3,8 +3,6 @@ pub mod marketing;
 #[allow(dead_code)] // Used starting in Step 6 (recruitment integration)
 pub mod recruitment;
 
-use std::path::PathBuf;
-
 use bevy::prelude::*;
 
 use crate::course::data::CourseData;
@@ -38,19 +36,8 @@ impl Default for LeagueState {
     }
 }
 
-fn league_save_path() -> PathBuf {
-    PathBuf::from("assets/league/league_state.ron")
-}
-
-fn load_league_state(mut commands: Commands) {
-    let state: LeagueState =
-        crate::persistence::load_ron_or_default(&league_save_path());
-    info!(
-        "Loaded league state: {} fans, ${:.0}",
-        state.fan_network.network_size(),
-        state.money
-    );
-    commands.insert_resource(state);
+fn init_league_state(mut commands: Commands) {
+    commands.insert_resource(LeagueState::default());
     commands.insert_resource(LocationRegistry::new());
 }
 
@@ -84,6 +71,7 @@ fn simulate_fans_on_results(
         location_attractiveness: attractiveness,
         capacity,
         marketing: marketing_effects,
+        ticket_price: league.ticket_price,
         seed,
     };
 
@@ -103,18 +91,13 @@ fn simulate_fans_on_results(
     );
 
     commands.insert_resource(result);
-
-    // Save updated league state
-    if let Err(e) = crate::persistence::save_ron(&*league, &league_save_path()) {
-        error!("Failed to save league state: {e}");
-    }
 }
 
 pub struct LeaguePlugin;
 
 impl Plugin for LeaguePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, load_league_state)
+        app.add_systems(Startup, init_league_state)
             .add_systems(OnEnter(AppState::Results), simulate_fans_on_results);
     }
 }

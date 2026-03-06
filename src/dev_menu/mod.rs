@@ -1,5 +1,6 @@
 pub mod color_picker_data;
 pub mod pilot_generator;
+pub mod pilot_roster_viewer;
 pub mod portrait_config;
 pub mod portrait_editor;
 
@@ -59,6 +60,28 @@ impl Plugin for DevMenuPlugin {
         // ── Obstacle Workshop (ObstacleWorkshop page) ─────────────────
         app.add_plugins(workshop::WorkshopPlugin);
 
+        // ── Pilot Roster Viewer (PilotRosterViewer page) ────────────────
+        app.add_systems(
+            OnEnter(DevMenuPage::PilotRosterViewer),
+            pilot_roster_viewer::setup_roster_viewer,
+        )
+        .add_systems(
+            OnExit(DevMenuPage::PilotRosterViewer),
+            pilot_roster_viewer::cleanup_roster_viewer,
+        )
+        .add_systems(
+            Update,
+            (
+                pilot_roster_viewer::handle_back_button,
+                pilot_roster_viewer::handle_pilot_generator_button,
+                pilot_roster_viewer::handle_palette_editor_button,
+                pilot_roster_viewer::handle_obstacle_workshop_button,
+                pilot_roster_viewer::handle_delete_button,
+                pilot_roster_viewer::rebuild_roster_list,
+            )
+                .run_if(in_state(DevMenuPage::PilotRosterViewer)),
+        );
+
         // ── Pilot Generator (PilotGenerator page — default) ───────────
         app.add_systems(
             OnEnter(DevMenuPage::PilotGenerator),
@@ -79,6 +102,7 @@ impl Plugin for DevMenuPlugin {
                 pilot_generator::handle_reroll_personality_button,
                 pilot_generator::handle_reroll_skill_button,
                 pilot_generator::handle_accept_button,
+                pilot_generator::handle_roster_viewer_button,
                 pilot_generator::update_preview,
                 pilot_generator::update_pilot_info,
             )

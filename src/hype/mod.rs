@@ -561,11 +561,6 @@ fn handle_start_race_button(
             if total_cost <= league.money {
                 league.money -= total_cost;
                 league.campaign_budgets = budgets;
-
-                let save_path = std::path::PathBuf::from("assets/league/league_state.ron");
-                if let Err(e) = crate::persistence::save_ron(&**league, &save_path) {
-                    error!("Failed to save league state: {e}");
-                }
             } else {
                 warn!(
                     "Not enough money for campaigns (need ${total_cost:.0}, have ${:.0})",

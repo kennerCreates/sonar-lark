@@ -72,6 +72,9 @@ pub struct SkillLabel;
 #[derive(Component)]
 pub struct RosterCountLabel;
 
+#[derive(Component)]
+pub struct RosterViewerButton;
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 fn generate_random_pilot(roster: &PilotRoster, config: &PortraitPaletteConfig) -> Pilot {
@@ -218,6 +221,17 @@ pub fn handle_obstacle_workshop_button(
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             next_state.set(DevMenuPage::ObstacleWorkshop);
+        }
+    }
+}
+
+pub fn handle_roster_viewer_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<RosterViewerButton>)>,
+    mut next_state: ResMut<NextState<DevMenuPage>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(DevMenuPage::PilotRosterViewer);
         }
     }
 }

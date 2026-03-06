@@ -8,7 +8,7 @@ use super::{
     AcceptButton, DroneColorSwatch, GamertagLabel, GenBackButton, ObstacleWorkshopButton,
     PaletteEditorButton, PersonalityLabel, PilotGeneratorState, PreviewImage,
     RerollGamertagButton, RerollPersonalityButton, RerollPortraitButton, RerollSkillButton,
-    RosterCountLabel, SkillLabel, format_personality, format_skill,
+    RosterCountLabel, RosterViewerButton, SkillLabel, format_personality, format_skill,
 };
 
 const PANEL_BG: Color = Color::srgba(0.02, 0.04, 0.08, 0.95);
@@ -62,6 +62,7 @@ pub fn build_ui(
                         ..default()
                     })
                     .with_children(|btns| {
+                        spawn_header_button(btns, "ROSTER", RosterViewerButton, &ui_font);
                         spawn_header_button(btns, "OBSTACLE WORKSHOP", ObstacleWorkshopButton, &ui_font);
                         spawn_header_button(btns, "PALETTE EDITOR", PaletteEditorButton, &ui_font);
                         spawn_header_button(btns, "BACK", GenBackButton, &ui_font);

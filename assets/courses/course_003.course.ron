@@ -14,7 +14,7 @@
                 is_primary: true,
                 label: None,
             )),
-            color_override: Some((0.949, 0.949, 0.855, 1.0)),
+            color_override: Some((0.961, 0.506, 0.133, 1.0)),
         ),
         (
             obstacle_id: ("gate_air"),
@@ -24,7 +24,7 @@
             gate_order: Some(1),
             gate_forward_flipped: false,
             camera: None,
-            color_override: Some((0.949, 0.949, 0.855, 1.0)),
+            color_override: Some((0.98, 0.851, 0.216, 1.0)),
         ),
         (
             obstacle_id: ("gate_air"),
@@ -34,7 +34,7 @@
             gate_order: Some(3),
             gate_forward_flipped: false,
             camera: None,
-            color_override: Some((0.949, 0.949, 0.855, 1.0)),
+            color_override: Some((0.682, 0.533, 0.89, 1.0)),
         ),
         (
             obstacle_id: ("gate_air"),
@@ -44,7 +44,7 @@
             gate_order: Some(4),
             gate_forward_flipped: false,
             camera: None,
-            color_override: Some((0.949, 0.949, 0.855, 1.0)),
+            color_override: Some((0.333, 0.702, 0.231, 1.0)),
         ),
         (
             obstacle_id: ("gate_air"),
@@ -54,7 +54,7 @@
             gate_order: Some(5),
             gate_forward_flipped: false,
             camera: None,
-            color_override: Some((0.949, 0.949, 0.855, 1.0)),
+            color_override: Some((0.851, 0.298, 0.557, 1.0)),
         ),
         (
             obstacle_id: ("gate_air"),
@@ -64,9 +64,10 @@
             gate_order: Some(6),
             gate_forward_flipped: false,
             camera: None,
-            color_override: Some((0.949, 0.949, 0.855, 1.0)),
+            color_override: Some((0.286, 0.761, 0.949, 1.0)),
         ),
     ],
     props: [],
     cameras: [],
+    location: "Abandoned Warehouse",
 )

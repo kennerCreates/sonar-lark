@@ -45,6 +45,7 @@ pub enum DevMenuPage {
     PilotGenerator,
     PaletteEditor,
     ObstacleWorkshop,
+    PilotRosterViewer,
 }
 
 /// Inserted before entering the editor to request auto-loading a specific course.
