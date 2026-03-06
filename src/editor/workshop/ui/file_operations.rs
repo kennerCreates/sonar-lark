@@ -76,6 +76,7 @@ pub fn handle_save_button(
             glb_node_name: state.node_name.clone(),
             trigger_volume,
             is_gate: state.is_gate,
+            gate_cost: state.gate_cost,
             model_offset: state.model_offset,
             model_rotation: state.model_rotation,
             collision_volumes,

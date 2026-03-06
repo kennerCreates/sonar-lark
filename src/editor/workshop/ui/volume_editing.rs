@@ -1,7 +1,6 @@
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 
-use crate::course::data::gate_cost;
 use crate::editor::undo::{UndoStack, WorkshopAction, WorkshopSnapshot};
 use crate::palette;
 use crate::ui_theme;
@@ -20,6 +19,36 @@ pub fn handle_gate_toggle(
             state.is_gate = !state.is_gate;
             let after = WorkshopSnapshot::capture(&state);
             undo_stack.push(WorkshopAction::StateChange { before, after });
+        }
+    }
+}
+
+const GATE_COST_STEP: u32 = 5;
+
+pub fn handle_gate_cost_buttons(
+    mut state: ResMut<WorkshopState>,
+    down: Query<&Interaction, (Changed<Interaction>, With<GateCostDown>)>,
+    up: Query<&Interaction, (Changed<Interaction>, With<GateCostUp>)>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
+) {
+    let mut changed = false;
+    for interaction in &down {
+        if *interaction == Interaction::Pressed && state.gate_cost >= GATE_COST_STEP {
+            let before = WorkshopSnapshot::capture(&state);
+            state.gate_cost -= GATE_COST_STEP;
+            let after = WorkshopSnapshot::capture(&state);
+            undo_stack.push(WorkshopAction::StateChange { before, after });
+            changed = true;
+        }
+    }
+    if !changed {
+        for interaction in &up {
+            if *interaction == Interaction::Pressed {
+                let before = WorkshopSnapshot::capture(&state);
+                state.gate_cost += GATE_COST_STEP;
+                let after = WorkshopSnapshot::capture(&state);
+                undo_stack.push(WorkshopAction::StateChange { before, after });
+            }
         }
     }
 }
@@ -208,11 +237,7 @@ pub fn update_display_values(
     }
     if let Ok(mut text) = cost_label.single_mut() {
         if state.is_gate {
-            if let Some(cost) = gate_cost(&state.obstacle_name) {
-                **text = format!("Gate Cost: ${cost}");
-            } else {
-                **text = "Gate Cost: not set (add to gate_cost())".to_string();
-            }
+            **text = format!("${}", state.gate_cost);
         } else {
             **text = String::new();
         }

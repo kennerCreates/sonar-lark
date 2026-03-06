@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
-use crate::course::data::gate_cost;
 use crate::dev_menu::color_picker_data::PALETTE_COLORS;
 use crate::editor::course_editor::TransformMode;
 use crate::obstacle::definition::ObstacleId;
+use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
 use crate::ui_theme;
 
@@ -257,8 +257,9 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, font: &Handle<Font>)
         });
 }
 
-pub fn spawn_palette_button(parent: &mut ChildSpawnerCommands, id: &ObstacleId, font: &Handle<Font>) {
-    let label = if let Some(cost) = gate_cost(&id.0) {
+pub fn spawn_palette_button(parent: &mut ChildSpawnerCommands, id: &ObstacleId, font: &Handle<Font>, library: &ObstacleLibrary) {
+    let cost = crate::course::data::gate_cost(&id.0, library);
+    let label = if cost > 0 {
         format!("{} (${cost})", id.0)
     } else {
         id.0.clone()

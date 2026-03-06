@@ -83,6 +83,7 @@ mod tests {
                 None
             },
             is_gate: gate,
+            gate_cost: 0,
             model_offset: Vec3::ZERO,
             model_rotation: Quat::IDENTITY,
             collision_volumes: vec![],

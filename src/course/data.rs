@@ -56,14 +56,14 @@ pub struct CameraInstance {
     pub label: Option<String>,
 }
 
-/// Cost to place a gate in the course editor. Returns None for non-gate obstacles.
-pub fn gate_cost(obstacle_id: &str) -> Option<u32> {
-    match obstacle_id {
-        "gate_ground" => Some(10),
-        "gate_loop" => Some(20),
-        "gate_air" => Some(40),
-        _ => None,
-    }
+/// Cost to place a gate in the course editor. Returns 0 for non-gate obstacles.
+/// Looks up the cost from the obstacle library definition.
+pub fn gate_cost(obstacle_id: &str, library: &crate::obstacle::library::ObstacleLibrary) -> u32 {
+    library
+        .get(&crate::obstacle::definition::ObstacleId(obstacle_id.to_string()))
+        .filter(|def| def.is_gate)
+        .map(|def| def.gate_cost)
+        .unwrap_or(0)
 }
 
 /// Spectacle weight for fan attraction. Higher = crowds like it more.

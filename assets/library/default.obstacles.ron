@@ -3,12 +3,13 @@
         id: ("gate_loop"),
         glb_node_name: "gate_loop",
         trigger_volume: Some((
-            offset: (0.72912645, 11.759434, -0.19355547),
+            offset: (0.32486534, 11.759434, -0.19355547),
             half_extents: (5.024712, 2.6387913, 2.9330819),
             forward: (0.0, 0.0, -1.0),
             rotation: (0.0, 0.0, 0.0, 1.0),
         )),
         is_gate: true,
+        gate_cost: 40,
         model_offset: (0.0, 0.0, 0.0),
         model_rotation: (0.0, 0.0, 0.0, 1.0),
         collision_volumes: [
@@ -24,8 +25,33 @@
             ),
         ],
         default_camera: Some((
-            offset: (3.143069, 12.467335, 12.274555),
+            offset: (1.7409439, 9.525578, 20.91745),
             rotation: (0.0, 0.043619387, 0.0, 0.99904823),
+        )),
+    ),
+    (
+        id: ("gate_air"),
+        glb_node_name: "gate_air",
+        trigger_volume: Some((
+            offset: (0.1485765, 8.553577, 0.66191065),
+            half_extents: (2.8640785, 2.97975, 3.054034),
+            forward: (0.0, 0.0, -1.0),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+        )),
+        is_gate: true,
+        gate_cost: 80,
+        model_offset: (0.0, 1.0886803, 0.0),
+        model_rotation: (0.0, 0.0, 0.0, 1.0),
+        collision_volumes: [
+            (
+                offset: (0.19372201, 7.990698, -0.04422474),
+                half_extents: (5.5022383, 5.126374, 1.0225697),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+            ),
+        ],
+        default_camera: Some((
+            offset: (0.14376068, 8.658417, 16.14569),
+            rotation: (0.0, 0.0, 0.0, 1.0),
         )),
     ),
     (
@@ -38,6 +64,7 @@
             rotation: (0.0, 0.0, -0.087155744, 0.9961947),
         )),
         is_gate: true,
+        gate_cost: 20,
         model_offset: (8.549886, 0.0, 0.3694346),
         model_rotation: (0.0, 0.0, 0.0, 1.0),
         collision_volumes: [
@@ -59,30 +86,6 @@
         ],
         default_camera: Some((
             offset: (-4.108778, 7.4868817, 24.844906),
-            rotation: (0.0, 0.0, 0.0, 1.0),
-        )),
-    ),
-    (
-        id: ("gate_air"),
-        glb_node_name: "gate_air",
-        trigger_volume: Some((
-            offset: (-0.70611095, 15.847187, 0.66191065),
-            half_extents: (2.8640785, 2.97975, 3.054034),
-            forward: (0.0, 0.0, -1.0),
-            rotation: (0.0, 0.0, 0.0, 1.0),
-        )),
-        is_gate: true,
-        model_offset: (0.0, 1.0886803, 0.0),
-        model_rotation: (0.0, 0.0, 0.0, 1.0),
-        collision_volumes: [
-            (
-                offset: (-1.1014323, 16.317728, -0.04422474),
-                half_extents: (5.5022383, 5.126374, 1.0225697),
-                rotation: (0.0, 0.0, 0.0, 1.0),
-            ),
-        ],
-        default_camera: Some((
-            offset: (0.14376068, 15.91959, 16.14569),
             rotation: (0.0, 0.0, 0.0, 1.0),
         )),
     ),

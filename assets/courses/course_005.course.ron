@@ -48,7 +48,7 @@
         ),
         (
             obstacle_id: ("gate_air"),
-            translation: (0.0, -13.537695, 0.0),
+            translation: (0.0, 23.543829, 0.0),
             rotation: (0.0, 0.0, 0.0, 1.0),
             scale: (1.0, 1.0, 1.0),
             gate_order: Some(4),

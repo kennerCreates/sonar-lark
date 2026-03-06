@@ -421,17 +421,20 @@ fn handle_delete_key(
     camera_query: Query<&PlacedCamera, (Without<PlacedObstacle>, Without<PlacedProp>)>,
     transform_query: Query<&Transform, PlacedFilter>,
     camera_child_query: Query<(Entity, &ChildOf, &PlacedCamera, &Transform)>,
+    library: Res<ObstacleLibrary>,
     mut league: Option<ResMut<crate::league::LeagueState>>,
 ) {
     if keyboard.just_pressed(KeyCode::Delete)
         && let Some(entity) = selection.entity.take()
     {
         // Refund gate cost
-        if let Ok(placed) = obstacle_query.get(entity)
-            && let Some(cost) = crate::course::data::gate_cost(&placed.obstacle_id.0)
-            && let Some(ref mut league) = league
-        {
-            league.money += cost as f32;
+        if let Ok(placed) = obstacle_query.get(entity) {
+            let cost = crate::course::data::gate_cost(&placed.obstacle_id.0, &library);
+            if cost > 0
+                && let Some(ref mut league) = league
+            {
+                league.money += cost as f32;
+            }
         }
 
         if let Some(action) = undo_redo::snapshot_for_delete(

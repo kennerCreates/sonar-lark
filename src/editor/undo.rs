@@ -190,6 +190,8 @@ pub fn remap_entity_in_stack(stack: &mut UndoStack<CourseEditorAction>, old: Ent
 
 #[derive(Clone)]
 pub struct WorkshopSnapshot {
+    pub is_gate: bool,
+    pub gate_cost: u32,
     pub model_offset: Vec3,
     pub model_rotation: Quat,
     pub has_trigger: bool,
@@ -210,6 +212,8 @@ pub struct WorkshopSnapshot {
 impl WorkshopSnapshot {
     pub fn capture(state: &WorkshopState) -> Self {
         Self {
+            is_gate: state.is_gate,
+            gate_cost: state.gate_cost,
             model_offset: state.model_offset,
             model_rotation: state.model_rotation,
             has_trigger: state.has_trigger,
@@ -229,6 +233,8 @@ impl WorkshopSnapshot {
     }
 
     pub fn restore_to(&self, state: &mut WorkshopState) {
+        state.is_gate = self.is_gate;
+        state.gate_cost = self.gate_cost;
         state.model_offset = self.model_offset;
         state.model_rotation = self.model_rotation;
         state.has_trigger = self.has_trigger;

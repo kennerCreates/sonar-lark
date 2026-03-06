@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 
-use crate::course::data::gate_cost;
 use crate::editor::EditorTab;
 use crate::editor::course_editor::{EditorSelection, EditorTransform, EditorUI, PlacedObstacle};
 use crate::editor::undo::{CameraSnapshot, CourseEditorAction, UndoStack};
@@ -41,7 +40,8 @@ pub fn handle_palette_selection(
         };
 
         // Check gate cost against budget
-        if let Some(cost) = gate_cost(&btn.0.0) {
+        let cost = crate::course::data::gate_cost(&btn.0.0, &library);
+        if cost > 0 {
             let money = league.as_ref().map_or(0.0, |l| l.money);
             if money < cost as f32 {
                 warn!("Cannot afford {} (${cost}, have ${:.0})", btn.0.0, money);
@@ -101,7 +101,7 @@ pub fn handle_palette_selection(
             });
 
             // Deduct gate cost
-            if let Some(cost) = gate_cost(&btn.0.0)
+            if cost > 0
                 && let Some(ref mut league) = league
             {
                 league.money -= cost as f32;

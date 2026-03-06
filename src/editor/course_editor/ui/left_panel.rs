@@ -107,7 +107,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 let mut ids: Vec<_> = library.definitions.keys().collect();
                                 ids.sort_by(|a, b| a.0.cmp(&b.0));
                                 for id in ids {
-                                    spawn_palette_button(container, id, font);
+                                    spawn_palette_button(container, id, font, library);
                                 }
                             }
                         });

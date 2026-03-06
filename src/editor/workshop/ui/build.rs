@@ -32,6 +32,12 @@ pub struct IsGateText;
 pub struct GateCostLabel;
 
 #[derive(Component)]
+pub struct GateCostDown;
+
+#[derive(Component)]
+pub struct GateCostUp;
+
+#[derive(Component)]
 pub struct HasTriggerToggle;
 
 #[derive(Component)]
@@ -280,18 +286,9 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
                     ));
                 });
 
-            // Is Gate toggle + cost label
+            // Is Gate toggle + cost editor
             spawn_toggle_row(panel, "Is Gate", IsGateToggle, IsGateText, true, &font);
-            panel.spawn((
-                Text::new(""),
-                TextFont {
-                    font: font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette::CHAINMAIL),
-                GateCostLabel,
-            ));
+            spawn_gate_cost_row(panel, &font);
 
             ui_theme::spawn_divider(panel);
 
@@ -519,6 +516,48 @@ fn spawn_collision_shape_row(parent: &mut ChildSpawnerCommands, font: &Handle<Fo
 
             // Remove button
             spawn_small_button(row, "-", RemoveCollisionShapeButton, &font);
+        });
+}
+
+fn spawn_gate_cost_row(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
+    let font = font.clone();
+    parent
+        .spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(6.0),
+            ..default()
+        })
+        .with_children(|row| {
+            row.spawn((
+                Text::new("Cost:"),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(palette::SIDEWALK),
+            ));
+
+            spawn_small_button(row, "-", GateCostDown, &font);
+
+            row.spawn((
+                GateCostLabel,
+                Text::new("$10"),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(palette::FROG),
+                Node {
+                    width: Val::Px(40.0),
+                    justify_content: JustifyContent::Center,
+                    ..default()
+                },
+            ));
+
+            spawn_small_button(row, "+", GateCostUp, &font);
         });
 }
 

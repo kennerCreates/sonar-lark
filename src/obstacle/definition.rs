@@ -44,6 +44,9 @@ pub struct ObstacleDef {
     pub glb_node_name: String,
     pub trigger_volume: Option<TriggerVolumeConfig>,
     pub is_gate: bool,
+    /// Cost to place this gate in the course editor. Only meaningful when `is_gate` is true.
+    #[serde(default)]
+    pub gate_cost: u32,
     #[serde(default)]
     pub model_offset: Vec3,
     #[serde(default = "default_rotation")]

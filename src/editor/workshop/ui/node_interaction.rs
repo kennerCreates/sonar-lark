@@ -54,6 +54,7 @@ pub fn handle_library_selection(
         state.obstacle_name = def.id.0.clone();
         state.node_name = def.glb_node_name.clone();
         state.is_gate = def.is_gate;
+        state.gate_cost = def.gate_cost;
         state.has_trigger = def.trigger_volume.is_some();
         state.model_offset = def.model_offset;
         state.model_rotation = def.model_rotation;
