@@ -10,12 +10,12 @@ pub struct Location {
 pub fn default_locations() -> Vec<Location> {
     vec![
         Location {
-            name: "Abandoned Warehouse".to_string(),
+            name: "Local Park".to_string(),
             base_attractiveness: 0.2,
             capacity: 40,
         },
         Location {
-            name: "Local Park".to_string(),
+            name: "Abandoned Warehouse".to_string(),
             base_attractiveness: 0.4,
             capacity: 80,
         },

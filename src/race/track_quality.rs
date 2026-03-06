@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use std::collections::HashSet;
 
 use crate::course::data::gate_spectacle_weight;
-use super::script::RaceScript;
 
 // ---------------------------------------------------------------------------
 // Data structures
@@ -13,9 +12,6 @@ pub struct RaceSummary {
     pub distinct_obstacle_ids: u32,
     pub turn_tightness_counts: [u32; 3], // [gentle, medium, tight]
     pub elevation_deltas: Vec<f32>,
-    pub overtake_count: u32,
-    pub crash_count: u32,
-    pub photo_finish_gap: f32,
     /// Obstacle IDs of gates only (e.g. "gate_ground", "gate_air").
     pub gate_obstacle_ids: Vec<String>,
 }
@@ -26,9 +22,6 @@ pub struct TrackQuality {
     pub obstacle_variety_score: f32,
     pub turn_mix_score: f32,
     pub elevation_score: f32,
-    pub overtake_score: f32,
-    pub crash_score: f32,
-    pub photo_finish_score: f32,
     pub gate_spectacle_score: f32,
     pub overall: f32,
 }
@@ -38,12 +31,10 @@ pub struct TrackQuality {
 // ---------------------------------------------------------------------------
 
 pub fn harvest_race_summary(
-    script: &RaceScript,
     gate_positions: &[Vec3],
     obstacle_ids: &[&str],
     gate_obstacle_ids: &[&str],
     tightness_counts: [u32; 3],
-    photo_finish_gap: f32,
 ) -> RaceSummary {
     let gate_count = gate_positions.len() as u32;
 
@@ -57,22 +48,11 @@ pub fn harvest_race_summary(
         .map(|w| w[1].y - w[0].y)
         .collect();
 
-    let overtake_count = script.overtakes.len() as u32;
-
-    let crash_count = script
-        .drone_scripts
-        .iter()
-        .filter(|ds| ds.crash.is_some())
-        .count() as u32;
-
     RaceSummary {
         gate_count,
         distinct_obstacle_ids,
         turn_tightness_counts: tightness_counts,
         elevation_deltas,
-        overtake_count,
-        crash_count,
-        photo_finish_gap,
         gate_obstacle_ids: gate_obstacle_ids.iter().map(|s| s.to_string()).collect(),
     }
 }
@@ -81,8 +61,12 @@ pub fn harvest_race_summary(
 // Scoring
 // ---------------------------------------------------------------------------
 
-pub fn compute_track_quality(summary: &RaceSummary) -> TrackQuality {
-    let gate_count_score = gaussian(summary.gate_count as f32, 11.0, 4.0);
+/// `venue_capacity` scales the ideal gate count: small venues want fewer gates,
+/// large venues want more. The ideal is linearly interpolated from 6 (capacity 40)
+/// to 14 (capacity 200+).
+pub fn compute_track_quality(summary: &RaceSummary, venue_capacity: u32) -> TrackQuality {
+    let ideal_gates = ideal_gate_count(venue_capacity);
+    let gate_count_score = gaussian(summary.gate_count as f32, ideal_gates, 4.0);
 
     let obstacle_variety_score = (summary.distinct_obstacle_ids as f32 / 5.0).min(1.0);
 
@@ -95,12 +79,6 @@ pub fn compute_track_quality(summary: &RaceSummary) -> TrackQuality {
             / summary.elevation_deltas.len() as f32;
         1.0 - (-mean_abs / 3.0).exp()
     };
-
-    let overtake_score = (summary.overtake_count as f32 / 8.0).min(1.0);
-
-    let crash_score = gaussian(summary.crash_count as f32, 1.5, 1.0);
-
-    let photo_finish_score = (-summary.photo_finish_gap / 3.0).exp();
 
     // Gate spectacle: average weight / max weight (4.0). Air gates score highest.
     let gate_spectacle_score = if summary.gate_obstacle_ids.is_empty() {
@@ -115,26 +93,27 @@ pub fn compute_track_quality(summary: &RaceSummary) -> TrackQuality {
         (avg / 4.0).min(1.0)
     };
 
-    let overall = gate_count_score * 0.10
-        + obstacle_variety_score * 0.10
-        + turn_mix_score * 0.15
-        + elevation_score * 0.10
-        + overtake_score * 0.15
-        + crash_score * 0.15
-        + photo_finish_score * 0.10
-        + gate_spectacle_score * 0.15;
+    let overall = gate_count_score * 0.20
+        + obstacle_variety_score * 0.20
+        + turn_mix_score * 0.20
+        + elevation_score * 0.20
+        + gate_spectacle_score * 0.20;
 
     TrackQuality {
         gate_count_score,
         obstacle_variety_score,
         turn_mix_score,
         elevation_score,
-        overtake_score,
-        crash_score,
-        photo_finish_score,
         gate_spectacle_score,
         overall,
     }
+}
+
+/// Ideal gate count scales linearly with venue capacity:
+/// capacity 40 → 6 gates, capacity 200+ → 14 gates.
+fn ideal_gate_count(capacity: u32) -> f32 {
+    let t = ((capacity as f32 - 40.0) / 160.0).clamp(0.0, 1.0);
+    6.0 + t * 8.0
 }
 
 // ---------------------------------------------------------------------------
@@ -177,86 +156,65 @@ fn shannon_entropy_normalized(bins: &[u32]) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::race::script::{DroneScript, RaceScript, ScriptedOvertake};
 
-    fn make_script(drone_count: u32, crash_indices: &[usize], overtake_count: u32) -> RaceScript {
-        let drone_scripts = (0..drone_count)
-            .map(|i| DroneScript {
-                segment_pace: vec![1.0],
-                crash: if crash_indices.contains(&(i as usize)) {
-                    Some(crate::race::script::CrashScript {
-                        gate_index: 2,
-                        progress_past_gate: 0.5,
-                        crash_type: crate::race::script::ScriptedCrashType::ObstacleCollision,
-                    })
-                } else {
-                    None
-                },
-                acrobatic_gates: vec![],
-                gate_pass_t: vec![],
-            })
-            .collect();
-
-        let overtakes = (0..overtake_count)
-            .map(|i| ScriptedOvertake {
-                gate_index: i,
-                overtaker_idx: 0,
-                overtaken_idx: 1,
-            })
-            .collect();
-
-        RaceScript {
-            drone_scripts,
-            overtakes,
-        }
-    }
+    const DEFAULT_CAPACITY: u32 = 100;
 
     fn make_summary(
         gate_count: u32,
         distinct_obstacle_ids: u32,
         turn_tightness_counts: [u32; 3],
         elevation_deltas: Vec<f32>,
-        overtake_count: u32,
-        crash_count: u32,
-        photo_finish_gap: f32,
     ) -> RaceSummary {
         RaceSummary {
             gate_count,
             distinct_obstacle_ids,
             turn_tightness_counts,
             elevation_deltas,
-            overtake_count,
-            crash_count,
-            photo_finish_gap,
             gate_obstacle_ids: vec![],
         }
     }
 
     #[test]
-    fn test_gate_count_score_peak() {
-        let s = make_summary(11, 3, [4, 4, 4], vec![], 0, 0, 1.0);
-        let q = compute_track_quality(&s);
+    fn test_ideal_gate_count_scales_with_capacity() {
+        assert!((ideal_gate_count(40) - 6.0).abs() < 0.01);
+        assert!((ideal_gate_count(120) - 10.0).abs() < 0.01);
+        assert!((ideal_gate_count(200) - 14.0).abs() < 0.01);
+        // Clamps above 200
+        assert!((ideal_gate_count(500) - 14.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_gate_count_score_peak_small_venue() {
+        let s = make_summary(6, 3, [4, 4, 4], vec![]);
+        let q = compute_track_quality(&s, 40);
+        assert!((q.gate_count_score - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_gate_count_score_peak_large_venue() {
+        let s = make_summary(14, 3, [4, 4, 4], vec![]);
+        let q = compute_track_quality(&s, 200);
         assert!((q.gate_count_score - 1.0).abs() < 0.001);
     }
 
     #[test]
     fn test_gate_count_score_low() {
-        let s = make_summary(3, 3, [4, 4, 4], vec![], 0, 0, 1.0);
-        let q = compute_track_quality(&s);
+        let s = make_summary(3, 3, [4, 4, 4], vec![]);
+        let q = compute_track_quality(&s, DEFAULT_CAPACITY);
         assert!(q.gate_count_score < 0.5, "got {}", q.gate_count_score);
     }
 
     #[test]
     fn test_obstacle_variety_caps_at_one() {
-        let s = make_summary(11, 10, [4, 4, 4], vec![], 0, 0, 1.0);
-        let q = compute_track_quality(&s);
+        let s = make_summary(11, 10, [4, 4, 4], vec![]);
+        let q = compute_track_quality(&s, DEFAULT_CAPACITY);
         assert!((q.obstacle_variety_score - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn test_turn_mix_uniform() {
-        let s = make_summary(11, 3, [4, 4, 4], vec![], 0, 0, 1.0);
-        let q = compute_track_quality(&s);
+        let s = make_summary(11, 3, [4, 4, 4], vec![]);
+        let q = compute_track_quality(&s, DEFAULT_CAPACITY);
         assert!(
             (q.turn_mix_score - 1.0).abs() < 0.01,
             "got {}",
@@ -266,8 +224,8 @@ mod tests {
 
     #[test]
     fn test_turn_mix_all_one_type() {
-        let s = make_summary(11, 3, [12, 0, 0], vec![], 0, 0, 1.0);
-        let q = compute_track_quality(&s);
+        let s = make_summary(11, 3, [12, 0, 0], vec![]);
+        let q = compute_track_quality(&s, DEFAULT_CAPACITY);
         assert!(
             q.turn_mix_score.abs() < f32::EPSILON,
             "got {}",
@@ -277,8 +235,8 @@ mod tests {
 
     #[test]
     fn test_elevation_zero() {
-        let s = make_summary(11, 3, [4, 4, 4], vec![], 0, 0, 1.0);
-        let q = compute_track_quality(&s);
+        let s = make_summary(11, 3, [4, 4, 4], vec![]);
+        let q = compute_track_quality(&s, DEFAULT_CAPACITY);
         assert!(
             q.elevation_score.abs() < f32::EPSILON,
             "got {}",
@@ -288,72 +246,20 @@ mod tests {
 
     #[test]
     fn test_elevation_high() {
-        let s = make_summary(11, 3, [4, 4, 4], vec![10.0, -8.0, 12.0], 0, 0, 1.0);
-        let q = compute_track_quality(&s);
+        let s = make_summary(11, 3, [4, 4, 4], vec![10.0, -8.0, 12.0]);
+        let q = compute_track_quality(&s, DEFAULT_CAPACITY);
         assert!(q.elevation_score > 0.9, "got {}", q.elevation_score);
     }
 
     #[test]
-    fn test_overtake_diminishing() {
-        let s8 = make_summary(11, 3, [4, 4, 4], vec![], 8, 0, 1.0);
-        let s16 = make_summary(11, 3, [4, 4, 4], vec![], 16, 0, 1.0);
-        let q8 = compute_track_quality(&s8);
-        let q16 = compute_track_quality(&s16);
-        assert!((q8.overtake_score - 1.0).abs() < f32::EPSILON);
-        assert!((q16.overtake_score - 1.0).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn test_crash_sweet_spot() {
-        let s1 = make_summary(11, 3, [4, 4, 4], vec![], 0, 1, 1.0);
-        let s2 = make_summary(11, 3, [4, 4, 4], vec![], 0, 2, 1.0);
-        let q1 = compute_track_quality(&s1);
-        let q2 = compute_track_quality(&s2);
-        // Both 1 and 2 should score high (near the 1.5 center)
-        assert!(q1.crash_score > 0.7, "got {}", q1.crash_score);
-        assert!(q2.crash_score > 0.7, "got {}", q2.crash_score);
-    }
-
-    #[test]
-    fn test_crash_zero_penalized() {
-        let s0 = make_summary(11, 3, [4, 4, 4], vec![], 0, 0, 1.0);
-        let s1 = make_summary(11, 3, [4, 4, 4], vec![], 0, 1, 1.0);
-        let q0 = compute_track_quality(&s0);
-        let q1 = compute_track_quality(&s1);
-        assert!(
-            q0.crash_score < q1.crash_score,
-            "0 crashes {} should be less than 1 crash {}",
-            q0.crash_score,
-            q1.crash_score
-        );
-    }
-
-    #[test]
-    fn test_photo_finish_tight() {
-        let s = make_summary(11, 3, [4, 4, 4], vec![], 0, 0, 0.1);
-        let q = compute_track_quality(&s);
-        assert!(q.photo_finish_score > 0.95, "got {}", q.photo_finish_score);
-    }
-
-    #[test]
-    fn test_photo_finish_wide() {
-        let s = make_summary(11, 3, [4, 4, 4], vec![], 0, 0, 20.0);
-        let q = compute_track_quality(&s);
-        assert!(q.photo_finish_score < 0.01, "got {}", q.photo_finish_score);
-    }
-
-    #[test]
     fn test_overall_weighted_sum() {
-        let s = make_summary(11, 5, [4, 4, 4], vec![3.0, -2.0], 4, 1, 1.0);
-        let q = compute_track_quality(&s);
-        let expected = q.gate_count_score * 0.10
-            + q.obstacle_variety_score * 0.10
-            + q.turn_mix_score * 0.15
-            + q.elevation_score * 0.10
-            + q.overtake_score * 0.15
-            + q.crash_score * 0.15
-            + q.photo_finish_score * 0.10
-            + q.gate_spectacle_score * 0.15;
+        let s = make_summary(10, 5, [4, 4, 4], vec![3.0, -2.0]);
+        let q = compute_track_quality(&s, DEFAULT_CAPACITY);
+        let expected = q.gate_count_score * 0.20
+            + q.obstacle_variety_score * 0.20
+            + q.turn_mix_score * 0.20
+            + q.elevation_score * 0.20
+            + q.gate_spectacle_score * 0.20;
         assert!(
             (q.overall - expected).abs() < 1e-6,
             "overall {} != expected {}",
@@ -364,15 +270,13 @@ mod tests {
 
     #[test]
     fn test_zero_gates_edge_case() {
-        let s = make_summary(0, 0, [0, 0, 0], vec![], 0, 0, 0.0);
-        let q = compute_track_quality(&s);
-        // Should not panic; gate_count_score should be low
+        let s = make_summary(0, 0, [0, 0, 0], vec![]);
+        let q = compute_track_quality(&s, DEFAULT_CAPACITY);
         assert!(q.gate_count_score < 0.01);
     }
 
     #[test]
     fn test_harvest_basic() {
-        let script = make_script(4, &[1, 3], 5);
         let positions = vec![
             Vec3::new(0.0, 0.0, 0.0),
             Vec3::new(10.0, 2.0, 0.0),
@@ -381,7 +285,7 @@ mod tests {
         let obstacle_ids = vec!["ring", "hoop", "ring", "pillar"];
         let tightness = [3, 2, 1];
         let gate_ids = vec!["gate_air", "gate_ground", "gate_loop"];
-        let summary = harvest_race_summary(&script, &positions, &obstacle_ids, &gate_ids, tightness, 0.5);
+        let summary = harvest_race_summary(&positions, &obstacle_ids, &gate_ids, tightness);
 
         assert_eq!(summary.gate_count, 3);
         assert_eq!(summary.distinct_obstacle_ids, 3); // ring, hoop, pillar
@@ -389,9 +293,6 @@ mod tests {
         assert_eq!(summary.elevation_deltas.len(), 2);
         assert!((summary.elevation_deltas[0] - 2.0).abs() < f32::EPSILON);
         assert!((summary.elevation_deltas[1] - 3.0).abs() < f32::EPSILON);
-        assert_eq!(summary.overtake_count, 5);
-        assert_eq!(summary.crash_count, 2);
-        assert!((summary.photo_finish_gap - 0.5).abs() < f32::EPSILON);
         assert_eq!(summary.gate_obstacle_ids.len(), 3);
     }
 }

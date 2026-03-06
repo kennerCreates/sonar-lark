@@ -142,6 +142,7 @@ pub fn generate_race_script_system(
     selected_pilots: Option<Res<SelectedPilots>>,
     roster: Option<Res<PilotRoster>>,
     course: Option<Res<crate::course::data::CourseData>>,
+    location_registry: Res<crate::course::location::LocationRegistry>,
 ) {
     if *phase != RacePhase::Racing || existing_script.is_some() {
         return;
@@ -243,32 +244,18 @@ pub fn generate_race_script_system(
         })
         .unwrap_or_default();
 
-    // Compute photo finish gap from the last two drones' gate_pass_t
-    let photo_finish_gap = if race_script.drone_scripts.len() >= 2 {
-        let mut finish_times: Vec<f32> = race_script
-            .drone_scripts
-            .iter()
-            .filter_map(|ds| ds.gate_pass_t.last().copied())
-            .collect();
-        finish_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        if finish_times.len() >= 2 {
-            finish_times[1] - finish_times[0]
-        } else {
-            f32::MAX
-        }
-    } else {
-        f32::MAX
-    };
-
     let summary = track_quality::harvest_race_summary(
-        &race_script,
         gate_positions,
         &obstacle_ids,
         &gate_obstacle_ids,
         tightness_counts,
-        photo_finish_gap,
     );
-    let quality = track_quality::compute_track_quality(&summary);
+
+    let venue_capacity = course
+        .as_ref()
+        .and_then(|c| location_registry.get(&c.location))
+        .map_or(100, |loc| loc.capacity);
+    let quality = track_quality::compute_track_quality(&summary, venue_capacity);
     info!("Track quality: {:.2}", quality.overall);
     commands.insert_resource(quality);
 

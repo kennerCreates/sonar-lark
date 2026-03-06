@@ -325,9 +325,6 @@ fn spawn_league_stats_panel(
                     ("Variety", tq.obstacle_variety_score),
                     ("Turn Mix", tq.turn_mix_score),
                     ("Elevation", tq.elevation_score),
-                    ("Overtakes", tq.overtake_score),
-                    ("Crashes", tq.crash_score),
-                    ("Photo Finish", tq.photo_finish_score),
                     ("Spectacle", tq.gate_spectacle_score),
                 ], Some(("Overall", tq.overall)));
             }
