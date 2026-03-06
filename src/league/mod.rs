@@ -22,6 +22,9 @@ pub struct LeagueState {
     pub fan_network: FanNetwork,
     pub money: f32,
     pub campaign_budgets: CampaignBudgets,
+    /// Ticket price in whole dollars. 0 = FREE.
+    #[serde(default)]
+    pub ticket_price: u32,
 }
 
 impl Default for LeagueState {
@@ -30,6 +33,7 @@ impl Default for LeagueState {
             fan_network: FanNetwork::new_seeded(42),
             money: 0.0,
             campaign_budgets: CampaignBudgets::default(),
+            ticket_price: 0,
         }
     }
 }
@@ -85,8 +89,9 @@ fn simulate_fans_on_results(
 
     let result = fan_network::simulate_race(&mut league.fan_network, &inputs);
 
-    // Ticket revenue: $2 per attendee
-    league.money += result.actual_attendance as f32 * 2.0;
+    // Ticket revenue
+    let ticket_revenue = result.actual_attendance as f32 * league.ticket_price as f32;
+    league.money += ticket_revenue;
 
     info!(
         "Fan simulation: {} attended ({} demand), network={}, fans={}, +${:.0}",
@@ -94,7 +99,7 @@ fn simulate_fans_on_results(
         result.demand,
         result.network_size,
         result.fan_count,
-        result.actual_attendance as f32 * 2.0,
+        ticket_revenue,
     );
 
     commands.insert_resource(result);

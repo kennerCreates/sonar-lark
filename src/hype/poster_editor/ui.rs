@@ -15,8 +15,8 @@ use super::{
     BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
     EraseToolButton, PaintToolButton, PosterAction, PosterCanvas, PosterColorCell,
     PosterCountDownButton, PosterCountText, PosterCountUpButton, PosterEditorState, PosterOrder,
-    PosterStartRaceButton, PosterTool, TextDragState, TextFontButton, TextFontPanel,
-    TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker, POSTER_FONTS,
+    PosterStartRaceButton, PosterTool, SavedPosterData, TextDragState, TextFontButton,
+    TextFontPanel, TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker, POSTER_FONTS,
 };
 
 const COLOR_CELL_SIZE: f32 = 28.0;
@@ -38,17 +38,26 @@ pub fn setup_poster_editor(
     asset_server: Res<AssetServer>,
     font: Res<UiFont>,
     poster_order: Option<Res<PosterOrder>>,
+    saved: Option<Res<SavedPosterData>>,
 ) {
     let ui_font = font.0.clone();
-    let canvas_image = canvas::create_blank_canvas();
-    let canvas_handle = images.add(canvas_image);
+
+    // Restore saved canvas or create a blank one
+    let (canvas_handle, restored_actions) = if let Some(saved) = &saved {
+        let mut img = canvas::create_blank_canvas();
+        *img.data.as_mut().unwrap() = saved.image_data.clone();
+        (images.add(img), saved.actions.clone())
+    } else {
+        (images.add(canvas::create_blank_canvas()), Vec::new())
+    };
+    commands.remove_resource::<SavedPosterData>();
 
     commands.insert_resource(PosterEditorState {
         active_tool: PosterTool::Paint,
         brush_color: [0, 0, 0, 255],
         brush_radius: BRUSH_MEDIUM,
         canvas_handle: canvas_handle.clone(),
-        actions: Vec::new(),
+        actions: restored_actions,
         current_stroke: None,
         editing_text: None,
         text_size: TEXT_MEDIUM,
@@ -62,7 +71,7 @@ pub fn setup_poster_editor(
     commands.insert_resource(TextDragState::default());
     commands.init_resource::<PosterOrder>();
 
-    let poster_count = poster_order.map(|o| o.count).unwrap_or(25);
+    let poster_count = poster_order.map(|o| o.count).unwrap_or(0);
 
     // Root container
     commands
@@ -566,10 +575,15 @@ fn spawn_start_race_button(
                     });
 
                     // Count + cost text
-                    let cost = poster_count as f32 / 25.0 * 5.0;
+                    let count_label = if poster_count == 0 {
+                        "0 posters".to_string()
+                    } else {
+                        let cost = poster_count as f32 / 25.0 * 5.0;
+                        format!("{poster_count} posters  ${cost:.0}")
+                    };
                     row.spawn((
                         PosterCountText,
-                        Text::new(format!("{poster_count} posters  ${cost:.0}")),
+                        Text::new(count_label),
                         TextFont {
                             font: ui_font.clone(),
                             font_size: 18.0,

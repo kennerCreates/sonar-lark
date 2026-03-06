@@ -4,7 +4,6 @@ use bevy::prelude::*;
 
 use crate::league::marketing::CampaignBudgets;
 use crate::league::LeagueState;
-use crate::menu::ui::SkipToLocationSelect;
 use crate::palette;
 use crate::states::{AdCampaign, AppState, HypeMode, SelectedAdCampaign};
 use crate::ui_theme::{self, UiFont};
@@ -21,6 +20,7 @@ impl Plugin for HypePlugin {
                 (
                     handle_campaign_toggle,
                     handle_edit_poster_button,
+                    handle_ticket_price_buttons,
                     handle_start_race_button,
                 )
                     .run_if(in_state(HypeMode::CampaignSelector)),
@@ -48,23 +48,45 @@ struct EditPosterButton;
 #[derive(Component)]
 struct StartRaceButton;
 
+#[derive(Component)]
+struct TicketPriceDownButton;
+
+#[derive(Component)]
+struct TicketPriceUpButton;
+
+#[derive(Component)]
+struct TicketPriceText;
+
+#[derive(Component)]
+struct PosterCostText;
+
 // --- Toggle state ---
 
 #[derive(Resource, Default)]
 struct CampaignToggles {
     posters: bool,
+    /// Saved poster count for when the checkbox is unchecked then rechecked.
+    saved_poster_count: u32,
+    ticket_price: u32,
 }
 
 fn setup_campaign_ui(
     mut commands: Commands,
     font: Res<UiFont>,
     poster_order: Option<Res<PosterOrder>>,
+    league: Option<Res<LeagueState>>,
 ) {
     let ui_font = font.0.clone();
-    let poster_count = poster_order.map(|o| o.count).unwrap_or(25);
+    let poster_count = poster_order.map(|o| o.count).unwrap_or(0);
     let poster_cost = poster_count as f32 / 25.0 * 5.0;
+    let posters_auto_checked = poster_count > 0;
+    let ticket_price = league.map(|l| l.ticket_price).unwrap_or(0);
 
-    commands.insert_resource(CampaignToggles::default());
+    commands.insert_resource(CampaignToggles {
+        posters: posters_auto_checked,
+        saved_poster_count: poster_count,
+        ticket_price,
+    });
 
     commands
         .spawn((
@@ -98,7 +120,7 @@ fn setup_campaign_ui(
                 .spawn(Node {
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(20.0),
-                    align_items: AlignItems::Center,
+                    align_items: AlignItems::Start,
                     ..default()
                 })
                 .with_children(|col| {
@@ -109,6 +131,7 @@ fn setup_campaign_ui(
                         AdCampaign::Posters,
                         poster_cost,
                         true,
+                        posters_auto_checked,
                     );
                     spawn_campaign_row(
                         col,
@@ -116,6 +139,7 @@ fn setup_campaign_ui(
                         "Highlight Reel",
                         AdCampaign::HighlightReel,
                         HIGHLIGHT_REEL_COST,
+                        false,
                         false,
                     );
                     spawn_campaign_row(
@@ -125,27 +149,120 @@ fn setup_campaign_ui(
                         AdCampaign::Merch,
                         MERCH_COST,
                         false,
+                        false,
                     );
                 });
 
-            // START RACE button — bottom right
-            parent
-                .spawn(Node {
-                    width: Val::Percent(100.0),
-                    justify_content: JustifyContent::FlexEnd,
-                    padding: UiRect::right(Val::Px(40.0)),
-                    margin: UiRect::top(Val::Px(40.0)),
-                    ..default()
-                })
-                .with_children(|row| {
-                    ui_theme::spawn_menu_button(
-                        row,
-                        "START RACE",
-                        StartRaceButton,
-                        240.0,
-                        &ui_font,
-                    );
-                });
+            // Ticket price row
+            {
+                let ui_font_ticket = ui_font.clone();
+                parent
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(12.0),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        row.spawn((
+                            Text::new("Ticket Price:"),
+                            TextFont {
+                                font: ui_font_ticket.clone(),
+                                font_size: 28.0,
+                                ..default()
+                            },
+                            TextColor(palette::VANILLA),
+                        ));
+
+                        // Down button
+                        row.spawn((
+                            Button,
+                            ui_theme::ThemedButton,
+                            TicketPriceDownButton,
+                            Node {
+                                width: Val::Px(36.0),
+                                height: Val::Px(36.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                border: UiRect::all(Val::Px(2.0)),
+                                ..default()
+                            },
+                            BackgroundColor(ui_theme::BUTTON_NORMAL),
+                            BorderColor::all(ui_theme::BORDER_NORMAL),
+                        ))
+                        .with_children(|btn| {
+                            btn.spawn((
+                                Text::new("-"),
+                                TextFont {
+                                    font: ui_font_ticket.clone(),
+                                    font_size: 20.0,
+                                    ..default()
+                                },
+                                TextColor(palette::VANILLA),
+                            ));
+                        });
+
+                        // Price text
+                        let price_label = if ticket_price == 0 {
+                            "FREE".to_string()
+                        } else {
+                            format!("${ticket_price}")
+                        };
+                        row.spawn((
+                            TicketPriceText,
+                            Text::new(price_label),
+                            TextFont {
+                                font: ui_font_ticket.clone(),
+                                font_size: 28.0,
+                                ..default()
+                            },
+                            TextColor(palette::FROG),
+                            Node {
+                                width: Val::Px(80.0),
+                                justify_content: JustifyContent::Center,
+                                ..default()
+                            },
+                            TextLayout::new_with_justify(Justify::Center),
+                        ));
+
+                        // Up button
+                        row.spawn((
+                            Button,
+                            ui_theme::ThemedButton,
+                            TicketPriceUpButton,
+                            Node {
+                                width: Val::Px(36.0),
+                                height: Val::Px(36.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                border: UiRect::all(Val::Px(2.0)),
+                                ..default()
+                            },
+                            BackgroundColor(ui_theme::BUTTON_NORMAL),
+                            BorderColor::all(ui_theme::BORDER_NORMAL),
+                        ))
+                        .with_children(|btn| {
+                            btn.spawn((
+                                Text::new("+"),
+                                TextFont {
+                                    font: ui_font_ticket.clone(),
+                                    font_size: 20.0,
+                                    ..default()
+                                },
+                                TextColor(palette::VANILLA),
+                            ));
+                        });
+                    });
+            }
+
+            // START RACE button — centered
+            ui_theme::spawn_menu_button(
+                parent,
+                "START RACE",
+                StartRaceButton,
+                240.0,
+                &ui_font,
+            );
         });
 }
 
@@ -156,6 +273,7 @@ fn spawn_campaign_row(
     campaign: AdCampaign,
     cost: f32,
     enabled: bool,
+    checked: bool,
 ) {
     let text_color = if enabled {
         palette::VANILLA
@@ -212,7 +330,7 @@ fn spawn_campaign_row(
                 .with_children(|btn| {
                     btn.spawn((
                         CampaignCheckboxFill(campaign),
-                        Text::new(""),
+                        Text::new(if checked { "X" } else { "" }),
                         TextFont {
                             font: ui_font.clone(),
                             font_size: 22.0,
@@ -292,8 +410,15 @@ fn spawn_campaign_row(
                 });
             }
 
-            // Cost
-            row.spawn((
+            // Cost — hidden unless checked (for poster row)
+            let cost_vis = if checked {
+                Visibility::Inherited
+            } else if enabled {
+                Visibility::Hidden
+            } else {
+                Visibility::Inherited
+            };
+            let mut cost_cmd = row.spawn((
                 Text::new(format!("${cost:.0}")),
                 TextFont {
                     font: ui_font.clone(),
@@ -301,7 +426,15 @@ fn spawn_campaign_row(
                     ..default()
                 },
                 TextColor(cost_color),
+                Node {
+                    width: Val::Px(100.0),
+                    ..default()
+                },
+                cost_vis,
             ));
+            if campaign == AdCampaign::Posters {
+                cost_cmd.insert(PosterCostText);
+            }
         });
 }
 
@@ -309,6 +442,8 @@ fn handle_campaign_toggle(
     query: Query<(&Interaction, &CampaignCheckbox), Changed<Interaction>>,
     mut toggles: ResMut<CampaignToggles>,
     mut fills: Query<(&CampaignCheckboxFill, &mut Text)>,
+    mut cost_text: Query<(&mut Visibility, &mut Text), (With<PosterCostText>, Without<CampaignCheckboxFill>)>,
+    mut poster_order: Option<ResMut<PosterOrder>>,
 ) {
     for (interaction, checkbox) in &query {
         if *interaction != Interaction::Pressed {
@@ -316,6 +451,29 @@ fn handle_campaign_toggle(
         }
         if checkbox.0 == AdCampaign::Posters {
             toggles.posters = !toggles.posters;
+
+            if let Some(ref mut order) = poster_order {
+                if toggles.posters {
+                    // Restore saved count
+                    order.count = toggles.saved_poster_count;
+                } else {
+                    // Save count before clearing
+                    toggles.saved_poster_count = order.count;
+                    order.count = 0;
+                }
+            }
+
+            // Show/hide poster cost
+            for (mut vis, mut text) in &mut cost_text {
+                if toggles.posters {
+                    let count = poster_order.as_ref().map(|o| o.count).unwrap_or(0);
+                    let cost = count as f32 / 25.0 * 5.0;
+                    text.0 = format!("${cost:.0}");
+                    *vis = Visibility::Inherited;
+                } else {
+                    *vis = Visibility::Hidden;
+                }
+            }
         }
 
         let is_on = match checkbox.0 {
@@ -343,6 +501,36 @@ fn handle_edit_poster_button(
     }
 }
 
+fn handle_ticket_price_buttons(
+    down_query: Query<&Interaction, (Changed<Interaction>, With<TicketPriceDownButton>)>,
+    up_query: Query<&Interaction, (Changed<Interaction>, With<TicketPriceUpButton>)>,
+    mut toggles: ResMut<CampaignToggles>,
+    mut text_query: Query<&mut Text, With<TicketPriceText>>,
+) {
+    let mut changed = false;
+    for interaction in &down_query {
+        if *interaction == Interaction::Pressed && toggles.ticket_price > 0 {
+            toggles.ticket_price -= 1;
+            changed = true;
+        }
+    }
+    for interaction in &up_query {
+        if *interaction == Interaction::Pressed {
+            toggles.ticket_price += 1;
+            changed = true;
+        }
+    }
+    if changed {
+        for mut text in &mut text_query {
+            text.0 = if toggles.ticket_price == 0 {
+                "FREE".to_string()
+            } else {
+                format!("${}", toggles.ticket_price)
+            };
+        }
+    }
+}
+
 fn handle_start_race_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<StartRaceButton>)>,
@@ -362,11 +550,13 @@ fn handle_start_race_button(
             let mut total_cost = 0.0;
 
             if toggles.posters {
-                let count = poster_order.as_ref().map(|o| o.count).unwrap_or(25);
+                let count = poster_order.as_ref().map(|o| o.count).unwrap_or(0);
                 let poster_cost = count as f32 / 25.0 * 5.0;
                 budgets.posters = poster_cost;
                 total_cost += poster_cost;
             }
+
+            league.ticket_price = toggles.ticket_price;
 
             if total_cost <= league.money {
                 league.money -= total_cost;
@@ -389,7 +579,7 @@ fn handle_start_race_button(
 
         commands.remove_resource::<CampaignToggles>();
         commands.remove_resource::<PosterOrder>();
-        commands.insert_resource(SkipToLocationSelect);
-        next_state.set(AppState::Menu);
+        commands.remove_resource::<poster_editor::SavedPosterData>();
+        next_state.set(AppState::Race);
     }
 }

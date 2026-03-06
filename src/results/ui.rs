@@ -16,6 +16,7 @@ use crate::race::track_quality::TrackQuality;
 use crate::course::data::CourseData;
 use crate::course::location::LocationRegistry;
 use crate::states::AppState;
+use crate::menu::ui::SkipToLocationSelect;
 use crate::ui_theme::{self, UiFont};
 
 #[derive(Component)]
@@ -23,6 +24,9 @@ pub(crate) struct ReplayRaceButton;
 
 #[derive(Component)]
 pub(crate) struct ContinueButton;
+
+#[derive(Component)]
+pub(crate) struct NewRaceButton;
 
 #[derive(Component)]
 pub(crate) struct ResultsRaceTime;
@@ -183,6 +187,7 @@ pub fn setup_results_ui(
                 })
                 .with_children(|row| {
                     ui_theme::spawn_menu_button(row, "REPLAY RACE", ReplayRaceButton, 220.0, &ui_font);
+                    ui_theme::spawn_menu_button(row, "NEW RACE", NewRaceButton, 180.0, &ui_font);
                     ui_theme::spawn_menu_button(row, "CONTINUE", ContinueButton, 180.0, &ui_font);
                 });
         });
@@ -296,8 +301,6 @@ fn spawn_result_row(
         });
 }
 
-const TICKET_PRICE: f32 = 2.0;
-
 fn spawn_league_stats_panel(
     parent: &mut ChildSpawnerCommands,
     ui_font: &Handle<Font>,
@@ -351,7 +354,8 @@ fn spawn_league_stats_panel(
                     if att.turned_away > 0 {
                         lines.push(format!("Turned away: {}", att.turned_away));
                     }
-                    let ticket_revenue = att.actual_attendance as f32 * TICKET_PRICE;
+                    let ticket_price = league.map(|l| l.ticket_price).unwrap_or(0);
+                    let ticket_revenue = att.actual_attendance as f32 * ticket_price as f32;
                     lines.push(format!("Tickets: +${ticket_revenue:.0}"));
                 }
 
@@ -702,13 +706,26 @@ pub fn handle_replay_button(
     }
 }
 
+pub fn handle_new_race_button(
+    query: Query<&Interaction, (Changed<Interaction>, With<NewRaceButton>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            next_state.set(AppState::Race);
+        }
+    }
+}
+
 pub fn handle_continue_button(
+    mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            next_state.set(AppState::HypeSetup);
+            commands.insert_resource(SkipToLocationSelect);
+            next_state.set(AppState::Menu);
         }
     }
 }

@@ -149,15 +149,9 @@ pub struct CursorBlinkTimer {
 }
 
 /// Poster print order: count in multiples of 25, $5 per 25.
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct PosterOrder {
     pub count: u32,
-}
-
-impl Default for PosterOrder {
-    fn default() -> Self {
-        Self { count: 25 }
-    }
 }
 
 #[derive(Component)]
@@ -168,6 +162,13 @@ pub struct PosterCountUpButton;
 
 #[derive(Component)]
 pub struct PosterCountDownButton;
+
+/// Persisted canvas data so the poster can be re-opened after leaving the editor.
+#[derive(Resource)]
+pub struct SavedPosterData {
+    pub actions: Vec<PosterAction>,
+    pub image_data: Vec<u8>,
+}
 
 /// Tracks an in-progress text drag operation.
 #[derive(Resource, Default)]
@@ -182,7 +183,20 @@ pub struct TextDragState {
     pub moved: bool,
 }
 
-fn cleanup_poster_editor(mut commands: Commands) {
+fn cleanup_poster_editor(
+    mut commands: Commands,
+    state: Option<Res<PosterEditorState>>,
+    images: Res<Assets<Image>>,
+) {
+    if let Some(state) = state
+        && let Some(image) = images.get(&state.canvas_handle)
+        && let Some(data) = image.data.as_ref()
+    {
+        commands.insert_resource(SavedPosterData {
+            actions: state.actions.clone(),
+            image_data: data.clone(),
+        });
+    }
     commands.remove_resource::<PosterEditorState>();
     commands.remove_resource::<crate::editor::undo::UndoStack<PosterAction>>();
     commands.remove_resource::<CursorBlinkTimer>();
