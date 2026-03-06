@@ -56,6 +56,26 @@ pub struct CameraInstance {
     pub label: Option<String>,
 }
 
+/// Cost to place a gate in the course editor. Returns None for non-gate obstacles.
+pub fn gate_cost(obstacle_id: &str) -> Option<u32> {
+    match obstacle_id {
+        "gate_ground" => Some(10),
+        "gate_loop" => Some(20),
+        "gate_air" => Some(40),
+        _ => None,
+    }
+}
+
+/// Spectacle weight for fan attraction. Higher = crowds like it more.
+pub fn gate_spectacle_weight(obstacle_id: &str) -> f32 {
+    match obstacle_id {
+        "gate_ground" => 1.0,
+        "gate_loop" => 2.0,
+        "gate_air" => 4.0,
+        _ => 0.0,
+    }
+}
+
 fn default_location() -> String {
     "Abandoned Warehouse".to_string()
 }

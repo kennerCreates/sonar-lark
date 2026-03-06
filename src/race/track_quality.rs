@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 
+use crate::course::data::gate_spectacle_weight;
 use super::script::RaceScript;
 
 // ---------------------------------------------------------------------------
@@ -15,6 +16,8 @@ pub struct RaceSummary {
     pub overtake_count: u32,
     pub crash_count: u32,
     pub photo_finish_gap: f32,
+    /// Obstacle IDs of gates only (e.g. "gate_ground", "gate_air").
+    pub gate_obstacle_ids: Vec<String>,
 }
 
 #[derive(Resource)]
@@ -26,6 +29,7 @@ pub struct TrackQuality {
     pub overtake_score: f32,
     pub crash_score: f32,
     pub photo_finish_score: f32,
+    pub gate_spectacle_score: f32,
     pub overall: f32,
 }
 
@@ -37,6 +41,7 @@ pub fn harvest_race_summary(
     script: &RaceScript,
     gate_positions: &[Vec3],
     obstacle_ids: &[&str],
+    gate_obstacle_ids: &[&str],
     tightness_counts: [u32; 3],
     photo_finish_gap: f32,
 ) -> RaceSummary {
@@ -68,6 +73,7 @@ pub fn harvest_race_summary(
         overtake_count,
         crash_count,
         photo_finish_gap,
+        gate_obstacle_ids: gate_obstacle_ids.iter().map(|s| s.to_string()).collect(),
     }
 }
 
@@ -96,13 +102,27 @@ pub fn compute_track_quality(summary: &RaceSummary) -> TrackQuality {
 
     let photo_finish_score = (-summary.photo_finish_gap / 3.0).exp();
 
+    // Gate spectacle: average weight / max weight (4.0). Air gates score highest.
+    let gate_spectacle_score = if summary.gate_obstacle_ids.is_empty() {
+        0.0
+    } else {
+        let total_weight: f32 = summary
+            .gate_obstacle_ids
+            .iter()
+            .map(|id| gate_spectacle_weight(id))
+            .sum();
+        let avg = total_weight / summary.gate_obstacle_ids.len() as f32;
+        (avg / 4.0).min(1.0)
+    };
+
     let overall = gate_count_score * 0.10
         + obstacle_variety_score * 0.10
-        + turn_mix_score * 0.20
+        + turn_mix_score * 0.15
         + elevation_score * 0.10
-        + overtake_score * 0.20
+        + overtake_score * 0.15
         + crash_score * 0.15
-        + photo_finish_score * 0.15;
+        + photo_finish_score * 0.10
+        + gate_spectacle_score * 0.15;
 
     TrackQuality {
         gate_count_score,
@@ -112,6 +132,7 @@ pub fn compute_track_quality(summary: &RaceSummary) -> TrackQuality {
         overtake_score,
         crash_score,
         photo_finish_score,
+        gate_spectacle_score,
         overall,
     }
 }
@@ -207,6 +228,7 @@ mod tests {
             overtake_count,
             crash_count,
             photo_finish_gap,
+            gate_obstacle_ids: vec![],
         }
     }
 
@@ -326,11 +348,12 @@ mod tests {
         let q = compute_track_quality(&s);
         let expected = q.gate_count_score * 0.10
             + q.obstacle_variety_score * 0.10
-            + q.turn_mix_score * 0.20
+            + q.turn_mix_score * 0.15
             + q.elevation_score * 0.10
-            + q.overtake_score * 0.20
+            + q.overtake_score * 0.15
             + q.crash_score * 0.15
-            + q.photo_finish_score * 0.15;
+            + q.photo_finish_score * 0.10
+            + q.gate_spectacle_score * 0.15;
         assert!(
             (q.overall - expected).abs() < 1e-6,
             "overall {} != expected {}",
@@ -357,7 +380,8 @@ mod tests {
         ];
         let obstacle_ids = vec!["ring", "hoop", "ring", "pillar"];
         let tightness = [3, 2, 1];
-        let summary = harvest_race_summary(&script, &positions, &obstacle_ids, tightness, 0.5);
+        let gate_ids = vec!["gate_air", "gate_ground", "gate_loop"];
+        let summary = harvest_race_summary(&script, &positions, &obstacle_ids, &gate_ids, tightness, 0.5);
 
         assert_eq!(summary.gate_count, 3);
         assert_eq!(summary.distinct_obstacle_ids, 3); // ring, hoop, pillar
@@ -368,5 +392,6 @@ mod tests {
         assert_eq!(summary.overtake_count, 5);
         assert_eq!(summary.crash_count, 2);
         assert!((summary.photo_finish_gap - 0.5).abs() < f32::EPSILON);
+        assert_eq!(summary.gate_obstacle_ids.len(), 3);
     }
 }

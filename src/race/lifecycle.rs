@@ -232,6 +232,17 @@ pub fn generate_race_script_system(
         .map(|c| c.instances.iter().map(|i| i.obstacle_id.0.as_str()).collect())
         .unwrap_or_default();
 
+    let gate_obstacle_ids: Vec<&str> = course
+        .as_ref()
+        .map(|c| {
+            c.instances
+                .iter()
+                .filter(|i| i.gate_order.is_some())
+                .map(|i| i.obstacle_id.0.as_str())
+                .collect()
+        })
+        .unwrap_or_default();
+
     // Compute photo finish gap from the last two drones' gate_pass_t
     let photo_finish_gap = if race_script.drone_scripts.len() >= 2 {
         let mut finish_times: Vec<f32> = race_script
@@ -253,6 +264,7 @@ pub fn generate_race_script_system(
         &race_script,
         gate_positions,
         &obstacle_ids,
+        &gate_obstacle_ids,
         tightness_counts,
         photo_finish_gap,
     );

@@ -34,6 +34,6 @@ pub use gate_color::{
 pub use display_updates::{
     handle_button_hover,
     handle_transform_mode_buttons, update_display_values, update_gate_count_display,
-    update_transform_mode_ui,
+    update_money_display, update_transform_mode_ui,
 };
 pub use types::*;

@@ -95,6 +95,9 @@ pub struct GateColorDefaultButton;
 #[derive(Component)]
 pub struct StartRaceButton;
 
+#[derive(Component)]
+pub struct MoneyText;
+
 pub const DEFAULT_GATE_COLOR: [f32; 4] = [0.949, 0.949, 0.855, 1.0];
 
 pub const GATE_COLOR_CELL_SIZE: f32 = 24.0;

@@ -29,7 +29,7 @@ impl Default for LeagueState {
     fn default() -> Self {
         Self {
             fan_network: FanNetwork::new_seeded(42),
-            money: 0.0,
+            money: 205.0,
             campaign_budgets: CampaignBudgets::default(),
             ticket_price: 0,
         }

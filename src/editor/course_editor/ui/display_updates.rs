@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::editor::course_editor::{EditorSelection, EditorTransform, PlacedObstacle};
+use crate::league::LeagueState;
 use crate::palette;
 use crate::ui_theme;
 
@@ -110,4 +111,20 @@ pub fn update_gate_count_display(
             TextColor(palette::BRONZE)
         };
     }
+}
+
+pub fn update_money_display(
+    league: Option<Res<LeagueState>>,
+    mut text_query: Query<(&mut Text, &mut TextColor), With<MoneyText>>,
+) {
+    let Ok((mut text, mut color)) = text_query.single_mut() else {
+        return;
+    };
+    let money = league.map_or(0.0, |l| l.money);
+    **text = format!("Budget: ${:.0}", money);
+    *color = if money >= 0.0 {
+        TextColor(palette::SUNSHINE)
+    } else {
+        TextColor(palette::NEON_RED)
+    };
 }

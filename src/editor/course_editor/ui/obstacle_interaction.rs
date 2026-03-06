@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 
+use crate::course::data::gate_cost;
 use crate::editor::EditorTab;
 use crate::editor::course_editor::{EditorSelection, EditorTransform, EditorUI, PlacedObstacle};
 use crate::editor::undo::{CameraSnapshot, CourseEditorAction, UndoStack};
+use crate::league::LeagueState;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, SpawnObstacleContext};
 use crate::rendering::{CelLightDir, CelMaterial};
@@ -27,6 +29,7 @@ pub fn handle_palette_selection(
     light_dir: Res<CelLightDir>,
     camera_meshes: Option<Res<CameraEditorMeshes>>,
     mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
+    mut league: Option<ResMut<LeagueState>>,
 ) {
     for (interaction, btn) in &query {
         if *interaction != Interaction::Pressed {
@@ -36,6 +39,16 @@ pub fn handle_palette_selection(
         let Some(def) = library.get(&btn.0) else {
             continue;
         };
+
+        // Check gate cost against budget
+        if let Some(cost) = gate_cost(&btn.0.0) {
+            let money = league.as_ref().map_or(0.0, |l| l.money);
+            if money < cost as f32 {
+                warn!("Cannot afford {} (${cost}, have ${:.0})", btn.0.0, money);
+                continue;
+            }
+        }
+
         let Some(handle) = &gltf_handle else {
             warn!("glTF not loaded yet, cannot place obstacle");
             continue;
@@ -86,6 +99,13 @@ pub fn handle_palette_selection(
                 gate_forward_flipped: false,
                 color_override,
             });
+
+            // Deduct gate cost
+            if let Some(cost) = gate_cost(&btn.0.0)
+                && let Some(ref mut league) = league
+            {
+                league.money -= cost as f32;
+            }
 
             // Auto-spawn a primary camera on the first gate (gate_order == 0)
             let mut camera_snapshot = None;
