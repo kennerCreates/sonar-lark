@@ -166,6 +166,14 @@ pub struct PosterCountUpButton;
 #[derive(Component)]
 pub struct PosterCountDownButton;
 
+/// Tracks where the poster editor was opened from, so DONE returns to the right place.
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PosterEditorOrigin {
+    #[default]
+    CampaignSelector,
+    Menu,
+}
+
 /// Persisted canvas data so the poster can be re-opened after leaving the editor.
 #[derive(Resource)]
 pub struct SavedPosterData {

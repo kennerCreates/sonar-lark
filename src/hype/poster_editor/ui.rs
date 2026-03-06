@@ -27,10 +27,10 @@ const BRUSH_SMALL: f32 = 4.0;
 const BRUSH_MEDIUM: f32 = 10.0;
 const BRUSH_LARGE: f32 = 20.0;
 
-const TEXT_SMALL: f32 = 18.0;
-const TEXT_MEDIUM: f32 = 28.0;
-const TEXT_LARGE: f32 = 40.0;
-const TEXT_XLARGE: f32 = 56.0;
+const TEXT_SMALL: f32 = 28.0;
+const TEXT_MEDIUM: f32 = 40.0;
+const TEXT_LARGE: f32 = 56.0;
+const TEXT_XLARGE: f32 = 72.0;
 
 pub fn setup_poster_editor(
     mut commands: Commands,

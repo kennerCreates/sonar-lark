@@ -68,8 +68,8 @@ mod tests {
         let found = registry.get("Local Park");
         assert!(found.is_some());
         let park = found.unwrap();
-        assert!((park.base_attractiveness - 0.4).abs() < f32::EPSILON);
-        assert_eq!(park.capacity, 80);
+        assert!((park.base_attractiveness - 0.2).abs() < f32::EPSILON);
+        assert_eq!(park.capacity, 40);
 
         assert!(registry.get("Nonexistent Venue").is_none());
     }

@@ -16,6 +16,7 @@ impl Plugin for MenuPlugin {
                     ui::handle_start_game_button,
                     ui::handle_dev_mode_button,
                     ui::handle_location_card,
+                    ui::handle_edit_poster_button,
                     ui::handle_course_library_button,
                     ui::handle_course_list_item,
                     ui::handle_course_delete_item,

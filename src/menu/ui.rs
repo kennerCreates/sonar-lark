@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 use crate::course::discovery::{discover_courses, CourseEntry};
+use crate::hype::poster_editor::PosterEditorOrigin;
 use crate::palette;
 use crate::states::{AppState, PendingEditorCourse};
 use crate::ui_theme::{self, UiFont};
@@ -41,6 +42,9 @@ pub(crate) struct CourseDeleteItem(String);
 
 #[derive(Component)]
 pub(crate) struct CourseLibraryBackButton;
+
+#[derive(Component)]
+pub(crate) struct EditPosterButton;
 
 struct LocationDef {
     name: &'static str,
@@ -175,6 +179,27 @@ fn spawn_location_select(commands: &mut Commands, font: &Handle<Font>) {
                     }
                 });
 
+            // Edit Poster button (bottom-left)
+            {
+                let ui_font_poster = ui_font.clone();
+                parent
+                    .spawn(Node {
+                        position_type: PositionType::Absolute,
+                        bottom: Val::Px(40.0),
+                        left: Val::Px(40.0),
+                        ..default()
+                    })
+                    .with_children(|col| {
+                        ui_theme::spawn_menu_button(
+                            col,
+                            "Edit Poster",
+                            EditPosterButton,
+                            160.0,
+                            &ui_font_poster,
+                        );
+                    });
+            }
+
             let ui_font3 = ui_font.clone();
             parent
                 .spawn(Node {
@@ -266,6 +291,19 @@ pub fn handle_location_card(
     for interaction in &query {
         if *interaction == Interaction::Pressed {
             next_state.set(AppState::Editor);
+        }
+    }
+}
+
+pub fn handle_edit_poster_button(
+    mut commands: Commands,
+    query: Query<&Interaction, (Changed<Interaction>, With<EditPosterButton>)>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            commands.insert_resource(PosterEditorOrigin::Menu);
+            next_state.set(AppState::HypeSetup);
         }
     }
 }

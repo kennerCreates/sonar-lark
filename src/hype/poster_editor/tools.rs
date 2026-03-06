@@ -4,7 +4,7 @@ use bevy::ui::RelativeCursorPosition;
 
 use crate::editor::undo::UndoStack;
 use crate::palette;
-use crate::states::HypeMode;
+use crate::states::{AppState, HypeMode};
 use crate::ui_theme;
 
 use crate::dev_menu::color_picker_data::PALETTE_COLORS;
@@ -13,7 +13,8 @@ use super::canvas::{self, CANVAS_DISPLAY_HEIGHT, CANVAS_DISPLAY_WIDTH, CANVAS_HE
 use super::{
     BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
     PaintStroke, PosterAction, PosterColorCell, PosterCountDownButton, PosterCountText,
-    PosterCountUpButton, PosterEditorState, PosterOrder, PosterStartRaceButton, PosterTextElement,
+    PosterCountUpButton, PosterEditorOrigin, PosterEditorState, PosterOrder, PosterStartRaceButton,
+    PosterTextElement,
     PosterTool, TextDragState, TextFontButton, TextFontPanel, TextSizeButton, TextSizePanel,
     ToolButtonMarker, POSTER_FONTS,
 };
@@ -662,10 +663,23 @@ pub fn handle_undo_redo(
 pub fn handle_start_race(
     query: Query<&Interaction, (Changed<Interaction>, With<PosterStartRaceButton>)>,
     mut next_hype: ResMut<NextState<HypeMode>>,
+    mut next_app: ResMut<NextState<AppState>>,
+    origin: Option<Res<PosterEditorOrigin>>,
+    mut commands: Commands,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            next_hype.set(HypeMode::CampaignSelector);
+            let origin = origin.as_ref().map(|o| **o).unwrap_or_default();
+            match origin {
+                PosterEditorOrigin::Menu => {
+                    commands.insert_resource(crate::menu::ui::SkipToLocationSelect);
+                    next_app.set(AppState::Menu);
+                }
+                PosterEditorOrigin::CampaignSelector => {
+                    next_hype.set(HypeMode::CampaignSelector);
+                }
+            }
+            commands.remove_resource::<PosterEditorOrigin>();
         }
     }
 }
