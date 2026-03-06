@@ -174,11 +174,23 @@ pub enum PosterEditorOrigin {
     Menu,
 }
 
+/// Saved state of a text element placed on the poster.
+#[derive(Clone)]
+pub struct SavedTextElement {
+    pub content: String,
+    pub x: f32,
+    pub y: f32,
+    pub font_size: f32,
+    pub font_index: usize,
+    pub color: [u8; 4],
+}
+
 /// Persisted canvas data so the poster can be re-opened after leaving the editor.
 #[derive(Resource)]
 pub struct SavedPosterData {
     pub actions: Vec<PosterAction>,
     pub image_data: Vec<u8>,
+    pub texts: Vec<SavedTextElement>,
 }
 
 /// Tracks an in-progress text drag operation.
@@ -198,14 +210,48 @@ fn cleanup_poster_editor(
     mut commands: Commands,
     state: Option<Res<PosterEditorState>>,
     images: Res<Assets<Image>>,
+    text_query: Query<(&Text, &TextColor, &TextFont, &Node), With<PosterTextElement>>,
 ) {
     if let Some(state) = state
         && let Some(image) = images.get(&state.canvas_handle)
         && let Some(data) = image.data.as_ref()
     {
+        let mut texts = Vec::new();
+        for (text, color, font, node) in &text_query {
+            let content = text.0.clone();
+            if content.is_empty() {
+                continue;
+            }
+            let x = if let Val::Px(v) = node.left { v } else { 0.0 };
+            let y = if let Val::Px(v) = node.top { v } else { 0.0 };
+            let rgba = color.0.to_srgba();
+            let color_bytes = [
+                (rgba.red * 255.0) as u8,
+                (rgba.green * 255.0) as u8,
+                (rgba.blue * 255.0) as u8,
+                255,
+            ];
+            // Find font index by matching handle
+            let font_index = POSTER_FONTS
+                .iter()
+                .position(|(_, path)| {
+                    // Compare by path suffix — AssetServer paths match the original load path
+                    font.font.path().is_some_and(|p| p.path().to_str() == Some(*path))
+                })
+                .unwrap_or(0);
+            texts.push(SavedTextElement {
+                content,
+                x,
+                y,
+                font_size: font.font_size,
+                font_index,
+                color: color_bytes,
+            });
+        }
         commands.insert_resource(SavedPosterData {
             actions: state.actions.clone(),
             image_data: data.clone(),
+            texts,
         });
     }
     commands.remove_resource::<PosterEditorState>();

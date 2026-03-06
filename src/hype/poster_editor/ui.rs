@@ -15,8 +15,9 @@ use super::{
     BrushCursorPreview, BrushSizeButton, BrushSizePanel, CanvasContainer, CursorBlinkTimer,
     EraseToolButton, PaintToolButton, PosterAction, PosterCanvas, PosterColorCell,
     PosterCountDownButton, PosterCountText, PosterCountUpButton, PosterEditorState, PosterOrder,
-    PosterStartRaceButton, PosterTool, SavedPosterData, TextDragState, TextFontButton,
-    TextFontPanel, TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker, POSTER_FONTS,
+    PosterStartRaceButton, PosterTextElement, PosterTool, SavedPosterData, TextDragState,
+    TextFontButton, TextFontPanel, TextSizeButton, TextSizePanel, TextToolButton, ToolButtonMarker,
+    POSTER_FONTS,
 };
 
 const COLOR_CELL_SIZE: f32 = 28.0;
@@ -91,7 +92,8 @@ pub fn setup_poster_editor(
             spawn_left_panel(root, &asset_server, ui_font.clone());
 
             // Center — canvas
-            spawn_canvas_area(root, canvas_handle);
+            let saved_texts = saved.as_ref().map(|s| s.texts.clone()).unwrap_or_default();
+            spawn_canvas_area(root, canvas_handle, &saved_texts, &asset_server);
 
             // Right panel — color palette
             spawn_right_panel(root);
@@ -418,7 +420,12 @@ fn spawn_font_button(
         });
 }
 
-fn spawn_canvas_area(parent: &mut ChildSpawnerCommands, canvas_handle: Handle<Image>) {
+fn spawn_canvas_area(
+    parent: &mut ChildSpawnerCommands,
+    canvas_handle: Handle<Image>,
+    saved_texts: &[super::SavedTextElement],
+    asset_server: &AssetServer,
+) {
     parent
         .spawn(Node {
             flex_grow: 1.0,
@@ -453,6 +460,31 @@ fn spawn_canvas_area(parent: &mut ChildSpawnerCommands, canvas_handle: Handle<Im
                             ..default()
                         },
                     ));
+
+                    // Restore saved text elements
+                    for saved_text in saved_texts {
+                        let font_handle: Handle<Font> =
+                            asset_server.load(POSTER_FONTS[saved_text.font_index].1);
+                        let [r, g, b, _] = saved_text.color;
+                        container.spawn((
+                            PosterTextElement,
+                            Interaction::default(),
+                            Text::new(&saved_text.content),
+                            TextFont {
+                                font: font_handle,
+                                font_size: saved_text.font_size,
+                                ..default()
+                            },
+                            TextColor(Color::srgb_u8(r, g, b)),
+                            ZIndex(1),
+                            Node {
+                                position_type: PositionType::Absolute,
+                                left: Val::Px(saved_text.x),
+                                top: Val::Px(saved_text.y),
+                                ..default()
+                            },
+                        ));
+                    }
 
                     // Brush cursor preview (circle outline, hidden by default)
                     // Pickable::IGNORE prevents it from blocking canvas picking

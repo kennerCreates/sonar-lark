@@ -124,6 +124,7 @@ fn redirect_to_poster_editor(
 fn setup_campaign_ui(
     mut commands: Commands,
     font: Res<UiFont>,
+    asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
     saved: Option<Res<SavedPosterData>>,
     poster_order: Option<Res<PosterOrder>>,
@@ -180,24 +181,73 @@ fn setup_campaign_ui(
             DespawnOnExit(HypeMode::CampaignSelector),
         ))
         .with_children(|root| {
-            // Left: poster preview with border
-            root.spawn((
-                Node {
-                    width: Val::Px(PREVIEW_WIDTH + 4.0),
-                    height: Val::Px(PREVIEW_HEIGHT + 4.0),
-                    border: UiRect::all(Val::Px(2.0)),
-                    ..default()
-                },
-                BorderColor::all(palette::SIDEWALK),
-            ))
-            .with_children(|frame| {
-                frame.spawn((
-                    ImageNode::new(preview_handle),
+            // Left: poster preview column (preview + edit button)
+            root.spawn(Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(12.0),
+                ..default()
+            })
+            .with_children(|col| {
+                // Clickable poster preview with border
+                col.spawn((
+                    Button,
+                    EditPosterButton,
                     Node {
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(100.0),
+                        width: Val::Px(PREVIEW_WIDTH + 4.0),
+                        height: Val::Px(PREVIEW_HEIGHT + 4.0),
+                        border: UiRect::all(Val::Px(2.0)),
+                        position_type: PositionType::Relative,
+                        overflow: Overflow::clip(),
                         ..default()
                     },
+                    BorderColor::all(palette::SIDEWALK),
+                ))
+                .with_children(|frame| {
+                    frame.spawn((
+                        ImageNode::new(preview_handle),
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                    ));
+
+                    // Recreate text overlays on preview (scaled down)
+                    if let Some(ref saved) = saved {
+                        let scale = PREVIEW_WIDTH / 450.0;
+                        for text_el in &saved.texts {
+                            let font_handle: Handle<Font> =
+                                asset_server.load(poster_editor::POSTER_FONTS[text_el.font_index].1);
+                            let [r, g, b, _] = text_el.color;
+                            frame.spawn((
+                                Text::new(&text_el.content),
+                                TextFont {
+                                    font: font_handle,
+                                    font_size: text_el.font_size * scale,
+                                    ..default()
+                                },
+                                TextColor(Color::srgb_u8(r, g, b)),
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    left: Val::Px(text_el.x * scale),
+                                    top: Val::Px(text_el.y * scale),
+                                    ..default()
+                                },
+                            ));
+                        }
+                    }
+                });
+
+                // "edit" label below preview
+                col.spawn((
+                    Text::new("click to edit"),
+                    TextFont {
+                        font: ui_font.clone(),
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(palette::SIDEWALK),
                 ));
             });
 
@@ -481,34 +531,6 @@ fn spawn_poster_row(
                 ));
             });
 
-            // Edit button
-            row.spawn((
-                Button,
-                ui_theme::ThemedButton,
-                EditPosterButton,
-                Node {
-                    width: Val::Px(80.0),
-                    height: Val::Px(36.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border: UiRect::all(Val::Px(2.0)),
-                    ..default()
-                },
-                BackgroundColor(ui_theme::BUTTON_NORMAL),
-                BorderColor::all(ui_theme::BORDER_NORMAL),
-            ))
-            .with_children(|btn| {
-                btn.spawn((
-                    Text::new("edit"),
-                    TextFont {
-                        font: ui_font.clone(),
-                        font_size: 18.0,
-                        ..default()
-                    },
-                    TextColor(palette::VANILLA),
-                ));
-            });
-
             // Count down button
             row.spawn((
                 Button,
@@ -630,30 +652,6 @@ fn spawn_campaign_row(
                 BorderColor::all(palette::STEEL),
             ));
 
-            // Disabled edit button
-            row.spawn((
-                Node {
-                    width: Val::Px(80.0),
-                    height: Val::Px(36.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border: UiRect::all(Val::Px(2.0)),
-                    ..default()
-                },
-                BackgroundColor(ui_theme::BUTTON_DISABLED),
-                BorderColor::all(ui_theme::BORDER_DISABLED),
-            ))
-            .with_children(|btn| {
-                btn.spawn((
-                    Text::new("edit"),
-                    TextFont {
-                        font: ui_font.clone(),
-                        font_size: 18.0,
-                        ..default()
-                    },
-                    TextColor(palette::CHAINMAIL),
-                ));
-            });
         });
 }
 
