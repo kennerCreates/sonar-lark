@@ -1,0 +1,45 @@
+(
+    fan_network: (
+        people: [
+            (
+                id: 0,
+                recruited_by: None,
+                tier: Aware,
+                races_attended: 0,
+                races_since_attended: 1,
+                spread_count: 0,
+            ),
+            (
+                id: 1,
+                recruited_by: None,
+                tier: Aware,
+                races_attended: 0,
+                races_since_attended: 1,
+                spread_count: 0,
+            ),
+            (
+                id: 2,
+                recruited_by: None,
+                tier: Attendee,
+                races_attended: 1,
+                races_since_attended: 0,
+                spread_count: 1,
+            ),
+            (
+                id: 3,
+                recruited_by: Some(2),
+                tier: Aware,
+                races_attended: 0,
+                races_since_attended: 0,
+                spread_count: 0,
+            ),
+        ],
+        next_id: 4,
+    ),
+    money: 2.0,
+    campaign_budgets: (
+        posters: 0.0,
+        highlight_reel: 0.0,
+        merch: 0.0,
+    ),
+)

@@ -1,3 +1,4 @@
+use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
 
 use super::marketing::MarketingEffects;
@@ -38,6 +39,8 @@ pub struct RaceAttractionInputs {
 }
 
 /// Output of the per-race fan simulation.
+#[derive(Resource)]
+#[allow(dead_code)] // Fields consumed by results UI in Step 5
 pub struct RaceAttractionResult {
     pub demand: u32,
     pub actual_attendance: u32,

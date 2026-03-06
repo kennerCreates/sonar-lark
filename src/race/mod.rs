@@ -113,4 +113,6 @@ fn cleanup_race_progress(mut commands: Commands) {
     commands.remove_resource::<lifecycle::RacePhase>();
     commands.remove_resource::<timing::RaceClock>();
     commands.remove_resource::<script::RaceScript>();
+    commands.remove_resource::<track_quality::TrackQuality>();
+    commands.remove_resource::<crate::league::fan_network::RaceAttractionResult>();
 }

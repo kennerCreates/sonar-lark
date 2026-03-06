@@ -27,7 +27,7 @@ pub fn default_locations() -> Vec<Location> {
     ]
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, bevy::prelude::Resource)]
 pub struct LocationRegistry {
     pub locations: Vec<Location>,
 }

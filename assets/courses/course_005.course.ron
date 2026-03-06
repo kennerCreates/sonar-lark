@@ -69,4 +69,5 @@
     ],
     props: [],
     cameras: [],
+    location: "Abandoned Warehouse",
 )

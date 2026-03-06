@@ -1,4 +1,4 @@
-use bevy::prelude::Vec3;
+use bevy::prelude::*;
 use std::collections::HashSet;
 
 use super::script::RaceScript;
@@ -17,6 +17,8 @@ pub struct RaceSummary {
     pub photo_finish_gap: f32,
 }
 
+#[derive(Resource)]
+#[allow(dead_code)] // Sub-scores consumed by results UI in Step 5
 pub struct TrackQuality {
     pub gate_count_score: f32,
     pub obstacle_variety_score: f32,

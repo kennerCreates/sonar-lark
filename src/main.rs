@@ -54,6 +54,7 @@ fn main() {
             race::RacePlugin,
             camera::CameraPlugin,
             results::ResultsPlugin,
+            league::LeaguePlugin,
             dev_menu::DevMenuPlugin,
         ))
         .run();

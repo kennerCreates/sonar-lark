@@ -127,14 +127,14 @@ src/
 │   │   ├── generation.rs generate_race_path(), generate_drone_race_path(), adaptive_approach_offset()
 │   │   └── start_positions.rs compute_start_positions()
 │   └── spawning.rs      DroneAssets/DroneGltfHandle resources, load/setup/spawn systems
-├── league/              Fan network & recruitment (pure logic, no ECS)
-│   ├── mod.rs           Module declarations
-│   ├── fan_network.rs   FanNetwork, Person, FanTier, simulate_race() — word-of-mouth fan simulation
+├── league/              Fan network, recruitment, and league management
+│   ├── mod.rs           LeaguePlugin, LeagueState resource, simulate_fans_on_results(), load/save
+│   ├── fan_network.rs   FanNetwork, Person, FanTier, RaceAttractionResult (Resource), simulate_race()
 │   ├── marketing.rs     MarketingEffects, CampaignBudgets, compute_marketing_effects()
 │   └── recruitment.rs   RecruitmentTier, RECRUITMENT_TIERS, accessible_tier()
 ├── race/                Race mechanics
 │   ├── script.rs        RaceScript, DroneScript, RaceEventLog, generate_race_script() — predetermined race outcomes
-│   ├── track_quality.rs RaceSummary, TrackQuality, harvest_race_summary(), compute_track_quality()
+│   ├── track_quality.rs RaceSummary, TrackQuality (Resource), harvest_race_summary(), compute_track_quality()
 │   ├── gate.rs          GateIndex, GateForward, GatePlanes (built at race start, used by script generator)
 │   ├── collision.rs     ObstacleCollisionCache, crash_drone helper
 │   ├── collision_math.rs segment_obb_intersection(), point_in_gate_opening(), clip_opening_to_ground() — pure geometry

@@ -9,6 +9,7 @@ use crate::states::AppState;
 use super::progress::{DroneRaceState, RaceProgress};
 use super::script::{self, DroneScriptInput, RaceEventLog, RaceScript};
 use super::timing::RaceClock;
+use super::track_quality;
 
 #[derive(Resource)]
 pub struct RaceStartSound(pub Handle<bevy::audio::AudioSource>);
@@ -140,6 +141,7 @@ pub fn generate_race_script_system(
     drones: Query<(&Drone, &AIController, &DroneConfig), With<Drone>>,
     selected_pilots: Option<Res<SelectedPilots>>,
     roster: Option<Res<PilotRoster>>,
+    course: Option<Res<crate::course::data::CourseData>>,
 ) {
     if *phase != RacePhase::Racing || existing_script.is_some() {
         return;
@@ -206,6 +208,57 @@ pub fn generate_race_script_system(
             .filter(|ds| ds.crash.is_some())
             .count(),
     );
+
+    // Harvest track quality from the generated script
+    let tightness = script::classify_turn_tightness(
+        &drone_data[0].1.spline,
+        gate_count,
+        &tuning,
+    );
+    let tightness_counts = {
+        let mut counts = [0u32; 3];
+        for t in &tightness {
+            match t {
+                script::TurnTightness::Gentle => counts[0] += 1,
+                script::TurnTightness::Medium => counts[1] += 1,
+                script::TurnTightness::Tight => counts[2] += 1,
+            }
+        }
+        counts
+    };
+
+    let obstacle_ids: Vec<&str> = course
+        .as_ref()
+        .map(|c| c.instances.iter().map(|i| i.obstacle_id.0.as_str()).collect())
+        .unwrap_or_default();
+
+    // Compute photo finish gap from the last two drones' gate_pass_t
+    let photo_finish_gap = if race_script.drone_scripts.len() >= 2 {
+        let mut finish_times: Vec<f32> = race_script
+            .drone_scripts
+            .iter()
+            .filter_map(|ds| ds.gate_pass_t.last().copied())
+            .collect();
+        finish_times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        if finish_times.len() >= 2 {
+            finish_times[1] - finish_times[0]
+        } else {
+            f32::MAX
+        }
+    } else {
+        f32::MAX
+    };
+
+    let summary = track_quality::harvest_race_summary(
+        &race_script,
+        gate_positions,
+        &obstacle_ids,
+        tightness_counts,
+        photo_finish_gap,
+    );
+    let quality = track_quality::compute_track_quality(&summary);
+    info!("Track quality: {:.2}", quality.overall);
+    commands.insert_resource(quality);
 
     commands.insert_resource(race_script);
     commands.insert_resource(RaceEventLog::default());
