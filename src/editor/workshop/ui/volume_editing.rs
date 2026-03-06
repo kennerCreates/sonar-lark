@@ -1,12 +1,28 @@
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::prelude::*;
 
+use crate::course::data::gate_cost;
 use crate::editor::undo::{UndoStack, WorkshopAction, WorkshopSnapshot};
 use crate::palette;
 use crate::ui_theme;
 
 use super::build::*;
 use crate::editor::workshop::{CollisionVolumeData, EditTarget, WorkshopState};
+
+pub fn handle_gate_toggle(
+    mut state: ResMut<WorkshopState>,
+    query: Query<&Interaction, (Changed<Interaction>, With<IsGateToggle>)>,
+    mut undo_stack: ResMut<UndoStack<WorkshopAction>>,
+) {
+    for interaction in &query {
+        if *interaction == Interaction::Pressed {
+            let before = WorkshopSnapshot::capture(&state);
+            state.is_gate = !state.is_gate;
+            let after = WorkshopSnapshot::capture(&state);
+            undo_stack.push(WorkshopAction::StateChange { before, after });
+        }
+    }
+}
 
 pub fn handle_camera_toggle(
     mut state: ResMut<WorkshopState>,
@@ -150,11 +166,13 @@ pub fn handle_name_text_input(
 
 pub fn update_display_values(
     state: Res<WorkshopState>,
-    mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<HasCameraText>)>,
-    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<HasCameraText>)>,
-    mut collision_text: Query<&mut Text, (With<HasCollisionText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<CollisionShapeLabel>, Without<HasCameraText>)>,
-    mut shape_label: Query<&mut Text, (With<CollisionShapeLabel>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<HasCameraText>)>,
-    mut camera_text: Query<&mut Text, (With<HasCameraText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>)>,
+    mut name_text: Query<&mut Text, (With<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<HasCameraText>, Without<IsGateText>, Without<GateCostLabel>)>,
+    mut trigger_text: Query<&mut Text, (With<HasTriggerText>, Without<NameDisplayText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<HasCameraText>, Without<IsGateText>, Without<GateCostLabel>)>,
+    mut collision_text: Query<&mut Text, (With<HasCollisionText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<CollisionShapeLabel>, Without<HasCameraText>, Without<IsGateText>, Without<GateCostLabel>)>,
+    mut shape_label: Query<&mut Text, (With<CollisionShapeLabel>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<HasCameraText>, Without<IsGateText>, Without<GateCostLabel>)>,
+    mut camera_text: Query<&mut Text, (With<HasCameraText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<IsGateText>, Without<GateCostLabel>)>,
+    mut gate_text: Query<&mut Text, (With<IsGateText>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<HasCameraText>, Without<GateCostLabel>)>,
+    mut cost_label: Query<&mut Text, (With<GateCostLabel>, Without<NameDisplayText>, Without<HasTriggerText>, Without<HasCollisionText>, Without<CollisionShapeLabel>, Without<HasCameraText>, Without<IsGateText>)>,
     mut bgs: ParamSet<(
         Query<&mut BackgroundColor, With<HasTriggerToggle>>,
         Query<&mut BackgroundColor, With<HasCollisionToggle>>,
@@ -163,6 +181,7 @@ pub fn update_display_values(
         Query<&mut BackgroundColor, With<EditTargetRadioCollision>>,
         Query<&mut BackgroundColor, With<HasCameraToggle>>,
         Query<&mut BackgroundColor, With<EditTargetRadioCamera>>,
+        Query<&mut BackgroundColor, With<IsGateToggle>>,
     )>,
 ) {
     if !state.is_changed() {
@@ -184,6 +203,20 @@ pub fn update_display_values(
         **text = display;
     }
 
+    if let Ok(mut text) = gate_text.single_mut() {
+        **text = if state.is_gate { "ON" } else { "OFF" }.to_string();
+    }
+    if let Ok(mut text) = cost_label.single_mut() {
+        if state.is_gate {
+            if let Some(cost) = gate_cost(&state.obstacle_name) {
+                **text = format!("Gate Cost: ${cost}");
+            } else {
+                **text = "Gate Cost: not set (add to gate_cost())".to_string();
+            }
+        } else {
+            **text = String::new();
+        }
+    }
     if let Ok(mut text) = trigger_text.single_mut() {
         **text = if state.has_trigger { "ON" } else { "OFF" }.to_string();
     }
@@ -202,6 +235,9 @@ pub fn update_display_values(
         }
     }
 
+    if let Ok(mut bg) = bgs.p7().single_mut() {
+        *bg = BackgroundColor(if state.is_gate { ui_theme::TOGGLE_ON } else { ui_theme::TOGGLE_OFF });
+    }
     if let Ok(mut bg) = bgs.p0().single_mut() {
         *bg = BackgroundColor(if state.has_trigger { ui_theme::TOGGLE_ON } else { ui_theme::TOGGLE_OFF });
     }

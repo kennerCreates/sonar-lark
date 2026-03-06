@@ -206,6 +206,7 @@ impl Plugin for WorkshopPlugin {
             (
                 ui::handle_node_selection,
                 ui::handle_library_selection,
+                ui::handle_gate_toggle,
                 ui::handle_trigger_toggle,
                 ui::handle_collision_toggle,
                 ui::handle_camera_toggle,

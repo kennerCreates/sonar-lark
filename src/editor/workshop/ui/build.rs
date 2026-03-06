@@ -23,6 +23,15 @@ pub struct NodeButton(pub String);
 pub struct LibraryButton(pub String);
 
 #[derive(Component)]
+pub struct IsGateToggle;
+
+#[derive(Component)]
+pub struct IsGateText;
+
+#[derive(Component)]
+pub struct GateCostLabel;
+
+#[derive(Component)]
 pub struct HasTriggerToggle;
 
 #[derive(Component)]
@@ -270,6 +279,19 @@ fn build_right_panel(parent: &mut ChildSpawnerCommands, font: &Handle<Font>) {
                         NameDisplayText,
                     ));
                 });
+
+            // Is Gate toggle + cost label
+            spawn_toggle_row(panel, "Is Gate", IsGateToggle, IsGateText, true, &font);
+            panel.spawn((
+                Text::new(""),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 13.0,
+                    ..default()
+                },
+                TextColor(palette::CHAINMAIL),
+                GateCostLabel,
+            ));
 
             ui_theme::spawn_divider(panel);
 
