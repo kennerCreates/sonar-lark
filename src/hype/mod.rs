@@ -82,13 +82,7 @@ struct MarketingCostText;
 struct AfterMarketingText;
 
 #[derive(Component)]
-struct VenueRevenueText;
-
-#[derive(Component)]
 struct FinalRemainingText;
-
-#[derive(Component)]
-struct VenueLabelText;
 
 #[derive(Component)]
 struct CampaignCountUp;
@@ -420,40 +414,6 @@ fn setup_campaign_ui(
                             spawn_money_row(col, &ui_font_money, "Total Money:", &format!("${total_money:.0}"), MoneyTotalText, palette::VANILLA);
                             spawn_money_row(col, &ui_font_money, "Marketing:", &format!("-${marketing_cost:.0}"), MarketingCostText, palette::SALMON);
                             spawn_money_row(col, &ui_font_money, "After Marketing:", &format!("${after_marketing:.0}"), AfterMarketingText, palette::VANILLA);
-                            // Venue row (with label marker for dynamic update)
-                            col.spawn(Node {
-                                flex_direction: FlexDirection::Row,
-                                column_gap: Val::Px(12.0),
-                                align_items: AlignItems::Center,
-                                ..default()
-                            }).with_children(|row| {
-                                row.spawn((
-                                    VenueLabelText,
-                                    Text::new(format!("Venue ({venue_capacity} x ${ticket_price}):")),
-                                    TextFont { font: ui_font_money.clone(), font_size: 22.0, ..default() },
-                                    TextColor(palette::SIDEWALK),
-                                    Node { width: Val::Px(220.0), ..default() },
-                                    TextLayout::new_with_justify(Justify::Right),
-                                ));
-                                row.spawn((
-                                    VenueRevenueText,
-                                    Text::new(format!("+${venue_revenue:.0}")),
-                                    TextFont { font: ui_font_money.clone(), font_size: 22.0, ..default() },
-                                    TextColor(palette::FROG),
-                                    Node { width: Val::Px(120.0), ..default() },
-                                    TextLayout::new_with_justify(Justify::Right),
-                                ));
-                            });
-                            // Divider
-                            col.spawn((
-                                Node {
-                                    width: Val::Px(340.0),
-                                    height: Val::Px(1.0),
-                                    margin: UiRect::vertical(Val::Px(2.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(palette::SIDEWALK),
-                            ));
                             spawn_money_row(col, &ui_font_money, "Remaining:", &format!("${final_remaining:.0}"), FinalRemainingText, palette::FROG);
                         });
                 }
@@ -872,11 +832,9 @@ fn update_money_summary(
     toggles: Res<CampaignToggles>,
     league: Option<Res<LeagueState>>,
     poster_order: Option<Res<PosterOrder>>,
-    mut marketing_text: Query<&mut Text, (With<MarketingCostText>, Without<AfterMarketingText>, Without<VenueRevenueText>, Without<FinalRemainingText>, Without<VenueLabelText>)>,
-    mut after_text: Query<&mut Text, (With<AfterMarketingText>, Without<MarketingCostText>, Without<VenueRevenueText>, Without<FinalRemainingText>, Without<VenueLabelText>)>,
-    mut venue_text: Query<&mut Text, (With<VenueRevenueText>, Without<MarketingCostText>, Without<AfterMarketingText>, Without<FinalRemainingText>, Without<VenueLabelText>)>,
-    mut venue_label: Query<&mut Text, (With<VenueLabelText>, Without<MarketingCostText>, Without<AfterMarketingText>, Without<VenueRevenueText>, Without<FinalRemainingText>)>,
-    mut final_text: Query<&mut Text, (With<FinalRemainingText>, Without<MarketingCostText>, Without<AfterMarketingText>, Without<VenueRevenueText>, Without<VenueLabelText>)>,
+    mut marketing_text: Query<&mut Text, (With<MarketingCostText>, Without<AfterMarketingText>, Without<FinalRemainingText>)>,
+    mut after_text: Query<&mut Text, (With<AfterMarketingText>, Without<MarketingCostText>, Without<FinalRemainingText>)>,
+    mut final_text: Query<&mut Text, (With<FinalRemainingText>, Without<MarketingCostText>, Without<AfterMarketingText>)>,
 ) {
     let poster_changed = poster_order
         .as_ref()
@@ -901,12 +859,6 @@ fn update_money_summary(
     }
     for mut text in &mut after_text {
         text.0 = format!("${after_marketing:.0}");
-    }
-    for mut text in &mut venue_label {
-        text.0 = format!("Venue ({} x ${}):", toggles.venue_capacity, toggles.ticket_price);
-    }
-    for mut text in &mut venue_text {
-        text.0 = format!("+${venue_revenue:.0}");
     }
     for mut text in &mut final_text {
         text.0 = format!("${final_remaining:.0}");
