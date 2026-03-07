@@ -16,7 +16,6 @@ use crate::race::track_quality::TrackQuality;
 use crate::course::data::CourseData;
 use crate::course::location::LocationRegistry;
 use crate::states::AppState;
-use crate::menu::ui::SkipToLocationSelect;
 use crate::ui_theme::{self, UiFont};
 
 #[derive(Component)]
@@ -726,14 +725,12 @@ pub fn handle_new_race_button(
 }
 
 pub fn handle_continue_button(
-    mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     for interaction in &query {
         if *interaction == Interaction::Pressed {
-            commands.insert_resource(SkipToLocationSelect);
-            next_state.set(AppState::Menu);
+            next_state.set(AppState::Bounties);
         }
     }
 }

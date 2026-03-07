@@ -1,5 +1,6 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+mod bounties;
 mod camera;
 mod common;
 mod course;
@@ -44,6 +45,7 @@ fn main() {
             rendering::RenderingPlugin,
             ui_theme::UiThemePlugin,
             common::CommonPlugin,
+            bounties::BountiesPlugin,
             menu::MenuPlugin,
             obstacle::ObstaclePlugin,
             course::CoursePlugin,
@@ -54,6 +56,8 @@ fn main() {
             race::RacePlugin,
             camera::CameraPlugin,
             results::ResultsPlugin,
+        ))
+        .add_plugins((
             league::LeaguePlugin,
             dev_menu::DevMenuPlugin,
         ))

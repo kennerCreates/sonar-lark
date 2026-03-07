@@ -1,3 +1,4 @@
+pub mod bounties;
 pub mod fan_network;
 pub mod marketing;
 #[allow(dead_code)] // Used starting in Step 6 (recruitment integration)
@@ -23,6 +24,9 @@ pub struct LeagueState {
     /// Ticket price in whole dollars. 0 = FREE.
     #[serde(default)]
     pub ticket_price: u32,
+    /// Bounties that have already been claimed (one-time only).
+    #[serde(default)]
+    pub claimed_bounties: Vec<bounties::BountyId>,
 }
 
 impl Default for LeagueState {
@@ -32,6 +36,7 @@ impl Default for LeagueState {
             money: 205.0,
             campaign_budgets: CampaignBudgets::default(),
             ticket_price: 0,
+            claimed_bounties: Vec::new(),
         }
     }
 }

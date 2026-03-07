@@ -8,6 +8,7 @@ pub enum AppState {
     HypeSetup,
     Race,
     Results,
+    Bounties,
     DevMenu,
 }
 
