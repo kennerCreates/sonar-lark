@@ -34,6 +34,12 @@ pub struct GateCountText;
 pub struct PaletteContainer;
 
 #[derive(Component)]
+pub struct InventoryContainer;
+
+#[derive(Component)]
+pub struct InventoryPaletteButton(pub ObstacleId);
+
+#[derive(Component)]
 pub struct TransformModeButton(pub TransformMode);
 
 #[derive(Component)]

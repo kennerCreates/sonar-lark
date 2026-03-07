@@ -10,7 +10,7 @@ mod right_panel;
 mod save_delete;
 mod types;
 
-pub use left_panel::{build_course_editor_ui, load_obstacle_thumbnails};
+pub use left_panel::{build_course_editor_ui, load_obstacle_thumbnails, rebuild_inventory_section};
 pub(crate) use data::build_course_data;
 pub use load::auto_load_pending_course;
 pub(crate) use load::load_course_into_editor;

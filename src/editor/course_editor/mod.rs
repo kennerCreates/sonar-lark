@@ -149,6 +149,7 @@ impl Plugin for CourseEditorPlugin {
                 Update,
                 (
                     drag_placement::begin_drag_on_palette_press,
+                    drag_placement::begin_drag_on_inventory_press,
                     drag_placement::update_ghost_position,
                     drag_placement::cancel_drag_on_escape,
                 )
@@ -212,6 +213,7 @@ impl Plugin for CourseEditorPlugin {
                     ui::update_transform_mode_ui,
                     ui::update_gate_count_display,
                     ui::update_money_display,
+                    ui::rebuild_inventory_section,
                 )
                     .run_if(in_state(EditorMode::CourseEditor)),
             )
@@ -473,15 +475,20 @@ fn handle_delete_key(
     camera_child_query: Query<(Entity, &ChildOf, &PlacedCamera, &Transform)>,
     library: Res<ObstacleLibrary>,
     mut course_state: ResMut<EditorCourse>,
+    mut league: Option<ResMut<crate::league::LeagueState>>,
 ) {
     if keyboard.just_pressed(KeyCode::Delete)
         && let Some(entity) = selection.entity.take()
     {
-        // Store gate in inventory (instead of refunding money)
+        // Pre-existing gates (from_inventory) go back to inventory; purchased gates refund money
         if let Ok(placed) = obstacle_query.get(entity) {
             let cost = crate::course::data::gate_cost(&placed.obstacle_id.0, &library);
             if cost > 0 {
-                course_state.inventory.add(&placed.obstacle_id);
+                if placed.from_inventory {
+                    course_state.inventory.add(&placed.obstacle_id);
+                } else if let Some(ref mut league) = league {
+                    league.money += cost as f32;
+                }
             }
         }
 

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::camera::orbit::MainCamera;
-use crate::editor::course_editor::ui::PaletteButton;
+use crate::editor::course_editor::ui::{InventoryPaletteButton, PaletteButton};
 use crate::editor::course_editor::{
     EditorCourse, EditorSelection, EditorTransform, PlacedObstacle,
 };
@@ -85,7 +85,6 @@ pub fn begin_drag_on_palette_press(
     mut commands: Commands,
     query: Query<(&Interaction, &PaletteButton), Changed<Interaction>>,
     library: Res<ObstacleLibrary>,
-    course_state: Res<EditorCourse>,
     league: Option<Res<LeagueState>>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
     gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
@@ -109,18 +108,14 @@ pub fn begin_drag_on_palette_press(
         };
 
         let cost = crate::course::data::gate_cost(&btn.0 .0, &library);
-        let from_inventory = if cost > 0 && course_state.inventory.count(&btn.0) > 0 {
-            true
-        } else if cost > 0 {
+        if cost > 0 {
             let money = league.as_ref().map_or(0.0, |l| l.money);
             if money < cost as f32 {
                 warn!("Cannot afford {} (${cost}, have ${:.0})", btn.0 .0, money);
                 continue;
             }
-            false
-        } else {
-            false
-        };
+        }
+        let from_inventory = false;
 
         let Some(handle) = &gltf_handle else {
             warn!("glTF not loaded yet, cannot place obstacle");
@@ -147,6 +142,68 @@ pub fn begin_drag_on_palette_press(
             obstacle_id: btn.0.clone(),
             ghost_entity,
             from_inventory,
+        });
+        break;
+    }
+}
+
+/// System: when an inventory button is pressed, begin a drag-placement from inventory.
+#[allow(clippy::too_many_arguments)]
+pub fn begin_drag_on_inventory_press(
+    mut commands: Commands,
+    query: Query<(&Interaction, &InventoryPaletteButton), Changed<Interaction>>,
+    library: Res<ObstacleLibrary>,
+    course_state: Res<EditorCourse>,
+    gltf_handle: Option<Res<ObstaclesGltfHandle>>,
+    gltf_assets: Res<Assets<bevy::gltf::Gltf>>,
+    node_assets: Res<Assets<bevy::gltf::GltfNode>>,
+    mesh_assets: Res<Assets<bevy::gltf::GltfMesh>>,
+    mut cel_materials: ResMut<Assets<CelMaterial>>,
+    light_dir: Res<CelLightDir>,
+    existing_drag: Option<Res<DragPlacement>>,
+) {
+    if existing_drag.is_some() {
+        return;
+    }
+
+    for (interaction, btn) in &query {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+
+        if course_state.inventory.count(&btn.0) == 0 {
+            continue;
+        }
+
+        let Some(def) = library.get(&btn.0) else {
+            continue;
+        };
+
+        let Some(handle) = &gltf_handle else {
+            warn!("glTF not loaded yet, cannot place obstacle");
+            continue;
+        };
+
+        let Some(ghost_entity) = spawn_ghost(
+            &mut commands,
+            &gltf_assets,
+            &node_assets,
+            &mesh_assets,
+            &mut cel_materials,
+            light_dir.0,
+            handle,
+            &def.glb_node_name,
+            def.model_offset,
+            def.model_rotation,
+        ) else {
+            warn!("Failed to spawn ghost for '{}'", def.id.0);
+            continue;
+        };
+
+        commands.insert_resource(DragPlacement {
+            obstacle_id: btn.0.clone(),
+            ghost_entity,
+            from_inventory: true,
         });
         break;
     }

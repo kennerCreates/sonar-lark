@@ -212,10 +212,14 @@ pub(super) fn handle_course_undo_input(
                     if gate_order.is_some() {
                         transform_state.next_gate_order += 1;
                     }
-                    // Undo the inventory addition that happened on delete
+                    // Reverse the delete: if from_inventory, remove from inventory; otherwise take money back
                     let cost = crate::course::data::gate_cost(&obstacle_id.0, &library);
                     if cost > 0 {
-                        course_state.inventory.remove(&obstacle_id);
+                        if from_inventory {
+                            course_state.inventory.remove(&obstacle_id);
+                        } else if let Some(ref mut league) = league {
+                            league.money -= cost as f32;
+                        }
                     }
                 }
             } else {
@@ -228,7 +232,11 @@ pub(super) fn handle_course_undo_input(
                 }
                 let cost = crate::course::data::gate_cost(&obstacle_id.0, &library);
                 if cost > 0 {
-                    course_state.inventory.add(&obstacle_id);
+                    if from_inventory {
+                        course_state.inventory.add(&obstacle_id);
+                    } else if let Some(ref mut league) = league {
+                        league.money += cost as f32;
+                    }
                 }
                 commands.entity(old_entity).despawn();
             }

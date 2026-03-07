@@ -3,6 +3,7 @@ use std::path::Path;
 use bevy::prelude::*;
 
 use crate::course::data::PropKind;
+use crate::editor::course_editor::EditorCourse;
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
@@ -135,6 +136,16 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 }
                             }
                         });
+
+                    // --- Inventory section (rebuilt dynamically) ---
+                    content.spawn((
+                        InventoryContainer,
+                        Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(4.0),
+                            ..default()
+                        },
+                    ));
                 });
 
             // --- Props palette content (hidden by default) ---
@@ -281,24 +292,19 @@ fn spawn_prop_palette_button(
         });
 }
 
-fn spawn_palette_card(
+fn spawn_obstacle_card(
     parent: &mut ChildSpawnerCommands,
     id: &ObstacleId,
     font: &Handle<Font>,
-    library: &ObstacleLibrary,
     thumbnails: &ObstacleThumbnails,
+    marker: impl Component,
+    label: String,
+    label_color: Color,
 ) {
-    let cost = crate::course::data::gate_cost(&id.0, library);
-    let cost_label = if cost > 0 {
-        format!("${cost}")
-    } else {
-        String::new()
-    };
-
     parent
         .spawn((
             Button,
-            PaletteButton(id.clone()),
+            marker,
             Node {
                 width: Val::Px(THUMB_CELL_SIZE),
                 flex_direction: FlexDirection::Column,
@@ -360,17 +366,181 @@ fn spawn_palette_card(
                 },
             ));
 
-            // Cost label
-            if !cost_label.is_empty() {
+            if !label.is_empty() {
                 card.spawn((
-                    Text::new(cost_label),
+                    Text::new(label.clone()),
                     TextFont {
                         font: font.clone(),
                         font_size: 10.0,
                         ..default()
                     },
-                    TextColor(palette::SUNSHINE),
+                    TextColor(label_color),
                 ));
             }
+        });
+}
+
+fn spawn_palette_card(
+    parent: &mut ChildSpawnerCommands,
+    id: &ObstacleId,
+    font: &Handle<Font>,
+    library: &ObstacleLibrary,
+    thumbnails: &ObstacleThumbnails,
+) {
+    let cost = crate::course::data::gate_cost(&id.0, library);
+    let label = if cost > 0 { format!("${cost}") } else { String::new() };
+    spawn_obstacle_card(parent, id, font, thumbnails, PaletteButton(id.clone()), label, palette::SUNSHINE);
+}
+
+pub fn rebuild_inventory_section(
+    mut commands: Commands,
+    course_state: Res<EditorCourse>,
+    container_query: Query<Entity, With<InventoryContainer>>,
+    thumbnails: Option<Res<ObstacleThumbnails>>,
+    font: Res<crate::ui_theme::UiFont>,
+) {
+    if !course_state.is_changed() {
+        return;
+    }
+
+    let Ok(container) = container_query.single() else {
+        return;
+    };
+
+    commands.entity(container).despawn_related::<Children>();
+
+    // Collect inventory entries with count > 0
+    let mut entries: Vec<_> = course_state
+        .inventory
+        .entries
+        .iter()
+        .filter(|e| e.count > 0)
+        .map(|e| (e.obstacle_id.clone(), e.count))
+        .collect();
+    if entries.is_empty() {
+        return;
+    }
+    entries.sort_by(|a, b| a.0 .0.cmp(&b.0 .0));
+
+    // Collect thumbnail handles we need (clone handles, not the whole resource)
+    let thumb_handles: Vec<_> = entries
+        .iter()
+        .map(|(id, _)| thumbnails.as_ref().and_then(|t| t.images.get(id).cloned()))
+        .collect();
+
+    let font = font.0.clone();
+
+    commands.entity(container).with_children(|section| {
+        section.spawn((
+            Text::new("Inventory"),
+            TextFont {
+                font: font.clone(),
+                font_size: 14.0,
+                ..default()
+            },
+            TextColor(palette::CHAINMAIL),
+            Node {
+                margin: UiRect::top(Val::Px(8.0)),
+                ..default()
+            },
+        ));
+
+        section
+            .spawn(Node {
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: Val::Px(4.0),
+                row_gap: Val::Px(4.0),
+                ..default()
+            })
+            .with_children(|grid| {
+                for (i, (id, count)) in entries.iter().enumerate() {
+                    spawn_inventory_card(grid, id, &font, thumb_handles[i].as_ref(), *count);
+                }
+            });
+    });
+}
+
+fn spawn_inventory_card(
+    parent: &mut ChildSpawnerCommands,
+    id: &ObstacleId,
+    font: &Handle<Font>,
+    thumbnail: Option<&Handle<Image>>,
+    count: u32,
+) {
+    parent
+        .spawn((
+            Button,
+            InventoryPaletteButton(id.clone()),
+            Node {
+                width: Val::Px(THUMB_CELL_SIZE),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(3.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(ui_theme::BUTTON_NORMAL),
+            BorderColor::all(palette::BRONZE),
+        ))
+        .with_children(|card| {
+            if let Some(image_handle) = thumbnail {
+                card.spawn((
+                    ImageNode::new(image_handle.clone()),
+                    Node {
+                        width: Val::Px(THUMB_CELL_SIZE - 8.0),
+                        height: Val::Px(THUMB_CELL_SIZE - 8.0),
+                        ..default()
+                    },
+                ));
+            } else {
+                card.spawn((
+                    Node {
+                        width: Val::Px(THUMB_CELL_SIZE - 8.0),
+                        height: Val::Px(THUMB_CELL_SIZE - 8.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(palette::INDIGO),
+                ))
+                .with_children(|fallback| {
+                    fallback.spawn((
+                        Text::new(&id.0),
+                        TextFont {
+                            font: font.clone(),
+                            font_size: 11.0,
+                            ..default()
+                        },
+                        TextColor(palette::CHAINMAIL),
+                    ));
+                });
+            }
+
+            // Name label
+            card.spawn((
+                Text::new(&id.0),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 10.0,
+                    ..default()
+                },
+                TextColor(palette::MINT),
+                Node {
+                    margin: UiRect::top(Val::Px(2.0)),
+                    ..default()
+                },
+            ));
+
+            // Count label
+            card.spawn((
+                Text::new(format!("x{count}")),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 10.0,
+                    ..default()
+                },
+                TextColor(palette::MINT),
+            ));
         });
 }

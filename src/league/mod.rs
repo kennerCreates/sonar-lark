@@ -45,6 +45,18 @@ fn init_league_state(mut commands: Commands) {
     commands.insert_resource(LeagueState::default());
 }
 
+/// Deletes location save files on startup so each session starts with empty courses.
+fn cleanup_location_saves(location_registry: Res<LocationRegistry>) {
+    for location in &location_registry.locations {
+        let path = location.save_path();
+        if std::path::Path::new(&path).exists()
+            && let Err(e) = std::fs::remove_file(&path)
+        {
+            warn!("Failed to remove location save {path}: {e}");
+        }
+    }
+}
+
 /// Runs on entering Results: simulates fan attraction from the last race.
 fn simulate_fans_on_results(
     mut league: ResMut<LeagueState>,
@@ -102,7 +114,7 @@ pub struct LeaguePlugin;
 impl Plugin for LeaguePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(LocationRegistry::new())
-            .add_systems(Startup, init_league_state)
+            .add_systems(Startup, (init_league_state, cleanup_location_saves))
             .add_systems(OnEnter(AppState::Results), simulate_fans_on_results);
     }
 }
