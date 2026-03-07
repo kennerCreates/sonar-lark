@@ -1,5 +1,5 @@
 mod gizmos;
-mod preview;
+pub mod preview;
 pub mod ui;
 mod widgets;
 
@@ -193,7 +193,7 @@ impl Plugin for WorkshopPlugin {
         app.init_gizmo_group::<TriggerGizmoGroup>()
         .add_systems(
             OnEnter(DevMenuPage::ObstacleWorkshop),
-            (load_gltf_for_workshop, setup_workshop, preview::setup_camera_view),
+            (load_gltf_for_workshop, setup_workshop, preview::setup_camera_view, preview::setup_thumbnail_camera),
         )
         // Populate node list once glTF is loaded (runs at most once per workshop entry)
         .add_systems(
@@ -253,6 +253,12 @@ impl Plugin for WorkshopPlugin {
                 widgets::handle_resize_widget,
             )
                 .run_if(in_state(DevMenuPage::ObstacleWorkshop)),
+        )
+        .add_systems(
+            Update,
+            preview::save_workshop_thumbnail
+                .run_if(in_state(DevMenuPage::ObstacleWorkshop))
+                .run_if(resource_exists::<preview::PendingWorkshopThumbnail>),
         )
         .add_systems(
             Update,

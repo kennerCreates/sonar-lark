@@ -1,5 +1,6 @@
 pub mod ui;
 
+pub mod drag_placement;
 mod overlays;
 mod preview;
 mod transform_gizmos;
@@ -147,7 +148,27 @@ impl Plugin for CourseEditorPlugin {
             .add_systems(
                 Update,
                 (
-                    ui::handle_palette_selection,
+                    drag_placement::begin_drag_on_palette_press,
+                    drag_placement::update_ghost_position,
+                    drag_placement::cancel_drag_on_escape,
+                )
+                    .run_if(in_state(EditorMode::CourseEditor)),
+            )
+            .add_systems(
+                Update,
+                drag_placement::finalize_drag_placement
+                    .run_if(in_state(EditorMode::CourseEditor))
+                    .run_if(resource_exists::<drag_placement::DragPlacement>),
+            )
+            .add_systems(
+                Update,
+                drag_placement::post_finalize_drag
+                    .run_if(in_state(EditorMode::CourseEditor))
+                    .run_if(resource_exists::<drag_placement::PendingPlacement>),
+            )
+            .add_systems(
+                Update,
+                (
                     ui::handle_prop_palette_selection,
                     ui::handle_tab_switch,
                     ui::handle_back_to_menu,
@@ -283,8 +304,11 @@ fn setup_course_editor(
     mut config_store: ResMut<GizmoConfigStore>,
     selected_location: Option<Res<crate::course::location::SelectedLocation>>,
     location_registry: Res<crate::course::location::LocationRegistry>,
+    asset_server: Res<AssetServer>,
 ) {
-    ui::build_course_editor_ui(&mut commands, &library, &font.0);
+    let thumbnails = ui::load_obstacle_thumbnails(&asset_server, &library);
+    ui::build_course_editor_ui(&mut commands, &library, &font.0, &thumbnails);
+    commands.insert_resource(thumbnails);
     commands.insert_resource(EditorSelection::default());
     commands.insert_resource(EditorTransform::default());
     let location_index = selected_location.as_ref().map_or(1, |l| l.0); // default to Warehouse (index 1)
@@ -320,6 +344,7 @@ fn setup_course_editor(
 fn cleanup_course_editor(
     mut commands: Commands,
     placed_query: Query<Entity, PlacedFilter>,
+    ghost_query: Query<Entity, With<drag_placement::GhostObstacle>>,
     mut config_store: ResMut<GizmoConfigStore>,
 ) {
     commands.remove_resource::<EditorSelection>();
@@ -332,6 +357,9 @@ fn cleanup_course_editor(
     commands.remove_resource::<UndoStack<CourseEditorAction>>();
     commands.remove_resource::<PendingEditorCourse>();
     commands.remove_resource::<PendingGlbReload>();
+    commands.remove_resource::<ui::ObstacleThumbnails>();
+    commands.remove_resource::<drag_placement::DragPlacement>();
+    commands.remove_resource::<drag_placement::PendingPlacement>();
     commands.remove_resource::<ui::PropEditorMeshes>();
     commands.remove_resource::<ui::CameraEditorMeshes>();
     commands.remove_resource::<ui::PendingRaceTransition>();
@@ -340,6 +368,9 @@ fn cleanup_course_editor(
         // PlacedObstacle entities — recursive despawn of the parent already
         // removes the child, so it may be gone by the time we iterate to it.
         commands.entity(entity).try_despawn();
+    }
+    for entity in &ghost_query {
+        commands.entity(entity).despawn();
     }
 
     let default_layers = RenderLayers::default();

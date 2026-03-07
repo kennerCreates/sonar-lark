@@ -8,6 +8,7 @@ use crate::states::DevMenuPage;
 use crate::ui_theme::UiFont;
 
 use super::build::*;
+use crate::editor::workshop::preview::PendingWorkshopThumbnail;
 use crate::editor::workshop::{PreviewObstacle, WorkshopState};
 
 pub fn handle_save_button(
@@ -86,6 +87,12 @@ pub fn handle_save_button(
         library.insert(def);
         save_obstacle_library(&library);
         info!("Saved obstacle '{}'", state.obstacle_name);
+
+        // Trigger thumbnail capture
+        commands.insert_resource(PendingWorkshopThumbnail {
+            obstacle_name: state.obstacle_name.clone(),
+            frames_waited: 0,
+        });
 
         rebuild_library_list(&mut commands, &library, &library_container, &font.0);
     }

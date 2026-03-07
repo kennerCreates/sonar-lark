@@ -1,18 +1,40 @@
+use std::path::Path;
+
 use bevy::prelude::*;
 
 use crate::course::data::PropKind;
+use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
 use crate::states::EditorMode;
 use crate::ui_theme;
 
-use super::right_panel::{build_right_panel, spawn_palette_button};
+use super::right_panel::build_right_panel;
 use super::types::*;
+
+pub fn load_obstacle_thumbnails(
+    asset_server: &AssetServer,
+    library: &ObstacleLibrary,
+) -> ObstacleThumbnails {
+    let mut images = std::collections::HashMap::new();
+    for id in library.definitions.keys() {
+        let path_str = format!("library/thumbnails/{}.png", id.0);
+        let full_path = format!("assets/{path_str}");
+        if Path::new(&full_path).exists() {
+            let handle: Handle<Image> = asset_server.load(path_str);
+            images.insert(id.clone(), handle);
+        }
+    }
+    ObstacleThumbnails { images }
+}
+
+const THUMB_CELL_SIZE: f32 = 112.0;
 
 pub fn build_course_editor_ui(
     commands: &mut Commands,
     library: &ObstacleLibrary,
     font: &Handle<Font>,
+    thumbnails: &ObstacleThumbnails,
 ) {
     commands
         .spawn((
@@ -26,12 +48,12 @@ pub fn build_course_editor_ui(
             DespawnOnExit(EditorMode::CourseEditor),
         ))
         .with_children(|root| {
-            build_left_panel(root, library, font);
+            build_left_panel(root, library, font, thumbnails);
             build_right_panel(root, font);
         });
 }
 
-fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary, font: &Handle<Font>) {
+fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary, font: &Handle<Font>, thumbnails: &ObstacleThumbnails) {
     parent
         .spawn((
             Node {
@@ -85,7 +107,9 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                         .spawn((
                             PaletteContainer,
                             Node {
-                                flex_direction: FlexDirection::Column,
+                                flex_direction: FlexDirection::Row,
+                                flex_wrap: FlexWrap::Wrap,
+                                column_gap: Val::Px(4.0),
                                 row_gap: Val::Px(4.0),
                                 ..default()
                             },
@@ -107,7 +131,7 @@ fn build_left_panel(parent: &mut ChildSpawnerCommands, library: &ObstacleLibrary
                                 let mut ids: Vec<_> = library.definitions.keys().collect();
                                 ids.sort_by(|a, b| a.0.cmp(&b.0));
                                 for id in ids {
-                                    spawn_palette_button(container, id, font, library);
+                                    spawn_palette_card(container, id, font, library, thumbnails);
                                 }
                             }
                         });
@@ -254,5 +278,99 @@ fn spawn_prop_palette_button(
                 },
                 TextColor(accent),
             ));
+        });
+}
+
+fn spawn_palette_card(
+    parent: &mut ChildSpawnerCommands,
+    id: &ObstacleId,
+    font: &Handle<Font>,
+    library: &ObstacleLibrary,
+    thumbnails: &ObstacleThumbnails,
+) {
+    let cost = crate::course::data::gate_cost(&id.0, library);
+    let cost_label = if cost > 0 {
+        format!("${cost}")
+    } else {
+        String::new()
+    };
+
+    parent
+        .spawn((
+            Button,
+            PaletteButton(id.clone()),
+            Node {
+                width: Val::Px(THUMB_CELL_SIZE),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(3.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(ui_theme::BUTTON_NORMAL),
+            BorderColor::all(palette::SAPPHIRE),
+        ))
+        .with_children(|card| {
+            if let Some(image_handle) = thumbnails.images.get(id) {
+                card.spawn((
+                    ImageNode::new(image_handle.clone()),
+                    Node {
+                        width: Val::Px(THUMB_CELL_SIZE - 8.0),
+                        height: Val::Px(THUMB_CELL_SIZE - 8.0),
+                        ..default()
+                    },
+                ));
+            } else {
+                // Fallback: colored box with name
+                card.spawn((
+                    Node {
+                        width: Val::Px(THUMB_CELL_SIZE - 8.0),
+                        height: Val::Px(THUMB_CELL_SIZE - 8.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(palette::INDIGO),
+                ))
+                .with_children(|fallback| {
+                    fallback.spawn((
+                        Text::new(&id.0),
+                        TextFont {
+                            font: font.clone(),
+                            font_size: 11.0,
+                            ..default()
+                        },
+                        TextColor(palette::CHAINMAIL),
+                    ));
+                });
+            }
+
+            // Name label
+            card.spawn((
+                Text::new(&id.0),
+                TextFont {
+                    font: font.clone(),
+                    font_size: 10.0,
+                    ..default()
+                },
+                TextColor(palette::MINT),
+                Node {
+                    margin: UiRect::top(Val::Px(2.0)),
+                    ..default()
+                },
+            ));
+
+            // Cost label
+            if !cost_label.is_empty() {
+                card.spawn((
+                    Text::new(cost_label),
+                    TextFont {
+                        font: font.clone(),
+                        font_size: 10.0,
+                        ..default()
+                    },
+                    TextColor(palette::SUNSHINE),
+                ));
+            }
         });
 }

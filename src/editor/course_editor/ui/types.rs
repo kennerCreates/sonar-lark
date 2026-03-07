@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bevy::prelude::*;
 
 use crate::course::data::PropKind;
@@ -102,6 +104,13 @@ pub const DEFAULT_GATE_COLOR: [f32; 4] = [0.949, 0.949, 0.855, 1.0];
 
 pub const GATE_COLOR_CELL_SIZE: f32 = 24.0;
 pub const GATE_COLOR_GRID_COLS: usize = 8;
+
+// --- Obstacle thumbnails ---
+
+#[derive(Resource, Default)]
+pub struct ObstacleThumbnails {
+    pub images: HashMap<ObstacleId, Handle<Image>>,
+}
 
 // --- Prop color cycle ---
 

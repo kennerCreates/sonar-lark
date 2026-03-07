@@ -2,8 +2,6 @@ use bevy::prelude::*;
 
 use crate::dev_menu::color_picker_data::PALETTE_COLORS;
 use crate::editor::course_editor::TransformMode;
-use crate::obstacle::definition::ObstacleId;
-use crate::obstacle::library::ObstacleLibrary;
 use crate::palette;
 use crate::ui_theme;
 
@@ -253,42 +251,6 @@ pub fn build_right_panel(parent: &mut ChildSpawnerCommands, font: &Handle<Font>)
                     ..default()
                 },
                 TextColor(palette::CHAINMAIL),
-            ));
-        });
-}
-
-pub fn spawn_palette_button(parent: &mut ChildSpawnerCommands, id: &ObstacleId, font: &Handle<Font>, library: &ObstacleLibrary) {
-    let cost = crate::course::data::gate_cost(&id.0, library);
-    let label = if cost > 0 {
-        format!("{} (${cost})", id.0)
-    } else {
-        id.0.clone()
-    };
-
-    parent
-        .spawn((
-            Button,
-            PaletteButton(id.clone()),
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Px(28.0),
-                padding: UiRect::horizontal(Val::Px(8.0)),
-                align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(1.0)),
-                ..default()
-            },
-            BackgroundColor(ui_theme::BUTTON_NORMAL),
-            BorderColor::all(palette::SAPPHIRE),
-        ))
-        .with_children(|btn| {
-            btn.spawn((
-                Text::new(label),
-                TextFont {
-                    font: font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette::MINT),
             ));
         });
 }

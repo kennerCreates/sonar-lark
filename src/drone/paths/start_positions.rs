@@ -36,7 +36,7 @@ pub fn compute_start_positions(
         let max_per_row = (usable_width / MIN_LATERAL_SPACING) as usize + 1;
         max_per_row.max(1).min(count as usize)
     };
-    let rows = (count as usize + cols - 1) / cols;
+    let rows = (count as usize).div_ceil(cols);
 
     let mut positions = Vec::with_capacity(count as usize);
     for row in 0..rows {

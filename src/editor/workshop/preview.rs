@@ -1,12 +1,15 @@
 use bevy::camera::{ClearColorConfig, RenderTarget};
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
-use bevy::render::render_resource::TextureFormat;
+use bevy::render::gpu_readback::{Readback, ReadbackComplete};
+use bevy::render::render_resource::{TextureFormat, TextureUsages};
 
+use crate::camera::orbit::MainCamera;
 use crate::camera::settings::CameraSettings;
 use crate::obstacle::spawning::ObstaclesGltfHandle;
 use crate::palette;
 use crate::rendering::{CelLightDir, CelMaterial, FOG_END, FOG_START, cel_material_from_color, fog_color};
+use crate::states::DevMenuPage;
 use crate::ui_theme::UiFont;
 
 use super::{PreviewObstacle, WorkshopState};
@@ -19,9 +22,26 @@ const VIEW_MARGIN: f32 = 12.0;
 const VIEW_BORDER: f32 = 3.0;
 const RIGHT_PANEL_WIDTH: f32 = 280.0;
 
+const THUMB_SIZE: u32 = 128;
+
 #[derive(Resource)]
 pub(super) struct CameraViewState {
     pub camera_entity: Entity,
+}
+
+#[derive(Component)]
+pub(super) struct WorkshopThumbnailCamera;
+
+#[derive(Resource)]
+pub(super) struct WorkshopThumbnailTarget {
+    pub image_handle: Handle<Image>,
+    pub camera_entity: Entity,
+}
+
+#[derive(Resource)]
+pub struct PendingWorkshopThumbnail {
+    pub obstacle_name: String,
+    pub frames_waited: u8,
 }
 
 #[derive(Component)]
@@ -288,6 +308,7 @@ pub(super) fn cleanup_camera_view(
     mut commands: Commands,
     view_state: Option<Res<CameraViewState>>,
     overlay_query: Query<Entity, With<CameraViewOverlay>>,
+    thumb_target: Option<Res<WorkshopThumbnailTarget>>,
 ) {
     if let Some(vs) = view_state {
         commands.entity(vs.camera_entity).despawn();
@@ -296,5 +317,104 @@ pub(super) fn cleanup_camera_view(
     for entity in &overlay_query {
         commands.entity(entity).despawn();
     }
+    if let Some(tt) = thumb_target {
+        commands.entity(tt.camera_entity).despawn();
+    }
+    commands.remove_resource::<WorkshopThumbnailTarget>();
+    commands.remove_resource::<PendingWorkshopThumbnail>();
+}
+
+// --- Workshop thumbnail capture ---
+
+pub(super) fn setup_thumbnail_camera(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    let mut image = Image::new_target_texture(
+        THUMB_SIZE,
+        THUMB_SIZE,
+        TextureFormat::Rgba8UnormSrgb,
+        None,
+    );
+    image.texture_descriptor.usage |= TextureUsages::COPY_SRC;
+    let image_handle = images.add(image);
+
+    let camera_entity = commands
+        .spawn((
+            Camera3d::default(),
+            Camera {
+                order: -2,
+                is_active: false,
+                clear_color: ClearColorConfig::Custom(fog_color()),
+                ..default()
+            },
+            RenderTarget::from(image_handle.clone()),
+            Transform::default(),
+            DistanceFog {
+                color: fog_color(),
+                directional_light_color: Color::NONE,
+                directional_light_exponent: 0.0,
+                falloff: FogFalloff::Linear {
+                    start: FOG_START,
+                    end: FOG_END,
+                },
+            },
+            WorkshopThumbnailCamera,
+        ))
+        .id();
+
+    commands.insert_resource(WorkshopThumbnailTarget {
+        image_handle,
+        camera_entity,
+    });
+}
+
+pub(super) fn save_workshop_thumbnail(
+    mut commands: Commands,
+    mut pending: ResMut<PendingWorkshopThumbnail>,
+    target: Res<WorkshopThumbnailTarget>,
+    mut thumb_cam: Query<(&mut Camera, &mut Transform), With<WorkshopThumbnailCamera>>,
+    editor_cam: Query<&GlobalTransform, (With<MainCamera>, Without<WorkshopThumbnailCamera>)>,
+) {
+    let Ok((mut cam, mut cam_tf)) = thumb_cam.single_mut() else {
+        return;
+    };
+
+    // Frame 0: copy the main camera's current viewpoint and activate
+    if pending.frames_waited == 0 {
+        if let Ok(editor_gt) = editor_cam.single() {
+            let (_, rotation, translation) = editor_gt.to_scale_rotation_translation();
+            *cam_tf = Transform::from_translation(translation).with_rotation(rotation);
+            cam.is_active = true;
+        }
+        pending.frames_waited = 1;
+        return;
+    }
+
+    pending.frames_waited += 1;
+    if pending.frames_waited < 3 {
+        return;
+    }
+
+    let obstacle_name = pending.obstacle_name.clone();
+    let size = THUMB_SIZE;
+    commands
+        .spawn((
+            Readback::texture(target.image_handle.clone()),
+            DespawnOnExit(DevMenuPage::ObstacleWorkshop),
+        ))
+        .observe(move |event: On<ReadbackComplete>, mut commands: Commands| {
+            let data = &event.data;
+            let path_str = format!("assets/library/thumbnails/{obstacle_name}.png");
+            if let Some(rgba) = image::RgbaImage::from_raw(size, size, data.clone()) {
+                match rgba.save(&path_str) {
+                    Ok(()) => info!("Saved obstacle thumbnail to {path_str}"),
+                    Err(e) => error!("Failed to save obstacle thumbnail: {e}"),
+                }
+            } else {
+                error!("Failed to construct thumbnail image from render target data");
+            }
+            commands.entity(event.observer()).try_despawn();
+        });
+
+    cam.is_active = false;
+    commands.remove_resource::<PendingWorkshopThumbnail>();
 }
 

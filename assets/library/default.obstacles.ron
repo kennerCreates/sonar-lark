@@ -30,31 +30,6 @@
         )),
     ),
     (
-        id: ("gate_air"),
-        glb_node_name: "gate_air",
-        trigger_volume: Some((
-            offset: (0.1485765, 8.553577, 0.66191065),
-            half_extents: (2.8640785, 2.97975, 3.054034),
-            forward: (0.0, 0.0, -1.0),
-            rotation: (0.0, 0.0, 0.0, 1.0),
-        )),
-        is_gate: true,
-        gate_cost: 80,
-        model_offset: (0.0, 1.0886803, 0.0),
-        model_rotation: (0.0, 0.0, 0.0, 1.0),
-        collision_volumes: [
-            (
-                offset: (0.19372201, 7.990698, -0.04422474),
-                half_extents: (5.5022383, 5.126374, 1.0225697),
-                rotation: (0.0, 0.0, 0.0, 1.0),
-            ),
-        ],
-        default_camera: Some((
-            offset: (0.14376068, 8.658417, 16.14569),
-            rotation: (0.0, 0.0, 0.0, 1.0),
-        )),
-    ),
-    (
         id: ("gate_ground"),
         glb_node_name: "gate_ground",
         trigger_volume: Some((
@@ -86,6 +61,31 @@
         ],
         default_camera: Some((
             offset: (-4.108778, 7.4868817, 24.844906),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+        )),
+    ),
+    (
+        id: ("gate_air"),
+        glb_node_name: "gate_air",
+        trigger_volume: Some((
+            offset: (0.1485765, 8.553577, 0.66191065),
+            half_extents: (2.8640785, 2.97975, 3.054034),
+            forward: (0.0, 0.0, -1.0),
+            rotation: (0.0, 0.0, 0.0, 1.0),
+        )),
+        is_gate: true,
+        gate_cost: 80,
+        model_offset: (0.0, 1.0886803, 0.0),
+        model_rotation: (0.0, 0.0, 0.0, 1.0),
+        collision_volumes: [
+            (
+                offset: (0.19372201, 7.990698, -0.04422474),
+                half_extents: (5.5022383, 5.126374, 1.0225697),
+                rotation: (0.0, 0.0, 0.0, 1.0),
+            ),
+        ],
+        default_camera: Some((
+            offset: (0.14376068, 8.658417, 16.14569),
             rotation: (0.0, 0.0, 0.0, 1.0),
         )),
     ),
