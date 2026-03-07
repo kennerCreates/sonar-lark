@@ -140,6 +140,29 @@ pub fn setup_results_ui(
                 TextColor(palette::STONE),
             ));
 
+            // Attendance & revenue headline
+            if let Some(att) = &attraction {
+                let ticket_price = league.as_ref().map(|l| l.ticket_price).unwrap_or(0);
+                let ticket_revenue = att.actual_attendance as f32 * ticket_price as f32;
+                let revenue_text = if ticket_revenue > 0.0 {
+                    format!("  |  +${ticket_revenue:.0} revenue")
+                } else {
+                    String::new()
+                };
+                parent.spawn((
+                    Text::new(format!(
+                        "{} attended{revenue_text}",
+                        att.actual_attendance,
+                    )),
+                    TextFont {
+                        font: ui_font.clone(),
+                        font_size: 20.0,
+                        ..default()
+                    },
+                    TextColor(palette::SEA_FOAM),
+                ));
+            }
+
             // Standings — two columns, DRONE_N rows total
             let half = DRONE_N.div_ceil(2);
             parent
