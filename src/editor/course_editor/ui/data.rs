@@ -8,6 +8,7 @@ use crate::editor::course_editor::{PlacedCamera, PlacedObstacle, PlacedProp};
 /// Pure function — no ECS dependencies.
 pub fn build_course_data<'a>(
     name: String,
+    location: String,
     obstacles: impl IntoIterator<
         Item = (&'a PlacedObstacle, &'a Transform, Option<(&'a PlacedCamera, &'a Transform)>),
     >,
@@ -47,7 +48,7 @@ pub fn build_course_data<'a>(
         instances,
         props,
         cameras: vec![],
-        location: "Abandoned Warehouse".to_string(),
+        location,
     }
 }
 
@@ -75,6 +76,7 @@ mod tests {
     fn build_course_data_empty() {
         let course = build_course_data(
             "empty".to_string(),
+            String::new(),
             Vec::<(&PlacedObstacle, &Transform, Option<(&PlacedCamera, &Transform)>)>::new(),
             Vec::<(&PlacedProp, &Transform)>::new(),
         );
@@ -90,6 +92,7 @@ mod tests {
             gate_order: Some(2),
             gate_forward_flipped: true,
             color_override: None,
+            from_inventory: false,
         };
         let transform = Transform {
             translation: Vec3::new(1.0, 2.0, 3.0),
@@ -99,6 +102,7 @@ mod tests {
 
         let course = build_course_data(
             "test".to_string(),
+            String::new(),
             vec![(&placed, &transform, None)],
             Vec::<(&PlacedProp, &Transform)>::new(),
         );
@@ -123,6 +127,7 @@ mod tests {
 
         let course = build_course_data(
             "props_test".to_string(),
+            String::new(),
             Vec::<(&PlacedObstacle, &Transform, Option<(&PlacedCamera, &Transform)>)>::new(),
             vec![(&prop, &transform)],
         );
@@ -141,12 +146,14 @@ mod tests {
             gate_order: Some(0),
             gate_forward_flipped: false,
             color_override: None,
+            from_inventory: false,
         };
         let obs2 = PlacedObstacle {
             obstacle_id: ObstacleId("wall".to_string()),
             gate_order: None,
             gate_forward_flipped: false,
             color_override: None,
+            from_inventory: false,
         };
         let t1 = Transform::from_translation(Vec3::ZERO);
         let t2 = Transform::from_translation(Vec3::X);
@@ -159,6 +166,7 @@ mod tests {
 
         let course = build_course_data(
             "mixed".to_string(),
+            String::new(),
             vec![(&obs1, &t1, None), (&obs2, &t2, None)],
             vec![(&prop, &tp)],
         );
@@ -178,6 +186,7 @@ mod tests {
             gate_order: Some(0),
             gate_forward_flipped: false,
             color_override: None,
+            from_inventory: false,
         };
         let transform = Transform::from_translation(Vec3::new(10.0, 0.0, 0.0));
         let cam = PlacedCamera {
@@ -188,6 +197,7 @@ mod tests {
 
         let course = build_course_data(
             "camera_test".to_string(),
+            String::new(),
             vec![(&placed, &transform, Some((&cam, &cam_tf)))],
             Vec::<(&PlacedProp, &Transform)>::new(),
         );

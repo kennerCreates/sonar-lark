@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::editor::course_editor::{
-    EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, PlacedObstacle,
+    EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, PlacedObstacle,
     PlacedProp,
 };
 use crate::editor::undo::{
@@ -21,6 +21,7 @@ pub(super) fn handle_course_undo_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut selection: ResMut<EditorSelection>,
     mut transform_state: ResMut<EditorTransform>,
+    mut course_state: ResMut<EditorCourse>,
     mut undo_stack: ResMut<UndoStack<CourseEditorAction>>,
     mut placed_transforms: Query<&mut Transform, PlacedFilter>,
     mut component_queries: ParamSet<(
@@ -35,6 +36,7 @@ pub(super) fn handle_course_undo_input(
     (mut cel_materials, std_materials, light_dir): (ResMut<Assets<CelMaterial>>, Res<Assets<StandardMaterial>>, Res<CelLightDir>),
     prop_meshes: Option<Res<PropEditorMeshes>>,
     camera_meshes: Option<Res<CameraEditorMeshes>>,
+    mut league: Option<ResMut<crate::league::LeagueState>>,
 ) {
     let ctrl = keyboard.pressed(KeyCode::ControlLeft) || keyboard.pressed(KeyCode::ControlRight);
     if !ctrl {
@@ -85,18 +87,28 @@ pub(super) fn handle_course_undo_input(
             gate_forward_flipped,
             camera,
             color_override,
+            from_inventory,
         } => {
             if is_undo {
-                // Undo spawn = despawn
+                // Undo spawn = despawn + reverse cost
                 if selection.entity == Some(entity) {
                     selection.entity = None;
                 }
                 if gate_order.is_some() && transform_state.next_gate_order > 0 {
                     transform_state.next_gate_order -= 1;
                 }
+                // Reverse the cost: if from inventory, put back; if purchased, refund money
+                let cost = crate::course::data::gate_cost(&obstacle_id.0, &library);
+                if cost > 0 {
+                    if from_inventory {
+                        course_state.inventory.add(&obstacle_id);
+                    } else if let Some(ref mut league) = league {
+                        league.money += cost as f32;
+                    }
+                }
                 commands.entity(entity).despawn();
             } else {
-                // Redo spawn = respawn
+                // Redo spawn = respawn + re-apply cost
                 if let Some(ref mut ctx) = ctx
                     && let Some(new_entity) = respawn_obstacle(
                         &mut commands,
@@ -109,12 +121,22 @@ pub(super) fn handle_course_undo_input(
                         camera.as_ref(),
                         camera_meshes.as_deref(),
                         color_override,
+                        from_inventory,
                     )
                 {
                     remap_entity_in_stack(&mut undo_stack, entity, new_entity);
                     selection.entity = Some(new_entity);
                     if gate_order.is_some() {
                         transform_state.next_gate_order += 1;
+                    }
+                    // Re-apply cost
+                    let cost = crate::course::data::gate_cost(&obstacle_id.0, &library);
+                    if cost > 0 {
+                        if from_inventory {
+                            course_state.inventory.remove(&obstacle_id);
+                        } else if let Some(ref mut league) = league {
+                            league.money -= cost as f32;
+                        }
                     }
                 }
             }
@@ -166,9 +188,10 @@ pub(super) fn handle_course_undo_input(
             gate_forward_flipped,
             camera,
             color_override,
+            from_inventory,
         } => {
             if is_undo {
-                // Undo delete = respawn
+                // Undo delete = respawn + remove from inventory
                 if let Some(ref mut ctx) = ctx
                     && let Some(new_entity) = respawn_obstacle(
                         &mut commands,
@@ -181,6 +204,7 @@ pub(super) fn handle_course_undo_input(
                         camera.as_ref(),
                         camera_meshes.as_deref(),
                         color_override,
+                        from_inventory,
                     )
                 {
                     remap_entity_in_stack(&mut undo_stack, old_entity, new_entity);
@@ -188,15 +212,23 @@ pub(super) fn handle_course_undo_input(
                     if gate_order.is_some() {
                         transform_state.next_gate_order += 1;
                     }
+                    // Undo the inventory addition that happened on delete
+                    let cost = crate::course::data::gate_cost(&obstacle_id.0, &library);
+                    if cost > 0 {
+                        course_state.inventory.remove(&obstacle_id);
+                    }
                 }
             } else {
-                // Redo delete = despawn again
-                // The entity was remapped, so old_entity should be current
+                // Redo delete = despawn again + add to inventory
                 if selection.entity == Some(old_entity) {
                     selection.entity = None;
                 }
                 if gate_order.is_some() && transform_state.next_gate_order > 0 {
                     transform_state.next_gate_order -= 1;
+                }
+                let cost = crate::course::data::gate_cost(&obstacle_id.0, &library);
+                if cost > 0 {
+                    course_state.inventory.add(&obstacle_id);
                 }
                 commands.entity(old_entity).despawn();
             }
@@ -324,6 +356,7 @@ pub(super) fn snapshot_for_delete(
             gate_forward_flipped: placed.gate_forward_flipped,
             camera,
             color_override: placed.color_override,
+            from_inventory: placed.from_inventory,
         });
     }
 
@@ -370,6 +403,7 @@ fn respawn_obstacle(
     camera: Option<&CameraSnapshot>,
     camera_meshes: Option<&CameraEditorMeshes>,
     color_override: Option<[f32; 4]>,
+    from_inventory: bool,
 ) -> Option<Entity> {
     let def = library.get(obstacle_id)?;
 
@@ -394,6 +428,7 @@ fn respawn_obstacle(
         gate_order,
         gate_forward_flipped,
         color_override,
+        from_inventory,
     });
 
     // Respawn camera child if present

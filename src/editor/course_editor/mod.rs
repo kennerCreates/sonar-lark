@@ -16,6 +16,7 @@ use bevy::{
 use crate::camera::orbit::MainCamera;
 
 use crate::course::data::{CourseData, PropKind};
+use crate::course::location::GateInventory;
 use crate::obstacle::definition::ObstacleId;
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, obstacles_gltf_ready};
@@ -56,12 +57,16 @@ pub struct EditorTransform {
 #[derive(Resource)]
 pub struct EditorCourse {
     pub name: String,
+    pub location_index: usize,
+    pub inventory: GateInventory,
 }
 
 impl Default for EditorCourse {
     fn default() -> Self {
         Self {
             name: DEFAULT_COURSE_NAME.to_string(),
+            location_index: 0,
+            inventory: GateInventory::default(),
         }
     }
 }
@@ -87,6 +92,8 @@ pub struct PlacedObstacle {
     pub gate_order: Option<u32>,
     pub gate_forward_flipped: bool,
     pub color_override: Option<[f32; 4]>,
+    /// True if this gate was placed from inventory (free), false if purchased with money.
+    pub from_inventory: bool,
 }
 
 /// Marker on every prop entity spawned in the course editor.
@@ -274,11 +281,23 @@ fn setup_course_editor(
     library: Res<ObstacleLibrary>,
     font: Res<UiFont>,
     mut config_store: ResMut<GizmoConfigStore>,
+    selected_location: Option<Res<crate::course::location::SelectedLocation>>,
+    location_registry: Res<crate::course::location::LocationRegistry>,
 ) {
     ui::build_course_editor_ui(&mut commands, &library, &font.0);
     commands.insert_resource(EditorSelection::default());
     commands.insert_resource(EditorTransform::default());
-    commands.insert_resource(EditorCourse::default());
+    let location_index = selected_location.as_ref().map_or(1, |l| l.0); // default to Warehouse (index 1)
+    let location_name = location_registry
+        .locations
+        .get(location_index)
+        .map(|l| l.name.clone())
+        .unwrap_or_else(|| "Abandoned Warehouse".to_string());
+    commands.insert_resource(EditorCourse {
+        name: location_name,
+        location_index,
+        inventory: GateInventory::default(),
+    });
     commands.insert_resource(EditorUI::default());
     commands.insert_resource(MoveWidgetState::default());
     commands.insert_resource(RotateWidgetState::default());
@@ -422,18 +441,16 @@ fn handle_delete_key(
     transform_query: Query<&Transform, PlacedFilter>,
     camera_child_query: Query<(Entity, &ChildOf, &PlacedCamera, &Transform)>,
     library: Res<ObstacleLibrary>,
-    mut league: Option<ResMut<crate::league::LeagueState>>,
+    mut course_state: ResMut<EditorCourse>,
 ) {
     if keyboard.just_pressed(KeyCode::Delete)
         && let Some(entity) = selection.entity.take()
     {
-        // Refund gate cost
+        // Store gate in inventory (instead of refunding money)
         if let Ok(placed) = obstacle_query.get(entity) {
             let cost = crate::course::data::gate_cost(&placed.obstacle_id.0, &library);
-            if cost > 0
-                && let Some(ref mut league) = league
-            {
-                league.money += cost as f32;
+            if cost > 0 {
+                course_state.inventory.add(&placed.obstacle_id);
             }
         }
 
@@ -572,6 +589,7 @@ fn snapshot_and_despawn_on_glb_reload(
 
     let course_data = ui::build_course_data(
         course_state.name.clone(),
+        String::new(), // location not needed for glb reload snapshot
         obstacles_with_cameras,
         prop_query.iter(),
     );

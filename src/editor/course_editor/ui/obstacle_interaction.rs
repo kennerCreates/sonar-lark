@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::editor::EditorTab;
-use crate::editor::course_editor::{EditorSelection, EditorTransform, EditorUI, PlacedObstacle};
+use crate::editor::course_editor::{EditorCourse, EditorSelection, EditorTransform, EditorUI, PlacedObstacle};
 use crate::editor::undo::{CameraSnapshot, CourseEditorAction, UndoStack};
 use crate::league::LeagueState;
 use crate::obstacle::library::ObstacleLibrary;
@@ -13,10 +13,12 @@ use crate::ui_theme;
 use super::camera_interaction::{DEFAULT_CAMERA_OFFSET, spawn_gate_camera};
 use super::types::*;
 
+#[allow(clippy::too_many_arguments)]
 pub fn handle_palette_selection(
     mut commands: Commands,
     mut selection: ResMut<EditorSelection>,
     mut transform_state: ResMut<EditorTransform>,
+    mut course_state: ResMut<EditorCourse>,
     query: Query<(&Interaction, &PaletteButton), Changed<Interaction>>,
     library: Res<ObstacleLibrary>,
     gltf_handle: Option<Res<ObstaclesGltfHandle>>,
@@ -39,15 +41,20 @@ pub fn handle_palette_selection(
             continue;
         };
 
-        // Check gate cost against budget
+        // Check inventory first, then money
         let cost = crate::course::data::gate_cost(&btn.0.0, &library);
-        if cost > 0 {
+        let from_inventory = if cost > 0 && course_state.inventory.count(&btn.0) > 0 {
+            true
+        } else if cost > 0 {
             let money = league.as_ref().map_or(0.0, |l| l.money);
             if money < cost as f32 {
                 warn!("Cannot afford {} (${cost}, have ${:.0})", btn.0.0, money);
                 continue;
             }
-        }
+            false
+        } else {
+            false
+        };
 
         let Some(handle) = &gltf_handle else {
             warn!("glTF not loaded yet, cannot place obstacle");
@@ -98,13 +105,15 @@ pub fn handle_palette_selection(
                 gate_order,
                 gate_forward_flipped: false,
                 color_override,
+                from_inventory,
             });
 
-            // Deduct gate cost
-            if cost > 0
-                && let Some(ref mut league) = league
-            {
-                league.money -= cost as f32;
+            // Deduct from inventory or money
+            if from_inventory {
+                course_state.inventory.remove(&btn.0);
+            } else if cost > 0
+                && let Some(ref mut league) = league {
+                    league.money -= cost as f32;
             }
 
             // Auto-spawn a primary camera on the first gate (gate_order == 0)
@@ -141,6 +150,7 @@ pub fn handle_palette_selection(
                 gate_forward_flipped: false,
                 camera: camera_snapshot,
                 color_override,
+                from_inventory,
             });
 
             selection.entity = Some(entity);

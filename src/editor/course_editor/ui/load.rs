@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::course::data::{CourseData, PropKind};
-use crate::course::loader::load_course_from_file;
+use crate::course::location::{LocationSaveData, SelectedLocation};
 use crate::editor::course_editor::{
     self, EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedFilter, PlacedObstacle,
     PlacedProp,
@@ -9,8 +9,9 @@ use crate::editor::course_editor::{
 use crate::editor::undo::{CourseEditorAction, UndoStack};
 use crate::obstacle::library::ObstacleLibrary;
 use crate::obstacle::spawning::{ObstaclesGltfHandle, SpawnObstacleContext};
+use crate::persistence;
 use crate::rendering::{CelLightDir, CelMaterial};
-use crate::states::{AppState, LastEditedCourse, PendingEditorCourse};
+use crate::states::{AppState, PendingEditorCourse};
 
 use super::data::next_gate_order_from_instances;
 use super::types::{CameraEditorMeshes, PropEditorMeshes};
@@ -76,6 +77,7 @@ pub(crate) fn load_course_into_editor(
                 gate_order: instance.gate_order,
                 gate_forward_flipped: instance.gate_forward_flipped,
                 color_override: instance.color_override,
+                from_inventory: false, // loaded gates are already owned
             });
 
             // Spawn camera child if this obstacle has one
@@ -152,7 +154,7 @@ pub(crate) fn load_course_into_editor(
 }
 
 /// Loads a `PendingEditorCourse` once glTF assets are ready.
-/// Gated by `run_if(resource_exists::<PendingEditorCourse>)` and `run_if(obstacles_gltf_ready)`.
+/// Tries LocationSaveData format first, falls back to raw CourseData.
 #[allow(clippy::too_many_arguments)]
 pub fn auto_load_pending_course(
     mut commands: Commands,
@@ -160,6 +162,7 @@ pub fn auto_load_pending_course(
     mut selection: ResMut<EditorSelection>,
     mut course_state: ResMut<EditorCourse>,
     mut transform_state: ResMut<EditorTransform>,
+    selected_location: Option<Res<SelectedLocation>>,
     placed_query: Query<
         Entity,
         PlacedFilter,
@@ -174,15 +177,18 @@ pub fn auto_load_pending_course(
     prop_meshes: Option<Res<PropEditorMeshes>>,
     (camera_meshes, mut undo_stack): (Option<Res<CameraEditorMeshes>>, ResMut<UndoStack<CourseEditorAction>>),
 ) {
-
     let path = std::path::Path::new(&pending.path);
-    let course = match load_course_from_file(path) {
-        Ok(c) => c,
-        Err(e) => {
-            error!("Failed to auto-load course: {e}");
-            commands.remove_resource::<PendingEditorCourse>();
-            return;
-        }
+
+    // Try LocationSaveData first, fall back to raw CourseData
+    let (course, inventory) = if let Ok(save_data) = persistence::load_ron::<LocationSaveData>(path)
+    {
+        (save_data.course, save_data.inventory)
+    } else if let Ok(course) = persistence::load_ron::<CourseData>(path) {
+        (course, Default::default())
+    } else {
+        error!("Failed to load course from: {}", pending.path);
+        commands.remove_resource::<PendingEditorCourse>();
+        return;
     };
 
     let mut ctx = SpawnObstacleContext::from_res(
@@ -208,9 +214,12 @@ pub fn auto_load_pending_course(
         camera_meshes.as_deref(),
     );
 
+    // Set inventory and location index from loaded data
+    course_state.inventory = inventory;
+    if let Some(loc) = selected_location.as_ref() {
+        course_state.location_index = loc.0;
+    }
+
     undo_stack.clear();
-    commands.insert_resource(LastEditedCourse {
-        path: pending.path.clone(),
-    });
     commands.remove_resource::<PendingEditorCourse>();
 }

@@ -38,7 +38,6 @@ impl Default for LeagueState {
 
 fn init_league_state(mut commands: Commands) {
     commands.insert_resource(LeagueState::default());
-    commands.insert_resource(LocationRegistry::new());
 }
 
 /// Runs on entering Results: simulates fan attraction from the last race.
@@ -97,7 +96,8 @@ pub struct LeaguePlugin;
 
 impl Plugin for LeaguePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, init_league_state)
+        app.insert_resource(LocationRegistry::new())
+            .add_systems(Startup, init_league_state)
             .add_systems(OnEnter(AppState::Results), simulate_fans_on_results);
     }
 }

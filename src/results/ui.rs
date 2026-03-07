@@ -765,10 +765,10 @@ pub fn handle_close_fan_network(
     overlay: Query<Entity, With<FanNetworkOverlay>>,
 ) {
     for interaction in &query {
-        if *interaction == Interaction::Pressed {
-            if let Ok(entity) = overlay.single() {
-                commands.entity(entity).despawn();
-            }
+        if *interaction == Interaction::Pressed
+            && let Ok(entity) = overlay.single()
+        {
+            commands.entity(entity).despawn();
         }
     }
 }

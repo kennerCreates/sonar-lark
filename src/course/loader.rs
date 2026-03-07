@@ -10,6 +10,7 @@ use crate::obstacle::spawning::{SpawnObstacleContext, spawn_obstacle, ObstacleMa
 use crate::rendering::{CelLightDir, CelMaterial};
 use crate::states::AppState;
 use super::data::CourseData;
+use super::location::LocationSaveData;
 
 #[derive(Resource)]
 pub struct SelectedCourse {
@@ -32,12 +33,18 @@ pub fn load_course(mut commands: Commands, selected: Option<Res<SelectedCourse>>
         return;
     }
 
-    match load_course_from_file(path) {
-        Ok(course) => {
-            info!("Loaded course '{}' with {} obstacles", course.name, course.instances.len());
-            commands.insert_resource(course);
+    // Try LocationSaveData first, fall back to raw CourseData
+    if let Ok(save_data) = persistence::load_ron::<LocationSaveData>(path) {
+        info!("Loaded course '{}' with {} obstacles", save_data.course.name, save_data.course.instances.len());
+        commands.insert_resource(save_data.course);
+    } else {
+        match load_course_from_file(path) {
+            Ok(course) => {
+                info!("Loaded course '{}' with {} obstacles", course.name, course.instances.len());
+                commands.insert_resource(course);
+            }
+            Err(e) => error!("{e}"),
         }
-        Err(e) => error!("{e}"),
     }
 }
 
@@ -145,6 +152,7 @@ pub fn delete_course(path: &Path) -> Result<(), String> {
         .map_err(|e| format!("Failed to delete {}: {e}", path.display()))
 }
 
+#[cfg(test)]
 pub fn save_course(course: &CourseData, path: &Path) -> Result<(), String> {
     persistence::save_ron(course, path)
 }

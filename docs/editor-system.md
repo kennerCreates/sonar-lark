@@ -42,8 +42,8 @@ The move gizmo draws per-axis arrows (X=red, Y=green, Z=blue) and a plane indica
 
 ## Course Editor UI Files
 
-`ui/` directory: `discover.rs` (re-exports from `course::discovery`), `left_panel.rs` + `right_panel.rs` (UI construction), `data.rs` (build_course_data + tests), `load.rs` (load into editor), `save_delete.rs` (save/delete/navigation/gate ordering), `systems.rs` (interaction handlers, display updates), `types.rs` (marker components, re-exports `CourseEntry`). Button styling uses shared `ui_theme` module.
+`ui/` directory: `left_panel.rs` + `right_panel.rs` (UI construction), `data.rs` (build_course_data + tests), `load.rs` (load into editor from per-location save), `save_delete.rs` (save to per-location file, gate ordering, race transition), `systems.rs` (interaction handlers, display updates), `obstacle_interaction.rs` (gate placement with inventory/money), `types.rs` (marker components). Button styling uses shared `ui_theme` module.
 
-## Course Delete Pattern
+## Per-Location Save System
 
-`PendingCourseDelete` tracks deletion with inline Yes/Cancel confirmation. Resets editor state if deleted course is currently loaded.
+Each location has exactly one save file at `assets/locations/{slug}.location.ron`. The save format is `LocationSaveData` wrapping `CourseData` + `GateInventory`. Gates are purchased with money and stored in per-location inventory when deleted. The `from_inventory` flag on `PlacedObstacle` tracks whether a gate came from inventory (free) or was purchased, enabling correct undo/redo behavior.

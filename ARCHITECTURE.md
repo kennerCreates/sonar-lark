@@ -39,17 +39,15 @@ src/
 │   └── race_participant.rs RaceParticipant (marker for race entities), DronePhase (lifecycle enum)
 ├── menu/                Menu UI, state navigation
 │   ├── mod.rs           MenuPlugin, system registration
-│   ├── discover.rs      Re-exports from course::discovery
-│   └── ui.rs            Menu setup, course selection, button handlers
+│   └── ui.rs            Menu setup, location selection, button handlers
 ├── obstacle/            Obstacle data layer
 │   ├── definition.rs    ObstacleId, ObstacleDef, TriggerVolumeConfig, CollisionVolumeConfig
 │   ├── library.rs       ObstacleLibrary resource, RON load/save
 │   └── spawning.rs      Spawn obstacles from glTF nodes, TriggerVolume/ObstacleCollisionVolumes (compound) components
 ├── course/              Course data layer
 │   ├── data.rs          CourseData, ObstacleInstance, PropKind, PropInstance, CameraInstance
-│   ├── discovery.rs     CourseEntry, discover_courses(), discover_courses_in() + tests
-│   ├── loader.rs        Load/save/spawn courses from RON
-│   └── location.rs      Location, LocationRegistry, default_locations()
+│   ├── loader.rs        Load/spawn courses from RON
+│   └── location.rs      Location, LocationRegistry, SelectedLocation, GateInventory, LocationSaveData
 ├── editor/              Map editor
 │   ├── workshop/        Define new obstacle types from glb scenes (registered by DevMenuPlugin)
 │   │   ├── mod.rs       WorkshopPlugin, WorkshopState, lifecycle, node list population
@@ -72,13 +70,12 @@ src/
 │       │   └── scale_gizmo.rs draw_scale_gizmo(), handle_scale_gizmo()
 │       └── ui/          Course editor UI
 │           ├── mod.rs   Re-exports
-│           ├── types.rs Marker components, resources, re-exports CourseEntry
-│           ├── discover.rs Re-exports from course::discovery
+│           ├── types.rs Marker components, resources
 │           ├── left_panel.rs build_course_editor_ui(), build_left_panel(), tab/prop palette buttons
 │           ├── right_panel.rs build_right_panel(), palette/course/action buttons, dividers
 │           ├── data.rs  build_course_data(), next_gate_order_from_instances() + tests
 │           ├── load.rs  load_course_into_editor(), handle_load_button(), auto_load_pending_course()
-│           ├── save_delete.rs Navigation, save/delete flows, gate ordering
+│           ├── save_delete.rs Save to per-location file, gate ordering, race transition
 │           └── systems.rs Interaction handlers, display updates, prop color
 ├── dev_menu/            Development tools (accessible via Dev button on main menu)
 │   ├── mod.rs           DevMenuPlugin, system registration (includes WorkshopPlugin)
@@ -254,13 +251,13 @@ assets/
 
 ## Testing
 
-Unit tests cover the pure-logic data layers. Run with `cargo test`. 321 tests total.
+Unit tests cover the pure-logic data layers. Run with `cargo test`. 312 tests total (311 pass, 1 pre-existing failure).
 
 | Module | Tests | What's covered |
 |--------|-------|----------------|
 | `obstacle::library` | 9 | Insert/get, overwrite, save/load roundtrip, error cases, existing RON format |
 | `course::loader` | 11 | Save/load roundtrip, empty course, transform preservation, error cases, existing RON format, delete course, camera roundtrip, backward compat |
-| `course::discovery` | 8 | Course discovery, filtering, sorting, path storage, gate counting, missing directory |
+| `course::location` | 1 | Location slug generation, save path |
 | `camera::orbit` | 3 | Orbit distance, transform computation, look-at verification |
 | `camera::spring` | 7 | Spring camera smoothing |
 | `drone::paths` | 23 | Race path/spline generation, per-drone path generation, start positions (split: generation.rs + start_positions.rs) |
@@ -296,7 +293,7 @@ Unit tests cover the pure-logic data layers. Run with `cargo test`. 321 tests to
 Functions used by tests:
 - `ObstacleLibrary::load_from_file` / `save_to_file` — pure file I/O, no Bevy systems
 - `load_course_from_file` / `save_course` / `delete_course` — pure file I/O, no Bevy systems
-- `discover_courses_in(path)` — parameterized version of `discover_courses()` for testability (in `course::discovery`)
+- `Location::slug()` / `save_path()` — deterministic file path from location name (in `course::location`)
 - `generate_race_path(course)` / `generate_drone_race_path(course, config, index)` / `compute_start_positions(...)` — pure geometry, no ECS (in `drone::paths`)
 - `generate_race_script(...)` — pure data generation from splines, configs, pilot data, and course geometry (in `race::script`)
 - `cyclic_curvature(spline, t, cycle_t)` / `safe_speed_for_curvature(κ, tuning)` — pure math (in `drone::ai`)

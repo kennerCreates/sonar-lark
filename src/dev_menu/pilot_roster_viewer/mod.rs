@@ -198,16 +198,15 @@ pub fn rebuild_roster_list(
     // Re-rasterize portraits for any new/remaining pilots
     if let Some(parts) = parts.as_deref() {
         for pilot in &roster_ref.pilots {
-            if !cache.portraits.contains_key(&pilot.id) {
+            cache.portraits.entry(pilot.id).or_insert_with(|| {
                 let image = rasterize_portrait(
                     &pilot.portrait,
                     pilot.color_scheme.primary,
                     PORTRAIT_THUMB_SIZE,
                     parts,
                 );
-                let handle = images.add(image);
-                cache.portraits.insert(pilot.id, handle);
-            }
+                images.add(image)
+            });
         }
     }
 

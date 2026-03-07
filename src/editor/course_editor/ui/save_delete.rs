@@ -1,13 +1,12 @@
-use std::fs;
-
 use bevy::prelude::*;
 
-use crate::course::loader::{SelectedCourse, save_course};
+use crate::course::loader::SelectedCourse;
+use crate::course::location::{LocationRegistry, LocationSaveData};
 use crate::editor::course_editor::{
-    DEFAULT_COURSE_NAME, EditorCourse, EditorSelection, EditorTransform, PlacedCamera,
-    PlacedObstacle, PlacedProp,
+    EditorCourse, EditorSelection, EditorTransform, PlacedCamera, PlacedObstacle, PlacedProp,
 };
-use crate::states::{AppState, LastEditedCourse};
+use crate::persistence;
+use crate::states::AppState;
 
 use super::data::build_course_data;
 use super::types::*;
@@ -36,97 +35,96 @@ pub fn handle_back_to_menu(
     }
 }
 
+/// Save location data (course + inventory) to the per-location file.
+fn save_location_data<'a>(
+    course_state: &EditorCourse,
+    location_registry: &LocationRegistry,
+    placed_query: &'a Query<(Entity, &PlacedObstacle, &Transform)>,
+    prop_query: impl IntoIterator<Item = (&'a PlacedProp, &'a Transform)>,
+    child_of_query: &'a Query<(Entity, &ChildOf), With<PlacedCamera>>,
+    camera_child_query: &'a Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
+) -> Result<String, String> {
+    let location = location_registry
+        .locations
+        .get(course_state.location_index)
+        .ok_or_else(|| format!("Invalid location index {}", course_state.location_index))?;
+
+    let obstacles_with_cameras = placed_query.iter().map(|(entity, placed, transform)| {
+        let camera = child_of_query
+            .iter()
+            .find(|(_, child_of)| child_of.parent() == entity)
+            .and_then(|(cam_entity, _)| camera_child_query.get(cam_entity).ok());
+        (placed, transform, camera)
+    });
+
+    let course = build_course_data(
+        course_state.name.clone(),
+        location.name.clone(),
+        obstacles_with_cameras,
+        prop_query,
+    );
+
+    let save_data = LocationSaveData {
+        course,
+        inventory: course_state.inventory.clone(),
+    };
+
+    let path_str = location.save_path();
+    let path = std::path::Path::new(&path_str);
+    persistence::save_ron(&save_data, path)?;
+
+    Ok(path_str)
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn handle_save_button(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<SaveCourseButton>)>,
-    mut course_state: ResMut<EditorCourse>,
+    course_state: Res<EditorCourse>,
     placed_query: Query<(Entity, &PlacedObstacle, &Transform)>,
     prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
     camera_child_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
     child_of_query: Query<(Entity, &ChildOf), With<PlacedCamera>>,
+    location_registry: Res<LocationRegistry>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
 
-        // Auto-assign name if still default
-        if course_state.name == DEFAULT_COURSE_NAME || course_state.name.is_empty() {
-            course_state.name = next_auto_name();
-        }
-
         let camera_count = child_of_query.iter().count();
         if camera_count > 9 {
-            warn!(
-                "Course has {camera_count} cameras (soft cap is 9). Consider reducing."
-            );
+            warn!("Course has {camera_count} cameras (soft cap is 9). Consider reducing.");
         }
 
-        let obstacles_with_cameras =
-            placed_query
-                .iter()
-                .map(|(entity, placed, transform)| {
-                    let camera = child_of_query
-                        .iter()
-                        .find(|(_, child_of)| child_of.parent() == entity)
-                        .and_then(|(cam_entity, _)| camera_child_query.get(cam_entity).ok());
-                    (placed, transform, camera)
-                });
-
-        let course = build_course_data(
-            course_state.name.clone(),
-            obstacles_with_cameras,
+        match save_location_data(
+            &course_state,
+            &location_registry,
+            &placed_query,
             prop_query.iter(),
-        );
-
-        let path_str = format!("assets/courses/{}.course.ron", course_state.name);
-        let path = std::path::Path::new(&path_str);
-        match save_course(&course, path) {
-            Ok(()) => {
+            &child_of_query,
+            &camera_child_query,
+        ) {
+            Ok(path_str) => {
                 info!(
-                    "Saved course '{}' ({} obstacles, {} cameras) to {}",
+                    "Saved location '{}' ({} obstacles, {} cameras) to {}",
                     course_state.name,
-                    course.instances.len(),
+                    placed_query.iter().count(),
                     camera_count,
                     path_str
                 );
-                commands.insert_resource(LastEditedCourse {
-                    path: path_str.clone(),
-                });
 
-                // Trigger thumbnail capture (handled by separate system)
                 commands.insert_resource(PendingThumbnailSave {
                     course_name: course_state.name.clone(),
                     frames_waited: 0,
                 });
             }
             Err(e) => {
-                error!("Failed to save course: {e}");
+                error!("Failed to save: {e}");
                 continue;
             }
         }
     }
-}
-
-/// Scan `assets/courses/` for `course_NNN.course.ron` and return the next name.
-fn next_auto_name() -> String {
-    let courses_dir = std::path::Path::new("assets/courses");
-    let mut max_num: u32 = 0;
-
-    if let Ok(entries) = fs::read_dir(courses_dir) {
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            if let Some(stem) = name_str.strip_suffix(".course.ron")
-                && let Some(num_str) = stem.strip_prefix("course_")
-                && let Ok(num) = num_str.parse::<u32>()
-            {
-                max_num = max_num.max(num);
-            }
-        }
-    }
-
-    format!("course_{:03}", max_num + 1)
 }
 
 pub fn handle_gate_order_toggle(
@@ -151,58 +149,34 @@ pub fn handle_gate_order_toggle(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn handle_start_race(
     mut commands: Commands,
     query: Query<&Interaction, (Changed<Interaction>, With<StartRaceButton>)>,
-    mut course_state: ResMut<EditorCourse>,
+    course_state: Res<EditorCourse>,
     placed_query: Query<(Entity, &PlacedObstacle, &Transform)>,
     prop_query: Query<(&PlacedProp, &Transform), (Without<PlacedObstacle>, Without<PlacedCamera>)>,
     camera_child_query: Query<(&PlacedCamera, &Transform), Without<PlacedObstacle>>,
     child_of_query: Query<(Entity, &ChildOf), With<PlacedCamera>>,
+    location_registry: Res<LocationRegistry>,
 ) {
     for interaction in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
 
-        if course_state.name == DEFAULT_COURSE_NAME || course_state.name.is_empty() {
-            course_state.name = next_auto_name();
-        }
-
-        let obstacles_with_cameras =
-            placed_query
-                .iter()
-                .map(|(entity, placed, transform)| {
-                    let camera = child_of_query
-                        .iter()
-                        .find(|(_, child_of)| child_of.parent() == entity)
-                        .and_then(|(cam_entity, _)| camera_child_query.get(cam_entity).ok());
-                    (placed, transform, camera)
-                });
-
-        let course = build_course_data(
-            course_state.name.clone(),
-            obstacles_with_cameras,
+        match save_location_data(
+            &course_state,
+            &location_registry,
+            &placed_query,
             prop_query.iter(),
-        );
+            &child_of_query,
+            &camera_child_query,
+        ) {
+            Ok(path_str) => {
+                info!("Saved '{}' — starting race", course_state.name);
+                commands.insert_resource(SelectedCourse { path: path_str });
 
-        let path_str = format!("assets/courses/{}.course.ron", course_state.name);
-        let path = std::path::Path::new(&path_str);
-        match save_course(&course, path) {
-            Ok(()) => {
-                info!(
-                    "Saved course '{}' — starting race",
-                    course_state.name,
-                );
-                commands.insert_resource(LastEditedCourse {
-                    path: path_str.clone(),
-                });
-                commands.insert_resource(SelectedCourse {
-                    path: path_str,
-                });
-
-                // Trigger thumbnail capture; defer race transition until readback
-                // entity is spawned (PendingThumbnailSave removed).
                 commands.insert_resource(PendingThumbnailSave {
                     course_name: course_state.name.clone(),
                     frames_waited: 0,

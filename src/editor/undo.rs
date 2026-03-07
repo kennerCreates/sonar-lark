@@ -83,6 +83,8 @@ pub enum CourseEditorAction {
         gate_forward_flipped: bool,
         camera: Option<CameraSnapshot>,
         color_override: Option<[f32; 4]>,
+        /// True if placed from inventory (free), false if purchased with money.
+        from_inventory: bool,
     },
     SpawnProp {
         entity: Entity,
@@ -106,6 +108,8 @@ pub enum CourseEditorAction {
         gate_forward_flipped: bool,
         camera: Option<CameraSnapshot>,
         color_override: Option<[f32; 4]>,
+        /// True if this gate was originally placed from inventory, false if purchased.
+        from_inventory: bool,
     },
     DeleteProp {
         old_entity: Entity,
