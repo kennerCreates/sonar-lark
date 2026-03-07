@@ -2,7 +2,7 @@ use bevy::math::cubic_splines::CubicCurve;
 use bevy::prelude::*;
 
 use crate::common::POINTS_PER_GATE;
-use crate::drone::ai::{cyclic_curvature, safe_speed_for_curvature};
+use crate::drone::ai::{cyclic_curvature, cyclic_vel, safe_speed_for_curvature};
 use crate::drone::components::{AiTuningParams, DroneConfig};
 use crate::pilot::personality::{PersonalityTrait, ScriptModifiers};
 use crate::pilot::skill::SkillProfile;
@@ -208,41 +208,85 @@ fn estimate_segment_times(
 // Step 2: Compute per-drone per-gate turn tightness
 // ---------------------------------------------------------------------------
 
+/// Classify turn tightness using accumulated angular deflection per segment,
+/// relative to the course's own median. This captures genuine turn variety
+/// regardless of the absolute deflection magnitudes (which are dominated by
+/// the approach/departure/midleg spline structure).
+///
+/// Thresholds: segments below 70% of median → Gentle, above 140% → Tight.
+const GENTLE_RATIO: f32 = 0.70;
+const TIGHT_RATIO: f32 = 1.40;
+
 pub(crate) fn classify_turn_tightness(
     spline: &CubicCurve<Vec3>,
     gate_count: u32,
-    tuning: &AiTuningParams,
+    _tuning: &AiTuningParams,
 ) -> Vec<TurnTightness> {
     let cycle_t = gate_count as f32 * POINTS_PER_GATE;
 
-    // Derive thresholds from speed bands
-    let speed_80 = tuning.max_speed * 0.8;
-    let speed_50 = tuning.max_speed * 0.5;
-    let kappa_gentle = tuning.safe_lateral_accel / (speed_80 * speed_80);
-    let kappa_tight = tuning.safe_lateral_accel / (speed_50 * speed_50);
+    // First pass: measure angular deflection per segment.
+    let deflections: Vec<f32> = (0..gate_count)
+        .map(|gate_idx| {
+            let seg_start = gate_idx as f32 * POINTS_PER_GATE;
+            let seg_end = seg_start + POINTS_PER_GATE;
+            segment_deflection(spline, seg_start, seg_end, cycle_t)
+        })
+        .collect();
 
-    let mut tightness = Vec::with_capacity(gate_count as usize);
-    for gate_idx in 0..gate_count {
-        let seg_start = gate_idx as f32 * POINTS_PER_GATE;
-        let seg_end = seg_start + POINTS_PER_GATE;
-        let mut peak_curvature = 0.0f32;
+    // Second pass: classify relative to median.
+    let mut sorted = deflections.clone();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let n = sorted.len();
+    let median = if n % 2 == 0 {
+        (sorted[n / 2 - 1] + sorted[n / 2]) * 0.5
+    } else {
+        sorted[n / 2]
+    };
 
-        for i in 0..CURVATURE_SAMPLES_PER_SEGMENT {
-            let frac = i as f32 / (CURVATURE_SAMPLES_PER_SEGMENT - 1).max(1) as f32;
-            let sample_t = seg_start + frac * (seg_end - seg_start);
-            peak_curvature = peak_curvature.max(cyclic_curvature(spline, sample_t, cycle_t));
-        }
+    let gentle_threshold = median * GENTLE_RATIO;
+    let tight_threshold = median * TIGHT_RATIO;
 
-        let class = if peak_curvature < kappa_gentle {
-            TurnTightness::Gentle
-        } else if peak_curvature < kappa_tight {
-            TurnTightness::Medium
-        } else {
-            TurnTightness::Tight
-        };
-        tightness.push(class);
+    deflections
+        .iter()
+        .map(|&d| {
+            if d < gentle_threshold {
+                TurnTightness::Gentle
+            } else if d > tight_threshold {
+                TurnTightness::Tight
+            } else {
+                TurnTightness::Medium
+            }
+        })
+        .collect()
+}
+
+/// Accumulated angular deflection (radians) across a spline segment.
+fn segment_deflection(
+    spline: &CubicCurve<Vec3>,
+    seg_start: f32,
+    seg_end: f32,
+    cycle_t: f32,
+) -> f32 {
+    let samples = CURVATURE_SAMPLES_PER_SEGMENT;
+    let mut total = 0.0f32;
+    let mut prev_dir = cyclic_vel(spline, seg_start, cycle_t);
+    let prev_len = prev_dir.length();
+    if prev_len > 0.001 {
+        prev_dir /= prev_len;
     }
-    tightness
+
+    for i in 1..=samples {
+        let frac = i as f32 / samples as f32;
+        let sample_t = seg_start + frac * (seg_end - seg_start);
+        let mut dir = cyclic_vel(spline, sample_t, cycle_t);
+        let len = dir.length();
+        if len > 0.001 {
+            dir /= len;
+            total += prev_dir.angle_between(dir);
+            prev_dir = dir;
+        }
+    }
+    total
 }
 
 // ---------------------------------------------------------------------------
@@ -1220,6 +1264,81 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// Build a spline with approach/departure/midleg per gate, like the real
+    /// path generation in `drone::paths::generation`.
+    fn make_racing_spline(positions: &[Vec3], forwards: &[Vec3]) -> CubicCurve<Vec3> {
+        let n = positions.len();
+        let mut control_points = Vec::with_capacity(n * 3);
+        for i in 0..n {
+            let pos = positions[i];
+            let fwd = forwards[i];
+            let next = (i + 1) % n;
+            let gate_dist = (positions[next] - pos).length();
+            let offset = (gate_dist * 0.3).min(12.0);
+            let approach = pos - fwd * offset;
+            let departure = pos + fwd * offset;
+            control_points.push(approach);
+            control_points.push(departure);
+
+            let next_gate_dist = (positions[(next + 1) % n] - positions[next]).length();
+            let next_offset = (next_gate_dist * 0.3).min(12.0);
+            let next_approach = positions[next] - forwards[next] * next_offset;
+            control_points.push((departure + next_approach) * 0.5);
+        }
+        CubicCardinalSpline::new_catmull_rom(control_points)
+            .to_curve_cyclic()
+            .expect("failed to build racing spline")
+    }
+
+    #[test]
+    fn turn_tightness_produces_mix_on_varied_course() {
+        let tuning = default_tuning();
+        // Irregular course: mix of straights and sharp turns
+        let positions = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(40.0, 0.0, 5.0),    // nearly straight
+            Vec3::new(50.0, 0.0, 30.0),   // sharp turn
+            Vec3::new(20.0, 5.0, 50.0),   // another sharp turn
+            Vec3::new(-10.0, 0.0, 25.0),  // moderate turn
+            Vec3::new(-5.0, 0.0, 5.0),    // closing the loop
+        ];
+        let forwards: Vec<Vec3> = (0..positions.len())
+            .map(|i| {
+                let next = (i + 1) % positions.len();
+                (positions[next] - positions[i]).normalize()
+            })
+            .collect();
+
+        let spline = make_racing_spline(&positions, &forwards);
+        let tightness = classify_turn_tightness(&spline, 6, &tuning);
+
+        assert_eq!(tightness.len(), 6);
+        let gentle = tightness.iter().filter(|&&t| t == TurnTightness::Gentle).count();
+        let medium = tightness.iter().filter(|&&t| t == TurnTightness::Medium).count();
+        let tight = tightness.iter().filter(|&&t| t == TurnTightness::Tight).count();
+
+        // With varied geometry we expect at least 2 different categories
+        let categories_used = [gentle, medium, tight].iter().filter(|&&c| c > 0).count();
+        assert!(
+            categories_used >= 2,
+            "Expected ≥2 tightness categories, got: gentle={gentle}, medium={medium}, tight={tight}"
+        );
+    }
+
+    #[test]
+    fn uniform_circle_has_uniform_tightness() {
+        let tuning = default_tuning();
+        let (positions, forwards, _) = make_oval_course(6, 30.0);
+        let spline = make_racing_spline(&positions, &forwards);
+        let tightness = classify_turn_tightness(&spline, 6, &tuning);
+
+        // A regular circle should classify all segments the same
+        let first = tightness[0];
+        for (i, &t) in tightness.iter().enumerate() {
+            assert_eq!(t, first, "Gate {i} differs from gate 0: {t:?} vs {first:?}");
         }
     }
 

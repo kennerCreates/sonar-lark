@@ -24,7 +24,7 @@ pub(super) fn cyclic_pos(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t
 }
 
 /// Sample velocity/tangent from the cyclic race spline, wrapping t into [0, cycle_t).
-pub(super) fn cyclic_vel(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> Vec3 {
+pub(crate) fn cyclic_vel(spline: &bevy::math::cubic_splines::CubicCurve<Vec3>, t: f32, cycle_t: f32) -> Vec3 {
     spline.velocity(t.rem_euclid(cycle_t))
 }
 
