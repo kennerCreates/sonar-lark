@@ -150,10 +150,10 @@ pub fn simulate_race(
             prob += inputs.marketing.aware_attendance_nudge;
         }
 
-        // Three-tier pricing:
+        // Pricing curve:
         // - Free ($0): bonus to attendance (people love free events)
-        // - $1-5: neutral (no effect)
-        // - $5+: soft-cap penalty that plateaus (die-hard fans still show up)
+        // - $1: neutral (no effect)
+        // - $2+: soft-cap penalty that plateaus (die-hard fans still show up)
         if inputs.ticket_price == 0 {
             let free_bonus = match person.tier {
                 FanTier::Aware => 0.15,
@@ -162,8 +162,8 @@ pub fn simulate_race(
                 FanTier::Superfan => 0.01,
             };
             prob += free_bonus;
-        } else if inputs.ticket_price > 5 {
-            let overage = (inputs.ticket_price - 5) as f32;
+        } else if inputs.ticket_price > 1 {
+            let overage = (inputs.ticket_price - 1) as f32;
             let max_penalty = match person.tier {
                 FanTier::Aware => 0.30,
                 FanTier::Attendee => 0.25,
@@ -979,7 +979,9 @@ mod tests {
 
     #[test]
     fn test_neutral_pricing_no_penalty() {
-        // $1-5 should produce the same demand as each other (no bonus or penalty)
+        // $0 and $1 are the only neutral prices; $1 should match $0 minus the free bonus
+        // We test that $1 produces identical demand across seeds (no penalty applied)
+        // and that $5 is noticeably lower (penalty kicks in at $2+)
         let make_net = || FanNetwork {
             people: vec![
                 Person { id: 0, recruited_by: None, tier: FanTier::Aware, races_attended: 0, races_since_attended: 0, spread_count: 0 },
@@ -1006,9 +1008,9 @@ mod tests {
             }).demand;
         }
 
-        assert_eq!(
-            total_demand_1, total_demand_5,
-            "$1 and $5 should produce identical demand (neutral zone): $1={}, $5={}",
+        assert!(
+            total_demand_1 > total_demand_5,
+            "$1 (neutral) should have more demand than $5 (penalized): $1={}, $5={}",
             total_demand_1, total_demand_5
         );
     }
