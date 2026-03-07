@@ -151,10 +151,23 @@ pub struct CursorBlinkTimer {
     pub visible: bool,
 }
 
-/// Poster print order: count in multiples of 25, $5 per 25.
-#[derive(Resource, Default)]
+/// Poster print order: count in multiples of 25, first 25 free, $5 per 25 after.
+pub const POSTER_FREE_TIER: u32 = 25;
+
+#[derive(Resource)]
 pub struct PosterOrder {
     pub count: u32,
+}
+
+impl Default for PosterOrder {
+    fn default() -> Self {
+        Self { count: POSTER_FREE_TIER }
+    }
+}
+
+/// Cost for a given poster count (first 25 are free).
+pub fn poster_cost(count: u32) -> f32 {
+    count.saturating_sub(POSTER_FREE_TIER) as f32 / 25.0 * 5.0
 }
 
 #[derive(Component)]

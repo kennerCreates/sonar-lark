@@ -10,7 +10,7 @@ use crate::palette;
 use crate::states::{AdCampaign, AppState, HypeMode, SelectedAdCampaign};
 use crate::ui_theme::{self, UiFont};
 
-use poster_editor::{canvas, PosterEditorOrigin, PosterOrder, SavedPosterData};
+use poster_editor::{canvas, poster_cost, PosterEditorOrigin, PosterOrder, SavedPosterData, POSTER_FREE_TIER};
 
 pub struct HypePlugin;
 
@@ -133,9 +133,8 @@ fn setup_campaign_ui(
     location_registry: Res<LocationRegistry>,
 ) {
     let ui_font = font.0.clone();
-    let poster_count = poster_order.map(|o| o.count).unwrap_or(0);
-    let poster_cost = poster_count as f32 / 25.0 * 5.0;
-    let posters_auto_checked = poster_count > 0;
+    let poster_count = poster_order.map(|o| o.count).unwrap_or(POSTER_FREE_TIER);
+    let posters_auto_checked = true;
     let league_state = league.as_deref().cloned().unwrap_or_default();
     let ticket_price = league_state.ticket_price;
     let total_money = league_state.money;
@@ -404,7 +403,7 @@ fn setup_campaign_ui(
 
                 // Money summary
                 {
-                    let marketing_cost = if posters_auto_checked { poster_cost } else { 0.0 };
+                    let marketing_cost = if posters_auto_checked { poster_cost(poster_count) } else { 0.0 };
                     let after_marketing = total_money - marketing_cost;
                     let venue_revenue = venue_capacity as f32 * ticket_price as f32;
                     let final_remaining = after_marketing + venue_revenue;
@@ -705,33 +704,16 @@ fn spawn_money_row(
 
 fn handle_campaign_toggle(
     query: Query<(&Interaction, &CampaignCheckbox), Changed<Interaction>>,
-    mut toggles: ResMut<CampaignToggles>,
+    toggles: ResMut<CampaignToggles>,
     mut fills: Query<(&CampaignCheckboxFill, &mut Text), Without<CampaignCountLabel>>,
-    mut count_text: Query<&mut Text, With<CampaignCountLabel>>,
-    mut poster_order: Option<ResMut<PosterOrder>>,
 ) {
     for (interaction, checkbox) in &query {
         if *interaction != Interaction::Pressed {
             continue;
         }
         if checkbox.0 == AdCampaign::Posters {
-            toggles.posters = !toggles.posters;
-
-            if let Some(ref mut order) = poster_order {
-                if toggles.posters {
-                    // Restore saved count
-                    order.count = toggles.saved_poster_count;
-                } else {
-                    // Save count before clearing
-                    toggles.saved_poster_count = order.count;
-                    order.count = 0;
-                }
-
-                // Update count label
-                for mut text in &mut count_text {
-                    text.0 = format!("{}", order.count);
-                }
-            }
+            // Posters are always active (first 25 are free), ignore toggle
+            continue;
         }
 
         let is_on = match checkbox.0 {
@@ -803,7 +785,7 @@ fn handle_campaign_poster_count(
     let mut changed = false;
 
     for interaction in &down {
-        if *interaction == Interaction::Pressed && order.count >= 25 {
+        if *interaction == Interaction::Pressed && order.count > POSTER_FREE_TIER {
             order.count -= 25;
             changed = true;
         }
@@ -816,7 +798,7 @@ fn handle_campaign_poster_count(
     }
 
     if changed {
-        toggles.posters = order.count > 0;
+        toggles.posters = true;
         toggles.saved_poster_count = order.count;
 
         for mut text in &mut count_text {
@@ -855,10 +837,11 @@ fn handle_start_race_button(
             let mut total_cost = 0.0;
 
             if toggles.posters {
-                let count = poster_order.as_ref().map(|o| o.count).unwrap_or(0);
-                let poster_cost = count as f32 / 25.0 * 5.0;
-                budgets.posters = poster_cost;
-                total_cost += poster_cost;
+                let count = poster_order.as_ref().map(|o| o.count).unwrap_or(POSTER_FREE_TIER);
+                // All posters contribute to marketing effect
+                budgets.posters = count as f32 / 25.0 * 5.0;
+                // But only posters beyond the free tier cost money
+                total_cost += poster_cost(count);
             }
 
             league.ticket_price = toggles.ticket_price;
@@ -903,9 +886,9 @@ fn update_money_summary(
     }
 
     let total_money = league.as_ref().map(|l| l.money).unwrap_or(205.0);
-    let poster_count = poster_order.as_ref().map(|o| o.count).unwrap_or(0);
+    let poster_count = poster_order.as_ref().map(|o| o.count).unwrap_or(POSTER_FREE_TIER);
     let marketing_cost = if toggles.posters {
-        poster_count as f32 / 25.0 * 5.0
+        poster_cost(poster_count)
     } else {
         0.0
     };

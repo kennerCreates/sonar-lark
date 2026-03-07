@@ -778,7 +778,7 @@ pub fn update_text_panel_visibility(
 // --- Poster count ---
 
 const POSTER_INCREMENT: u32 = 25;
-const POSTER_MIN: u32 = 0;
+const POSTER_MIN: u32 = super::POSTER_FREE_TIER;
 const POSTER_MAX: u32 = 500;
 
 pub fn handle_poster_count(
@@ -806,10 +806,10 @@ pub fn handle_poster_count(
     if changed
         && let Ok(mut text) = text_query.single_mut()
     {
-        if order.count == 0 {
-            text.0 = "0 posters".to_string();
+        let cost = super::poster_cost(order.count);
+        if cost == 0.0 {
+            text.0 = format!("{} posters  FREE", order.count);
         } else {
-            let cost = order.count as f32 / 25.0 * 5.0;
             text.0 = format!("{} posters  ${cost:.0}", order.count);
         }
     }

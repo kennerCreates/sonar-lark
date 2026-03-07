@@ -608,10 +608,10 @@ fn spawn_start_race_button(
                     });
 
                     // Count + cost text
-                    let count_label = if poster_count == 0 {
-                        "0 posters".to_string()
+                    let cost = super::poster_cost(poster_count);
+                    let count_label = if cost == 0.0 {
+                        format!("{poster_count} posters  FREE")
                     } else {
-                        let cost = poster_count as f32 / 25.0 * 5.0;
                         format!("{poster_count} posters  ${cost:.0}")
                     };
                     row.spawn((
