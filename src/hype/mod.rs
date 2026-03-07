@@ -2,8 +2,6 @@ pub(crate) mod poster_editor;
 
 use bevy::prelude::*;
 
-use crate::course::data::CourseData;
-use crate::course::location::LocationRegistry;
 use crate::league::marketing::CampaignBudgets;
 use crate::league::LeagueState;
 use crate::palette;
@@ -82,9 +80,6 @@ struct MarketingCostText;
 struct AfterMarketingText;
 
 #[derive(Component)]
-struct FinalRemainingText;
-
-#[derive(Component)]
 struct CampaignCountUp;
 
 #[derive(Component)]
@@ -101,7 +96,6 @@ struct CampaignToggles {
     /// Saved poster count for when the checkbox is unchecked then rechecked.
     saved_poster_count: u32,
     ticket_price: u32,
-    venue_capacity: u32,
 }
 
 fn redirect_to_poster_editor(
@@ -123,8 +117,6 @@ fn setup_campaign_ui(
     saved: Option<Res<SavedPosterData>>,
     poster_order: Option<Res<PosterOrder>>,
     league: Option<Res<LeagueState>>,
-    course: Option<Res<CourseData>>,
-    location_registry: Res<LocationRegistry>,
 ) {
     let ui_font = font.0.clone();
     let poster_count = poster_order.map(|o| o.count).unwrap_or(POSTER_FREE_TIER);
@@ -133,20 +125,10 @@ fn setup_campaign_ui(
     let ticket_price = league_state.ticket_price;
     let total_money = league_state.money;
 
-    let location_name = course
-        .as_ref()
-        .map(|c| c.location.as_str())
-        .unwrap_or("Abandoned Warehouse");
-    let venue_capacity = location_registry
-        .get(location_name)
-        .map(|l| l.capacity)
-        .unwrap_or(80);
-
     commands.insert_resource(CampaignToggles {
         posters: posters_auto_checked,
         saved_poster_count: poster_count,
         ticket_price,
-        venue_capacity,
     });
     commands.init_resource::<PosterOrder>();
 
@@ -399,9 +381,6 @@ fn setup_campaign_ui(
                 {
                     let marketing_cost = if posters_auto_checked { poster_cost(poster_count) } else { 0.0 };
                     let after_marketing = total_money - marketing_cost;
-                    let venue_revenue = venue_capacity as f32 * ticket_price as f32;
-                    let final_remaining = after_marketing + venue_revenue;
-
                     let ui_font_money = ui_font.clone();
                     parent
                         .spawn(Node {
@@ -413,8 +392,14 @@ fn setup_campaign_ui(
                         .with_children(|col| {
                             spawn_money_row(col, &ui_font_money, "Total Money:", &format!("${total_money:.0}"), MoneyTotalText, palette::VANILLA);
                             spawn_money_row(col, &ui_font_money, "Marketing:", &format!("-${marketing_cost:.0}"), MarketingCostText, palette::SALMON);
-                            spawn_money_row(col, &ui_font_money, "After Marketing:", &format!("${after_marketing:.0}"), AfterMarketingText, palette::VANILLA);
-                            spawn_money_row(col, &ui_font_money, "Remaining:", &format!("${final_remaining:.0}"), FinalRemainingText, palette::FROG);
+                            let remaining_color = if after_marketing > 0.0 {
+                                palette::FROG
+                            } else if after_marketing < 0.0 {
+                                palette::SALMON
+                            } else {
+                                palette::VANILLA
+                            };
+                            spawn_money_row(col, &ui_font_money, "Remaining:", &format!("${after_marketing:.0}"), AfterMarketingText, remaining_color);
                         });
                 }
 
@@ -832,9 +817,8 @@ fn update_money_summary(
     toggles: Res<CampaignToggles>,
     league: Option<Res<LeagueState>>,
     poster_order: Option<Res<PosterOrder>>,
-    mut marketing_text: Query<&mut Text, (With<MarketingCostText>, Without<AfterMarketingText>, Without<FinalRemainingText>)>,
-    mut after_text: Query<&mut Text, (With<AfterMarketingText>, Without<MarketingCostText>, Without<FinalRemainingText>)>,
-    mut final_text: Query<&mut Text, (With<FinalRemainingText>, Without<MarketingCostText>, Without<AfterMarketingText>)>,
+    mut marketing_text: Query<&mut Text, (With<MarketingCostText>, Without<AfterMarketingText>)>,
+    mut after_text: Query<(&mut Text, &mut TextColor), (With<AfterMarketingText>, Without<MarketingCostText>)>,
 ) {
     let poster_changed = poster_order
         .as_ref()
@@ -851,16 +835,19 @@ fn update_money_summary(
         0.0
     };
     let after_marketing = total_money - marketing_cost;
-    let venue_revenue = toggles.venue_capacity as f32 * toggles.ticket_price as f32;
-    let final_remaining = after_marketing + venue_revenue;
 
     for mut text in &mut marketing_text {
         text.0 = format!("-${marketing_cost:.0}");
     }
-    for mut text in &mut after_text {
+    let remaining_color = if after_marketing > 0.0 {
+        palette::FROG
+    } else if after_marketing < 0.0 {
+        palette::SALMON
+    } else {
+        palette::VANILLA
+    };
+    for (mut text, mut color) in &mut after_text {
         text.0 = format!("${after_marketing:.0}");
-    }
-    for mut text in &mut final_text {
-        text.0 = format!("${final_remaining:.0}");
+        color.0 = remaining_color;
     }
 }
