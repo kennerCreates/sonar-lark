@@ -27,6 +27,9 @@ pub struct DragPlacement {
     pub ghost_entity: Entity,
     /// Whether this gate came from inventory (free) or will be purchased.
     pub from_inventory: bool,
+    /// False until the initial mouse button is released after picking up.
+    /// Prevents the pick-up click from immediately placing.
+    pub ready: bool,
 }
 
 /// Spawn a ghost obstacle (seafoam-colored) from the obstacle library.
@@ -142,6 +145,7 @@ pub fn begin_drag_on_palette_press(
             obstacle_id: btn.0.clone(),
             ghost_entity,
             from_inventory,
+            ready: false,
         });
         break;
     }
@@ -204,6 +208,7 @@ pub fn begin_drag_on_inventory_press(
             obstacle_id: btn.0.clone(),
             ghost_entity,
             from_inventory: true,
+            ready: false,
         });
         break;
     }
@@ -239,7 +244,18 @@ pub fn update_ghost_position(
     }
 }
 
-/// System: on mouse release, finalize placement at ghost position.
+/// System: once the initial mouse button is released after picking up, mark drag as ready.
+pub fn arm_drag_placement(
+    mut drag: Option<ResMut<DragPlacement>>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+) {
+    let Some(ref mut drag) = drag else { return };
+    if !drag.ready && !mouse_buttons.pressed(MouseButton::Left) {
+        drag.ready = true;
+    }
+}
+
+/// System: on left click (while drag is ready), finalize placement at ghost position.
 /// Gated by `resource_exists::<DragPlacement>` so `drag` is always available.
 #[allow(clippy::too_many_arguments)]
 pub fn finalize_drag_placement(
@@ -260,7 +276,7 @@ pub fn finalize_drag_placement(
     std_materials: Res<Assets<StandardMaterial>>,
     light_dir: Res<CelLightDir>,
 ) {
-    if !mouse_buttons.just_released(MouseButton::Left) {
+    if !drag.ready || !mouse_buttons.just_pressed(MouseButton::Left) {
         return;
     }
 

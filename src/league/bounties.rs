@@ -23,19 +23,19 @@ pub const BOUNTIES: &[BountyDef] = &[
         id: BountyId::Attendees5,
         label: "5 Attendees",
         description: "Have at least 5 people attend a race",
-        reward: 50.0,
+        reward: 25.0,
     },
     BountyDef {
         id: BountyId::Attendees10,
         label: "10 Attendees",
         description: "Have at least 10 people attend a race",
-        reward: 100.0,
+        reward: 50.0,
     },
     BountyDef {
         id: BountyId::Attendees25,
         label: "25 Attendees",
         description: "Have at least 25 people attend a race",
-        reward: 200.0,
+        reward: 100.0,
     },
     BountyDef {
         id: BountyId::FirstFan,

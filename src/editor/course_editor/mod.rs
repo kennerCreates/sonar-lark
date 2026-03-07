@@ -150,6 +150,7 @@ impl Plugin for CourseEditorPlugin {
                 (
                     drag_placement::begin_drag_on_palette_press,
                     drag_placement::begin_drag_on_inventory_press,
+                    drag_placement::arm_drag_placement,
                     drag_placement::update_ghost_position,
                     drag_placement::cancel_drag_on_escape,
                 )
