@@ -784,10 +784,10 @@ fn tier_label(tier: FanTier) -> &'static str {
 
 fn tier_color(tier: FanTier) -> Color {
     match tier {
-        FanTier::Aware => palette::STONE,
-        FanTier::Attendee => palette::SIDEWALK,
-        FanTier::Fan => palette::SEA_FOAM,
-        FanTier::Superfan => palette::LIMON,
+        FanTier::Aware => palette::FROG,
+        FanTier::Attendee => palette::SUNSHINE,
+        FanTier::Fan => palette::TANGERINE,
+        FanTier::Superfan => palette::NEON_RED,
     }
 }
 
