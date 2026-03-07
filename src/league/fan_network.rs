@@ -150,17 +150,28 @@ pub fn simulate_race(
             prob += inputs.marketing.aware_attendance_nudge;
         }
 
-        // Price sensitivity: higher tiers tolerate higher prices, high hype mitigates cost.
-        // Each dollar reduces attendance prob, scaled by (1 - hype * 0.7).
-        if inputs.ticket_price > 0 {
-            let sensitivity = match person.tier {
-                FanTier::Aware => 0.04,
-                FanTier::Attendee => 0.03,
-                FanTier::Fan => 0.02,
+        // Three-tier pricing:
+        // - Free ($0): bonus to attendance (people love free events)
+        // - $1-5: neutral (no effect)
+        // - $5+: soft-cap penalty that plateaus (die-hard fans still show up)
+        if inputs.ticket_price == 0 {
+            let free_bonus = match person.tier {
+                FanTier::Aware => 0.15,
+                FanTier::Attendee => 0.08,
+                FanTier::Fan => 0.03,
                 FanTier::Superfan => 0.01,
             };
+            prob += free_bonus;
+        } else if inputs.ticket_price > 5 {
+            let overage = (inputs.ticket_price - 5) as f32;
+            let max_penalty = match person.tier {
+                FanTier::Aware => 0.30,
+                FanTier::Attendee => 0.25,
+                FanTier::Fan => 0.15,
+                FanTier::Superfan => 0.08,
+            };
             let price_penalty =
-                inputs.ticket_price as f32 * sensitivity * (1.0 - hype * 0.7);
+                max_penalty * (1.0 - (-overage * 0.12).exp()) * (1.0 - hype * 0.7);
             prob -= price_penalty;
         }
 
@@ -293,8 +304,9 @@ pub fn simulate_race(
             FanTier::Superfan => 0.35,
             FanTier::Aware => unreachable!(),
         };
+        let free_event_mult = if inputs.ticket_price == 0 { 1.3 } else { 1.0 };
         let final_chance =
-            base_chance * inputs.marketing.spread_potency_mult * (0.5 + excitement);
+            base_chance * inputs.marketing.spread_potency_mult * free_event_mult * (0.5 + excitement);
 
         for roll_idx in 0..roll_count {
             let roll = det_f32(inputs.seed, spreader_id, 1000 + roll_idx);
@@ -925,6 +937,154 @@ mod tests {
             demand_gap_low_hype > demand_gap_high_hype,
             "Price penalty should hurt more at low hype: low_hype_gap={}, high_hype_gap={}",
             demand_gap_low_hype, demand_gap_high_hype
+        );
+    }
+
+    #[test]
+    fn test_free_entry_boosts_attendance_over_neutral() {
+        // Free ($0) should attract more than neutral ($3) pricing
+        let make_net = || FanNetwork {
+            people: vec![
+                Person { id: 0, recruited_by: None, tier: FanTier::Aware, races_attended: 0, races_since_attended: 0, spread_count: 0 },
+                Person { id: 1, recruited_by: None, tier: FanTier::Attendee, races_attended: 2, races_since_attended: 0, spread_count: 0 },
+                Person { id: 2, recruited_by: None, tier: FanTier::Fan, races_attended: 5, races_since_attended: 0, spread_count: 0 },
+                Person { id: 3, recruited_by: None, tier: FanTier::Superfan, races_attended: 10, races_since_attended: 0, spread_count: 0 },
+            ],
+            next_id: 4,
+        };
+
+        let mut total_demand_free = 0u32;
+        let mut total_demand_neutral = 0u32;
+
+        for seed in 0..100 {
+            let mut net_free = make_net();
+            let mut net_neutral = make_net();
+
+            total_demand_free += simulate_race(&mut net_free, &RaceAttractionInputs {
+                track_quality: 0.5, location_attractiveness: 0.5, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 0, seed,
+            }).demand;
+            total_demand_neutral += simulate_race(&mut net_neutral, &RaceAttractionInputs {
+                track_quality: 0.5, location_attractiveness: 0.5, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 3, seed,
+            }).demand;
+        }
+
+        assert!(
+            total_demand_free > total_demand_neutral,
+            "Free entry should attract more than $3 neutral: free={}, neutral={}",
+            total_demand_free, total_demand_neutral
+        );
+    }
+
+    #[test]
+    fn test_neutral_pricing_no_penalty() {
+        // $1-5 should produce the same demand as each other (no bonus or penalty)
+        let make_net = || FanNetwork {
+            people: vec![
+                Person { id: 0, recruited_by: None, tier: FanTier::Aware, races_attended: 0, races_since_attended: 0, spread_count: 0 },
+                Person { id: 1, recruited_by: None, tier: FanTier::Attendee, races_attended: 2, races_since_attended: 0, spread_count: 0 },
+                Person { id: 2, recruited_by: None, tier: FanTier::Fan, races_attended: 5, races_since_attended: 0, spread_count: 0 },
+            ],
+            next_id: 3,
+        };
+
+        let mut total_demand_1 = 0u32;
+        let mut total_demand_5 = 0u32;
+
+        for seed in 0..100 {
+            let mut net_1 = make_net();
+            let mut net_5 = make_net();
+
+            total_demand_1 += simulate_race(&mut net_1, &RaceAttractionInputs {
+                track_quality: 0.5, location_attractiveness: 0.5, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 1, seed,
+            }).demand;
+            total_demand_5 += simulate_race(&mut net_5, &RaceAttractionInputs {
+                track_quality: 0.5, location_attractiveness: 0.5, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 5, seed,
+            }).demand;
+        }
+
+        assert_eq!(
+            total_demand_1, total_demand_5,
+            "$1 and $5 should produce identical demand (neutral zone): $1={}, $5={}",
+            total_demand_1, total_demand_5
+        );
+    }
+
+    #[test]
+    fn test_price_penalty_plateaus() {
+        // $50 ticket should not be dramatically worse than $20 (soft cap)
+        let make_net = || FanNetwork {
+            people: vec![
+                Person { id: 0, recruited_by: None, tier: FanTier::Aware, races_attended: 0, races_since_attended: 0, spread_count: 0 },
+                Person { id: 1, recruited_by: None, tier: FanTier::Attendee, races_attended: 2, races_since_attended: 0, spread_count: 0 },
+                Person { id: 2, recruited_by: None, tier: FanTier::Fan, races_attended: 5, races_since_attended: 0, spread_count: 0 },
+                Person { id: 3, recruited_by: None, tier: FanTier::Superfan, races_attended: 10, races_since_attended: 0, spread_count: 0 },
+            ],
+            next_id: 4,
+        };
+
+        let mut total_demand_20 = 0u32;
+        let mut total_demand_50 = 0u32;
+
+        for seed in 0..100 {
+            let mut net_20 = make_net();
+            let mut net_50 = make_net();
+
+            total_demand_20 += simulate_race(&mut net_20, &RaceAttractionInputs {
+                track_quality: 0.5, location_attractiveness: 0.5, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 20, seed,
+            }).demand;
+            total_demand_50 += simulate_race(&mut net_50, &RaceAttractionInputs {
+                track_quality: 0.5, location_attractiveness: 0.5, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 50, seed,
+            }).demand;
+        }
+
+        // The gap between $20 and $50 should be small relative to total demand,
+        // proving the penalty plateaus rather than growing linearly.
+        let gap = total_demand_20.saturating_sub(total_demand_50);
+        assert!(
+            gap <= total_demand_20 / 10,
+            "Penalty should plateau: $20 demand={}, $50 demand={}, gap={} (should be <={})",
+            total_demand_20, total_demand_50, gap, total_demand_20 / 10
+        );
+    }
+
+    #[test]
+    fn test_free_entry_boosts_spread() {
+        let make_net = || FanNetwork {
+            people: vec![
+                Person { id: 0, recruited_by: None, tier: FanTier::Attendee, races_attended: 2, races_since_attended: 0, spread_count: 0 },
+                Person { id: 1, recruited_by: None, tier: FanTier::Fan, races_attended: 5, races_since_attended: 0, spread_count: 0 },
+                Person { id: 2, recruited_by: None, tier: FanTier::Superfan, races_attended: 10, races_since_attended: 0, spread_count: 0 },
+            ],
+            next_id: 3,
+        };
+
+        let mut total_spread_free = 0u32;
+        let mut total_spread_paid = 0u32;
+
+        for seed in 0..200 {
+            let mut net_free = make_net();
+            let mut net_paid = make_net();
+
+            total_spread_free += simulate_race(&mut net_free, &RaceAttractionInputs {
+                track_quality: 0.5, location_attractiveness: 0.5, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 0, seed,
+            }).new_aware_from_spread;
+            total_spread_paid += simulate_race(&mut net_paid, &RaceAttractionInputs {
+                track_quality: 0.5, location_attractiveness: 0.5, capacity: 1000,
+                marketing: default_marketing(), ticket_price: 3, seed,
+            }).new_aware_from_spread;
+        }
+
+        assert!(
+            total_spread_free > total_spread_paid,
+            "Free events should generate more word-of-mouth: free={}, paid={}",
+            total_spread_free, total_spread_paid
         );
     }
 }
