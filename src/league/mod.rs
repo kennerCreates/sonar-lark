@@ -27,6 +27,9 @@ pub struct LeagueState {
     /// Bounties that have already been claimed (one-time only).
     #[serde(default)]
     pub claimed_bounties: Vec<bounties::BountyId>,
+    /// Number of races the player has completed.
+    #[serde(default)]
+    pub races_completed: u32,
 }
 
 impl Default for LeagueState {
@@ -37,6 +40,7 @@ impl Default for LeagueState {
             campaign_budgets: CampaignBudgets::default(),
             ticket_price: 0,
             claimed_bounties: Vec::new(),
+            races_completed: 0,
         }
     }
 }
@@ -96,6 +100,7 @@ fn simulate_fans_on_results(
     // Ticket revenue
     let ticket_revenue = result.actual_attendance as f32 * league.ticket_price as f32;
     league.money += ticket_revenue;
+    league.races_completed += 1;
 
     info!(
         "Fan simulation: {} attended ({} demand), network={}, fans={}, +${:.0}",

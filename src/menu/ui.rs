@@ -160,9 +160,12 @@ fn spawn_location_select(
                     ..default()
                 })
                 .with_children(|row| {
+                    let races_completed = league.map_or(0, |l| l.races_completed);
                     for (i, loc) in registry.locations.iter().enumerate() {
-                        let can_afford = money >= loc.rental_fee;
-                        spawn_location_card(row, i, &loc.name, loc.rental_fee, can_afford, &ui_font2);
+                        let locked = loc.name == "Golf Course" && races_completed == 0;
+                        let can_afford = !locked && money >= loc.rental_fee;
+                        let label_override = if locked { Some("LOCKED") } else { None };
+                        spawn_location_card(row, i, &loc.name, loc.rental_fee, can_afford, label_override, &ui_font2);
                     }
                 });
         });
@@ -174,10 +177,13 @@ fn spawn_location_card(
     name: &str,
     rental_fee: f32,
     can_afford: bool,
+    label_override: Option<&str>,
     font: &Handle<Font>,
 ) {
     let ui_font = font.clone();
-    let fee_label = if rental_fee == 0.0 {
+    let fee_label = if let Some(label) = label_override {
+        label.to_string()
+    } else if rental_fee == 0.0 {
         "FREE".to_string()
     } else {
         format!("${:.0}", rental_fee)
